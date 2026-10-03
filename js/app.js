@@ -1,5 +1,6 @@
 import {createTrack,watch,fitPace,WINDOW} from './gps.js';
-import {fmt,segAt,timeAt,band,hysteresis} from './pacing.js';
+import {fmt,segAt,timeAt,band,hysteresis,perKm} from './pacing.js';
+import {kmPaces,renderChart} from './chart.js';
 import {createMatcher} from './match.js';
 import {initSetup,selected,ICON,NAME} from './setup.js';
 import {SIM,SPEED,now,every,sim,simWatch} from './sim.js';
@@ -7,7 +8,7 @@ import {SIM,SPEED,now,every,sim,simWatch} from './sim.js';
 // State: running flag, banked ms, segment start, watch id, wake lock, draw tick
 let run=false,acc=0,t0=0,wid=null,lock=null,tick=0;
 const track=createTrack();
-// Route mode: active = {route,plan,pace,S,amber} from Setup (null = free run), matcher,
+// Route mode: active = {route,plan,pace,S,amber,kmT} from Setup (null = free run; kmT = per-km targets), matcher,
 // route distance, km split times by route distance, recent {t,d} by route distance, colour hysteresis
 let active=null,matcher=null,rd=0,rsplits=[],rpts=[],hyst=hysteresis(2);
 const ROUTE_WINDOW=20000,ROUTE_EVERY=2; // route mode: 20 s rolling pace (fitted, route distance), a reading every 2 s
@@ -44,6 +45,10 @@ function drawRoute(t){
   $('dlab').textContent=Math.abs(dl)<0.5?'On plan':dl>0?'Behind plan':'Ahead of plan';
   $('dl').textContent=(dl>=0.5?'+':dl<=-0.5?'−':'')+fmt(Math.abs(dl));
   $('ckm').textContent=pace((t-(rsplits.at(-1)||0))/1000,(rd-rsplits.length*1000)/1000);
+  if(!$('run').hidden){
+    const paces=kmPaces(rsplits,t,rd);
+    renderChart($('chart'),{targets:active.kmT,paces,live:paces.length>rsplits.length,S:active.S,amber:active.amber});
+  }
 }
 
 function draw(){
@@ -102,9 +107,10 @@ const show=id=>{$('setup').hidden=id!=='setup';$('run').hidden=id!=='run';scroll
 initSetup({onStart:sel=>{
   const same=(sel?.route.id)===(active?.route.id);
   if(!same&&acc>0&&!confirm('Discard the current run and start a new one?'))return;
-  active=sel;
+  active=sel&&{...sel,kmT:perKm(sel.plan.segs).map(k=>k.target)};
   if(!same)resetRun();
-  $('rt').hidden=!active;
+  $('rt').hidden=$('chart').hidden=!active;
+  if(active)$('chkey').textContent=`▲ faster · band ±${active.S} s`;
   $('rlabel').textContent=(SIM?`SIM ${SPEED}× · `:'')+(active?`${active.route.name} · target ${fmt(active.pace)} /km · ±${active.S} s`:'');
   show('run');draw();
 }});

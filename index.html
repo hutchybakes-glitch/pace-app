@@ -61,6 +61,10 @@
     <div><div class="l">Km</div><div class="mid" id="km">0.00</div></div>
   </div>
   <div class="row"><button id="go">Start</button><button id="rs">Reset</button></div>
+  <div id="chart" hidden>
+    <div class="ch-head"><span>Pace per km</span><span id="chkey">▲ faster · band ±5</span></div>
+    <div class="ch-body"><svg class="ch-y" aria-hidden="true"></svg><div class="ch-scroll"><svg class="ch-bars" role="img" aria-label="Pace per km against target band"></svg></div></div>
+  </div>
   <div id="gps">GPS: off</div>
   <div id="rlabel"></div>
   <div id="sp"></div>

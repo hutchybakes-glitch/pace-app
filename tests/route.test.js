@@ -77,3 +77,18 @@ test('segment: hilly noisy 10 km gives 5–15 segments, none shorter than the mi
 test('segment: route shorter than the minimum is a single segment',()=>{
   assert.equal(analyse(line(200,d=>d*0.1)).segs.length,1);
 });
+
+test('parseGPX: waypoint and point names are not taken as the route name',()=>{
+  const g=parseGPX('<gpx><metadata><desc>x</desc></metadata><wpt lat="1" lon="1"><name>Turn left</name></wpt><trk><name>My Race</name><trkseg><trkpt lat="1" lon="1"><name>p1</name></trkpt><trkpt lat="1.1" lon="1"/></trkseg></trk></gpx>');
+  assert.equal(g.name,'My Race');assert.equal(g.pts.length,2);
+});
+
+test('real route: Ribble Valley 10k (plotaroute GPX)',async()=>{
+  const fs=await import('node:fs');
+  const g=parseGPX(fs.readFileSync(new URL('./fixtures/ribble-valley-10k-2023.gpx',import.meta.url),'utf8'));
+  assert.equal(g.name,'Ribble Valley 10k Road Race 2023');
+  const {dist,segs}=analyse(resample(g.pts));
+  assert.ok(Math.abs(dist-10000)<150,`distance ${dist}`);
+  assert.ok(segs.length>=5&&segs.length<=15,`got ${segs.length}`);
+  segs.forEach(x=>assert.ok(x.len>=DEF.minLen));
+});

@@ -9,7 +9,9 @@ const ent=s=>s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').
 
 // Returns {name, pts:[{lat,lon,ele|null}]}. Uses trkpt if present, else rtept.
 export function parseGPX(xml){
-  const nm=xml.match(/<name>\s*(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?\s*<\/name>/);
+  // Route name: first <name> outside waypoints and points (those are cue names like "Turn left")
+  const outer=xml.replace(/<(wpt|trkpt|rtept)\b[^>]*?(?:\/>|>[\s\S]*?<\/\1\s*>)/g,'');
+  const nm=outer.match(/<name>\s*(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?\s*<\/name>/);
   const read=tag=>{
     const out=[],re=new RegExp(String.raw`<${tag}\b([^>]*?)(?:\/>|>([\s\S]*?)<\/${tag}\s*>)`,'g');let m;
     while((m=re.exec(xml))){

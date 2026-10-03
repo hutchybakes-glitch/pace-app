@@ -1,0 +1,9 @@
+body{margin:0;background:#000;color:#fff;font-family:-apple-system,system-ui,sans-serif;text-align:center;padding:calc(env(safe-area-inset-top) + 8px) 16px 24px}
+.l{font-size:13px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-top:18px}
+.big{font-size:92px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.mid{font-size:44px;font-weight:600;font-variant-numeric:tabular-nums}
+.row{display:flex;justify-content:space-around;gap:12px}
+button{font-size:22px;font-weight:600;padding:20px 0;flex:1;border:0;border-radius:16px;margin-top:26px;color:#fff}
+#go{background:#1a7f37}#rs{background:#333}
+#gps{font-size:13px;color:#888;margin-top:12px}
+#sp{font-size:17px;color:#ccc;margin:14px auto 0;max-width:280px;text-align:left;font-variant-numeric:tabular-nums}

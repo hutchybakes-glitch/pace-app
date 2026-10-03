@@ -1,11 +1,9 @@
 // Setup screen: load/select saved routes, route map, elevation profile, target pace and segment list.
-import {parseGPX,resample,fillElevation,analyse} from './route.js';
+import {parseGPX,resample,fillElevation,analyse,SEGCOL as COL,ICON,NAME} from './route.js';
 import {plan,fmt,parseTime} from './pacing.js';
 import {saveRoute,listRoutes,deleteRoute} from './storage.js';
 
 const $=id=>document.getElementById(id);
-const COL={up:'#e07a2e',down:'#3b82f6',flat:'#6b7280'};
-export const ICON={up:'▲',down:'▼',flat:'▬'},NAME={up:'Climb',down:'Descent',flat:'Flat'};
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const ok=p=>p>=120&&p<1800; // 2:00–30:00 /km

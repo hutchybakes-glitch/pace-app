@@ -5,6 +5,9 @@ import {hav} from './gps.js';
 // step/smooth/minLen in metres, up/down grade thresholds in %
 export const DEF={step:10,smooth:60,up:2,down:-2,minLen:250};
 
+// Segment classes for display
+export const SEGCOL={up:'#e07a2e',down:'#3b82f6',flat:'#6b7280'},ICON={up:'▲',down:'▼',flat:'▬'},NAME={up:'Climb',down:'Descent',flat:'Flat'};
+
 const ent=s=>s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&');
 
 // Returns {name, pts:[{lat,lon,ele|null}]}. Uses trkpt if present, else rtept.

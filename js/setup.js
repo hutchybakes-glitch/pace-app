@@ -2,6 +2,7 @@
 import {parseGPX,resample,fillElevation,analyse,SEGCOL as COL,ICON,NAME} from './route.js';
 import {plan,fmt,parseTime} from './pacing.js';
 import {saveRoute,listRoutes,deleteRoute} from './storage.js';
+import {settings,routeOpts,coef} from './settings.js';
 
 const $=id=>document.getElementById(id);
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
@@ -10,24 +11,25 @@ const ok=p=>p>=120&&p<1800; // 2:00–30:00 /km
 
 let routes=[],cur=null;               // cur = {route, a: analysis, p: plan}
 let pace=parseTime(ls.get('pace')||'')||300;
-let S=+ls.get('sens')||5,amber=ls.get('amber')==='1'; // colour band ± s/km, amber band on/off
 
 const msg=(t,err)=>{$('msg').textContent=t;$('msg').className=err?'err':''};
 
-export function initSetup({onStart}){
+export function initSetup({onStart,onSettings}){
   $('gpx').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)load(f)};
   $('tp').onchange=()=>setPace(parseTime($('tp').value),'tp');
   $('tf').onchange=()=>setPace(parseTime($('tf').value)/(cur.a.dist/1000),'tf');
-  $('sens').value=S;$('amber').checked=amber;
-  $('sens').onchange=()=>{const v=+$('sens').value;if(v>=1&&v<=60){S=v;ls.set('sens',v);$('sens').classList.remove('bad')}else $('sens').classList.add('bad')};
-  $('amber').onchange=()=>{amber=$('amber').checked;ls.set('amber',amber?'1':'0')};
   $('free').onclick=()=>onStart(null);
-  $('startr').onclick=()=>onStart({route:cur.route,analysis:cur.a,plan:cur.p,pace,S,amber});
+  $('fbset').onclick=onSettings;
+  $('startr').onclick=()=>{const s=settings();onStart({route:cur.route,analysis:cur.a,plan:cur.p,pace,S:s.S,amber:s.amber,speed:s.speed})};
   refresh().catch(e=>msg('Could not open saved routes: '+e.message,true));
 }
 
 // The route currently shown on Setup (sim mode replays it even for a free run)
 export const selected=()=>cur&&{route:cur.route,plan:cur.p};
+
+// Re-analyse the selected route after a settings change
+export const refreshRoute=()=>{if(cur)select(cur.route);else render()};
+export const routePreview=()=>cur?`${cur.a.segs.length} segments on ${cur.route.name} with these settings`:'';
 
 function setPace(p,id){
   if(!ok(p)){$(id).classList.add('bad');return}
@@ -57,13 +59,13 @@ async function refresh(){
 }
 
 function select(r){
-  cur=r?{route:r,a:analyse(r.pts)}:null;
+  cur=r?{route:r,a:analyse(r.pts,routeOpts(settings()))}:null;
   if(r)ls.set('route',r.id);
   render();
 }
 
 function render(){
-  $('routes').innerHTML=routes.map(r=>`<li class="${cur?.route.id===r.id?'on':''}"><button class="sel" data-id="${r.id}">${esc(r.name)}<span class="meta">${(r.pts.at(-1).d/1000).toFixed(2)} km · ${new Date(r.created).toLocaleDateString()}</span></button><button class="del" data-id="${r.id}" aria-label="Delete ${esc(r.name)}">✕</button></li>`).join('');
+  $('routes').innerHTML=routes.map(r=>`<li class="${cur?.route.id===r.id?'on':''}"><button class="sel" data-id="${r.id}">${esc(r.name)}<span class="meta">${(r.pts.at(-1).d/1000).toFixed(2)} km · added ${new Date(r.created).toLocaleDateString()}</span></button><button class="del" data-id="${r.id}" aria-label="Delete ${esc(r.name)}">✕</button></li>`).join('');
   $('routes').querySelectorAll('.sel').forEach(b=>b.onclick=()=>select(routes.find(r=>r.id===+b.dataset.id)));
   $('routes').querySelectorAll('.del').forEach(b=>b.onclick=async()=>{
     const r=routes.find(r=>r.id===+b.dataset.id);
@@ -73,11 +75,14 @@ function render(){
   });
   $('rv').hidden=!cur;
   if(!cur)return;
-  const {route,a}=cur,p=cur.p=plan(a.segs,pace);
+  const s=settings(),{route,a}=cur,p=cur.p=plan(a.segs,pace,coef(s));
   $('rname').textContent=route.name;
-  $('rstats').textContent=`${(a.dist/1000).toFixed(2)} km · ↑${Math.round(a.gain)} m ↓${Math.round(a.loss)} m · ${a.segs.length} segments · elevation from ${route.src}`;
+  const n={up:0,down:0,flat:0};a.segs.forEach(x=>n[x.cls]++);
+  $('rstats').innerHTML=[`${(a.dist/1000).toFixed(2)} km`,`↑${Math.round(a.gain)} m ↓${Math.round(a.loss)} m`,
+    `${a.segs.length} segments`,`${n.up} ▲ · ${n.flat} ▬ · ${n.down} ▼`,`elevation: ${route.src}`].map(t=>`<span>${esc(t)}</span>`).join('');
   $('tp').value=fmt(pace);$('tf').value=fmt(p.T);$('tp').classList.remove('bad');$('tf').classList.remove('bad');
-  $('rbase').textContent=`Even-effort flat pace ${fmt(p.base)} /km`;
+  $('rbase').textContent=`Flat pace for even effort: ${fmt(p.base)} /km`;
+  $('fbsum').textContent=`Colour band ±${s.S} s/km · amber ${s.amber?'on':'off'} · pace from ${s.speed?'GPS speed':'position'}`;
   drawMap(route.pts,a.segs);
   drawProfile(route.pts,a);
   $('segs').innerHTML='<tr><th>Segment</th><th>From km</th><th>Length</th><th>Grade</th><th>Target</th></tr>'+
@@ -93,7 +98,8 @@ function drawMap(pts,segs){
   const dot=(q,fill)=>`<circle cx="${X(q)}" cy="${Y(q)}" r="${r}" fill="${fill}" stroke="#000" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
   const svg=$('rmap');
   svg.setAttribute('viewBox',`${-pad} ${-pad} ${w+2*pad} ${h+2*pad}`);
-  svg.innerHTML=segs.map(x=>`<polyline points="${xy.slice(x.i0,x.i1+1).map(q=>X(q)+','+Y(q)).join(' ')}" fill="none" stroke="${COL[x.cls]}" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`).join('')+
+  svg.innerHTML=`<polyline points="${xy.map(q=>X(q)+','+Y(q)).join(' ')}" fill="none" stroke="#fff" stroke-opacity=".08" stroke-width="12" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`+
+    segs.map(x=>`<polyline points="${xy.slice(x.i0,x.i1+1).map(q=>X(q)+','+Y(q)).join(' ')}" fill="none" stroke="${COL[x.cls]}" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`).join('')+
     dot(xy.at(-1),'#fff')+dot(xy[0],'#22c55e');
 }
 
@@ -102,7 +108,7 @@ function drawProfile(pts,a){
   const W=1000,H=160,lo0=Math.min(...a.es),hi0=Math.max(...a.es),m=Math.max(10,(hi0-lo0)*0.1);
   const lo=lo0-m,hi=hi0+m,X=d=>(d/a.dist*W).toFixed(1),Y=e=>(H-(e-lo)/(hi-lo)*H).toFixed(1);
   let s='';
-  for(let km=1000;km<a.dist;km+=1000)s+=`<line x1="${X(km)}" x2="${X(km)}" y1="0" y2="${H}" stroke="#fff" stroke-opacity=".15" vector-effect="non-scaling-stroke"/>`;
+  for(let km=1000;km<a.dist;km+=1000)s+=`<line x1="${X(km)}" x2="${X(km)}" y1="0" y2="${H}" stroke="#fff" stroke-opacity=".12" vector-effect="non-scaling-stroke"/>`;
   s+=a.segs.map(x=>{let q=`${X(x.d0)},${H} `;for(let i=x.i0;i<=x.i1;i++)q+=`${X(pts[i].d)},${Y(a.es[i])} `;return `<polygon points="${q}${X(x.d1)},${H}" fill="${COL[x.cls]}" fill-opacity=".85"/>`}).join('');
   s+=`<polyline points="${a.es.map((e,i)=>`${X(pts[i].d)},${Y(e)}`).join(' ')}" fill="none" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
   $('prof').innerHTML=s;

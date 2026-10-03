@@ -42,4 +42,11 @@ export function fitPace(pts){
   return v>1000/1800?1000/v:null;
 }
 
+// Pace (s/km) from the mean of GPS-reported speeds over pts [{t ms, v m/s}]; same rules as fitPace
+export function speedPace(pts){
+  if(pts.length<3||pts.at(-1).t-pts[0].t<10000)return null;
+  const v=pts.reduce((a,p)=>a+p.v,0)/pts.length;
+  return v>1000/1800?1000/v:null;
+}
+
 export const watch=(onPos,onErr)=>navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:0});

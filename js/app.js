@@ -1,9 +1,10 @@
-import {createTrack,watch,fitPace,WINDOW} from './gps.js';
+import {createTrack,watch,fitPace,speedPace,WINDOW} from './gps.js';
 import {fmt,segAt,timeAt,band,hysteresis,perKm} from './pacing.js';
 import {kmPaces,renderChart} from './chart.js';
 import {createMatcher} from './match.js';
-import {initSetup,selected} from './setup.js';
-import {ICON,NAME} from './route.js';
+import {initSetup,selected,refreshRoute,routePreview} from './setup.js';
+import {ICON,NAME,SEGCOL,analyse} from './route.js';
+import {initSettings,settings,routeOpts} from './settings.js';
 import {initHistory,refreshHistory,settlePending,showRun} from './history.js';
 import {saveRun,deleteRun} from './storage.js';
 import {I,worthKeeping} from './record.js';
@@ -12,9 +13,10 @@ import {SIM,SPEED,now,every,sim,simWatch} from './sim.js';
 // State: running flag, banked ms, segment start, watch id, wake lock, draw tick
 let run=false,acc=0,t0=0,wid=null,lock=null,tick=0;
 const track=createTrack();
-// Route mode: active = {route,plan,pace,S,amber,kmT} from Setup (null = free run; kmT = per-km targets), matcher,
-// route distance, km split times by route distance, recent {t,d} by route distance, colour hysteresis
-let active=null,matcher=null,rd=0,rsplits=[],rpts=[],hyst=hysteresis(2);
+// Route mode: active = {route,plan,pace,S,amber,speed,kmT} from Setup (null = free run; kmT = per-km targets;
+// speed = current pace from GPS speed), matcher, route distance, km split times by route distance,
+// recent {t,d} by route distance, recent {t,v} GPS speeds, colour hysteresis
+let active=null,matcher=null,rd=0,rsplits=[],rpts=[],spts=[],hyst=hysteresis(2);
 // Recording: rec = run record being written (see record.js), dirty = unsaved fixes, saving = save queue
 let rec=null,dirty=false,saving=Promise.resolve();
 const ROUTE_WINDOW=20000,ROUTE_EVERY=2; // route mode: 20 s rolling pace (fitted, route distance), a reading every 2 s
@@ -35,8 +37,8 @@ function onPos(p){
     while(rd>=(rsplits.length+1)*1000)rsplits.push(t); // km split times by route distance
     $('off').hidden=!m.off;
     $('off').textContent=(m.matched?'Off route':'Not on route yet')+' · using GPS distance';
-    rpts=rpts.filter(q=>t-q.t<=ROUTE_WINDOW);
-    seg=segAt(active.plan.segs,rd);tgt=active.plan.segs[seg].target;cur=fitPace(rpts);
+    if(c.speed!=null&&c.speed>=0)spts.push({t,v:c.speed});
+    seg=segAt(active.plan.segs,rd);tgt=active.plan.segs[seg].target;cur=routePace(t);
     b=cur?band(cur,tgt,active.S,active.amber):null;
   }else{
     const o=track.pts.find(q=>t-q.t<=WINDOW),dd=o?track.dist-o.d:0;
@@ -44,6 +46,22 @@ function onPos(p){
   }
   rec.fixes.push([p.timestamp,t,c.latitude,c.longitude,c.accuracy,track.dist,matcher?rd:null,seg,cur,tgt,b]);
   dirty=true;
+}
+
+// Route-mode current pace over the last 20 s: fitted on route distance, or mean GPS speed if chosen
+// (falls back to the fit when the device gives no speed)
+function routePace(t){
+  rpts=rpts.filter(q=>t-q.t<=ROUTE_WINDOW);spts=spts.filter(q=>t-q.t<=ROUTE_WINDOW);
+  return (active.speed&&speedPace(spts))||fitPace(rpts);
+}
+
+// Course strip: route profile coloured by segment; the part already run is dimmed
+function drawStrip(){
+  const pts=active.route.pts,es=analyse(pts,routeOpts(settings())).es,total=pts.at(-1).d,segs=active.plan.segs;
+  const lo=Math.min(...es),hi=Math.max(...es),span=Math.max(hi-lo,15);
+  const X=d=>(d/total*1000).toFixed(1),Y=e=>(38-(e-lo)/span*30).toFixed(1);
+  $('strip').innerHTML=segs.map(x=>{let q=`${X(x.d0)},40 `;for(let i=x.i0;i<=x.i1;i++)q+=`${X(pts[i].d)},${Y(es[i])} `;return `<polygon points="${q}${X(x.d1)},40" fill="${SEGCOL[x.cls]}"/>`}).join('')+
+    `<rect id="sdone" x="0" y="0" height="40" width="0" fill="#000" fill-opacity=".55"/><line id="spos" y1="0" y2="40" stroke="#fff" stroke-width="3" vector-effect="non-scaling-stroke"/>`;
 }
 
 // Background colour from current pace vs the current segment target; null = neutral
@@ -62,6 +80,8 @@ function drawRoute(t){
   $('dlab').textContent=Math.abs(dl)<0.5?'On plan':dl>0?'Behind plan':'Ahead of plan';
   $('dl').textContent=(dl>=0.5?'+':dl<=-0.5?'−':'')+fmt(Math.abs(dl));
   $('ckm').textContent=pace((t-(rsplits.at(-1)||0))/1000,(rd-rsplits.length*1000)/1000);
+  const x=(rd/active.route.pts.at(-1).d*1000).toFixed(1);
+  $('sdone')?.setAttribute('width',x);$('spos')?.setAttribute('x1',x);$('spos')?.setAttribute('x2',x);
   if(!$('run').hidden){
     const paces=kmPaces(rsplits,t,rd);
     renderChart($('chart'),{targets:active.kmT,paces,live:paces.length>rsplits.length,S:active.S,amber:active.amber});
@@ -75,8 +95,7 @@ function draw(){
   $('avg').textContent=pace(t/1000,km);
   if(tick++%(matcher?ROUTE_EVERY:5)===0){         // current pace every 5 s (free) / 2 s (route)
     if(matcher){
-      rpts=rpts.filter(p=>t-p.t<=ROUTE_WINDOW);
-      const cur=fitPace(rpts);
+      const cur=routePace(t);
       $('cur').textContent=cur?fmt(cur):'--:--';
       setStatus(run?cur:null);
     }else{
@@ -94,7 +113,7 @@ every(1000,draw);
 function newRecord(){
   rec={started:Date.now(),status:'active',sim:SIM,fixes:[],
     route:active?{id:active.route.id,name:active.route.name,src:active.route.src,pts:active.route.pts}:null,
-    segs:active?active.plan.segs:null,pace:active?.pace??null,S:active?.S??null,amber:active?.amber??null};
+    segs:active?active.plan.segs:null,pace:active?.pace??null,S:active?.S??null,amber:active?.amber??null,speed:active?.speed??false};
 }
 // Copy live state into the record
 function snapshot(){
@@ -130,7 +149,7 @@ const gpsErr=e=>$('gps').textContent='GPS error: '+e.message;
 
 function start(){
   if(!rec){newRecord();settlePending().catch(()=>{})}
-  run=true;t0=now();track.last=null;tick=0;rpts=[];sim.moving=true;
+  run=true;t0=now();track.last=null;tick=0;rpts=[];spts=[];sim.moving=true;
   if(wid===null)wid=SIM?simWatch(()=>active||selected(),onPos,gpsErr):watch(onPos,gpsErr);
   $('back').hidden=true;
   wake();$('go').textContent='Pause';$('go').style.background='#b35900';
@@ -143,7 +162,7 @@ function pause(){
 $('go').onclick=()=>run?pause():start();
 
 function resetRun(){
-  acc=0;tick=0;track.reset();rd=0;rsplits=[];rpts=[];rec=null;dirty=false;
+  acc=0;tick=0;track.reset();rd=0;rsplits=[];rpts=[];spts=[];rec=null;dirty=false;sim.restart=true;
   matcher=active?createMatcher(active.route.pts):null;
   neutral();$('off').hidden=true;
   $('go').textContent='Start';$('go').style.background='#1a7f37';$('cur').textContent='--:--';draw();
@@ -159,13 +178,13 @@ $('rs').onclick=async()=>{
 };
 
 // ---- Screens ----
-const show=id=>{$('setup').hidden=id!=='setup';$('run').hidden=id!=='run';scrollTo(0,0)};
+const show=id=>{for(const s of ['setup','settings','run'])$(s).hidden=s!==id;scrollTo(0,0)};
 function applyActive(){
   $('rt').hidden=$('chart').hidden=!active;
-  if(active)$('chkey').textContent=`▲ faster · band ±${active.S} s`;
-  $('rlabel').textContent=(SIM?`SIM ${SPEED}× · `:'')+(active?`${active.route.name} · target ${fmt(active.pace)} /km · ±${active.S} s`:'');
+  if(active){$('chkey').textContent=`▲ faster · band ±${active.S} s`;drawStrip()}
+  $('rlabel').textContent=(SIM?`SIM ${SPEED}× · `:'')+(active?`${active.route.name} · target ${fmt(active.pace)} /km · ±${active.S} s`+(active.speed?' · GPS speed':''):'');
 }
-initSetup({onStart:async sel=>{
+initSetup({onSettings:()=>openSettings(),onStart:async sel=>{
   const same=(sel?.route.id)===(active?.route.id);
   if(!same&&acc>0){
     if(!confirm('Finish and save the current run, and start a new one?'))return;
@@ -176,12 +195,16 @@ initSetup({onStart:async sel=>{
   applyActive();show('run');draw();
 }});
 $('back').onclick=()=>{if(!run){neutral();refreshHistory();show('setup')}};
+const fillSettings=initSettings({onChange:refreshRoute,preview:routePreview});
+function openSettings(){fillSettings();show('settings')}
+$('gear').onclick=openSettings;
+$('sback').onclick=()=>show('setup');
 if(SIM)document.querySelector('#setup h1').textContent='Pace · SIM';
 
 // Resume an unfinished run saved by an earlier session. If it was running and saved recently, the
 // clock is assumed to have kept going, and distance from the last fix to the next one counts.
 initHistory({currentId:()=>rec?.id,onResume:r=>{
-  active=r.route&&{route:r.route,plan:{segs:r.segs},pace:r.pace,S:r.S,amber:r.amber,kmT:perKm(r.segs).map(k=>k.target)};
+  active=r.route&&{route:r.route,plan:{segs:r.segs},pace:r.pace,S:r.S,amber:r.amber,speed:!!r.speed,kmT:perKm(r.segs).map(k=>k.target)};
   resetRun();
   rec=r;rd=r.rd;rsplits=[...r.rsplits];track.dist=r.dist;track.splits=[...r.splits];
   if(matcher)matcher.seed(r.rd,r.dist);

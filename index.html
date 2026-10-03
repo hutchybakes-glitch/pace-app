@@ -15,22 +15,25 @@
 </head>
 <body>
 <section id="setup">
-  <h1>Pace</h1>
+  <header class="top">
+    <div class="brand"><img src="icons/icon-192.png" alt=""><div><h1>Pace</h1><span>Gradient pacing</span></div></div>
+    <button id="gear" class="iconbtn" aria-label="Settings"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg></button>
+  </header>
   <div id="resume" class="card warn" hidden>
     <div class="h">Unfinished run</div>
     <div id="rsinfo"></div>
     <div class="bt3"><button id="rsgo" class="btn go">Resume</button><button id="rssave" class="btn">Save</button><button id="rsdel" class="btn">Discard</button></div>
   </div>
-  <button id="free" class="btn go">Free run</button>
+  <button id="free" class="btn go hero">Free run<small>No route · pace, distance and splits</small></button>
   <div class="card">
     <div class="h">Routes</div>
-    <label class="btn">Load GPX file<input type="file" id="gpx" hidden></label>
+    <label class="btn ghost">＋ Load GPX file<input type="file" id="gpx" hidden></label>
     <div id="msg"></div>
     <ul id="routes"></ul>
   </div>
   <div id="rv" class="card" hidden>
     <h2 id="rname"></h2>
-    <div id="rstats"></div>
+    <div id="rstats" class="chips"></div>
     <svg id="rmap" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Route outline"></svg>
     <svg id="prof" viewBox="0 0 1000 160" preserveAspectRatio="none" role="img" aria-label="Elevation profile"></svg>
     <div id="paxis" class="axis"></div>
@@ -40,12 +43,9 @@
       <label>Finish time<input id="tf" autocomplete="off" placeholder="45:00"></label>
     </div>
     <div id="rbase" class="sub"></div>
-    <div class="tg">
-      <label>Colour band ± s/km<input id="sens" inputmode="numeric" autocomplete="off"></label>
-      <label class="chk"><input type="checkbox" id="amber">Amber band (± to 2×)</label>
-    </div>
+    <button id="fbset" class="fb"><span id="fbsum"></span><b>Change ›</b></button>
     <table id="segs"></table>
-    <button id="startr" class="btn go">Run this route</button>
+    <button id="startr" class="btn go sticky">Run this route</button>
   </div>
   <div class="card">
     <div class="h">History</div>
@@ -53,6 +53,36 @@
     <ul id="runs"></ul>
   </div>
 </section>
+
+<section id="settings" hidden>
+  <header class="top"><button id="sback" class="linkbtn">‹ Back</button><h1>Settings</h1><span></span></header>
+  <div class="card">
+    <div class="h">Live feedback</div>
+    <label class="set"><span><b>Colour band</b><small>Green while your pace is within this of the target</small></span><span class="in">±<input id="s-S" inputmode="decimal" autocomplete="off"><em>s/km</em></span></label>
+    <label class="set"><span><b>Amber band</b><small>Amber from 1× to 2× the band before turning red</small></span><input type="checkbox" id="s-amber" class="switch"></label>
+    <div class="set col"><span><b>Current pace from</b><small>Position is the default. GPS speed (Doppler) is often steadier on iPhone. Worth comparing on the field test.</small></span>
+      <div class="seg2"><input type="radio" name="spd" id="s-speed-off"><label for="s-speed-off">Position</label><input type="radio" name="spd" id="s-speed-on"><label for="s-speed-on">GPS speed</label></div></div>
+  </div>
+  <div class="card">
+    <div class="h">Segments</div>
+    <label class="set"><span><b>Climb</b><small>Steeper than this uphill</small></span><span class="in"><input id="s-up" inputmode="decimal" autocomplete="off"><em>%</em></span></label>
+    <label class="set"><span><b>Descent</b><small>Steeper than this downhill</small></span><span class="in">−<input id="s-down" inputmode="decimal" autocomplete="off"><em>%</em></span></label>
+    <label class="set"><span><b>Shortest segment</b><small>Shorter pieces merge into a neighbour. Raise it for fewer, longer segments.</small></span><span class="in"><input id="s-minLen" inputmode="decimal" autocomplete="off"><em>m</em></span></label>
+    <label class="set"><span><b>Elevation smoothing</b><small>Window that irons out GPS/map noise</small></span><span class="in"><input id="s-smooth" inputmode="decimal" autocomplete="off"><em>m</em></span></label>
+    <div id="s-preview" class="sub"></div>
+  </div>
+  <div class="card">
+    <div class="h">Effort model</div>
+    <label class="set"><span><b>Uphill cost</b><small>Slower per 1 % of climb</small></span><span class="in"><input id="s-cUp" inputmode="decimal" autocomplete="off"><em>%</em></span></label>
+    <label class="set"><span><b>Downhill gain</b><small>Faster per 1 % of descent</small></span><span class="in"><input id="s-cDown" inputmode="decimal" autocomplete="off"><em>%</em></span></label>
+    <label class="set"><span><b>Braking from</b><small>Steeper than this, the downhill gain fades back to zero</small></span><span class="in">−<input id="s-taper" inputmode="decimal" autocomplete="off"><em>%</em></span></label>
+    <svg id="s-curve" viewBox="0 0 320 150" role="img" aria-label="Effort factor by gradient"></svg>
+    <div id="s-curve-note" class="sub"></div>
+  </div>
+  <button id="s-reset" class="btn ghost">Reset to defaults</button>
+  <p class="foot">Settings apply to routes on Setup and to new runs. A run in progress keeps the plan it started with.</p>
+</section>
+
 <section id="run" hidden>
   <button id="back" aria-label="Back to setup">‹ Setup</button>
   <div id="off" hidden></div>
@@ -60,6 +90,7 @@
   <div id="rt" hidden>
     <div class="tgt"><span id="tgt">--:--</span> <span id="seg"></span></div>
     <div id="nxt"></div>
+    <svg id="strip" viewBox="0 0 1000 40" preserveAspectRatio="none" role="img" aria-label="Course profile with your position"></svg>
     <div class="row">
       <div><div class="l">This km</div><div class="mid" id="ckm">--:--</div></div>
       <div><div class="l" id="dlab">Plan</div><div class="mid" id="dl">0:00</div></div>

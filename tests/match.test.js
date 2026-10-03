@@ -65,3 +65,9 @@ test('GPS gap: a jump within the window still matches',()=>{
   m.update(...at(0,100),100);
   near(m.update(...at(0,350),350).d,350);
 });
+
+test('seed: carries on from a saved position instead of searching from the start',()=>{
+  const m=createMatcher(route([[0,0],[0,1000],[8,1000],[8,0]]));
+  m.seed(1500,1500);
+  near(m.update(...at(8,480),1520).d,1528);   // return leg, not the outbound 480 m
+});

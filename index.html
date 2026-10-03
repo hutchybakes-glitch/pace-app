@@ -16,6 +16,11 @@
 <body>
 <section id="setup">
   <h1>Pace</h1>
+  <div id="resume" class="card warn" hidden>
+    <div class="h">Unfinished run</div>
+    <div id="rsinfo"></div>
+    <div class="bt3"><button id="rsgo" class="btn go">Resume</button><button id="rssave" class="btn">Save</button><button id="rsdel" class="btn">Discard</button></div>
+  </div>
   <button id="free" class="btn go">Free run</button>
   <div class="card">
     <div class="h">Routes</div>
@@ -42,6 +47,11 @@
     <table id="segs"></table>
     <button id="startr" class="btn go">Run this route</button>
   </div>
+  <div class="card">
+    <div class="h">History</div>
+    <div id="noruns" class="sub">No runs yet. Finished runs appear here.</div>
+    <ul id="runs"></ul>
+  </div>
 </section>
 <section id="run" hidden>
   <button id="back" aria-label="Back to setup">‹ Setup</button>
@@ -60,7 +70,7 @@
     <div><div class="l">Time</div><div class="mid" id="tm">0:00</div></div>
     <div><div class="l">Km</div><div class="mid" id="km">0.00</div></div>
   </div>
-  <div class="row"><button id="go">Start</button><button id="rs">Reset</button></div>
+  <div class="row"><button id="go">Start</button><button id="rs">Finish</button></div>
   <div id="chart" hidden>
     <div class="ch-head"><span>Pace per km</span><span id="chkey">▲ faster · band ±5</span></div>
     <div class="ch-body"><svg class="ch-y" aria-hidden="true"></svg><div class="ch-scroll"><svg class="ch-bars" role="img" aria-label="Pace per km against target band"></svg></div></div>

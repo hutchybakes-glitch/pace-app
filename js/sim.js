@@ -16,7 +16,7 @@ const T0=Date.now();
 export const now=()=>SIM?T0+(Date.now()-T0)*SPEED:Date.now();
 export const every=(ms,fn)=>setInterval(fn,ms/SPEED);
 
-export const sim={moving:false}; // set by the app on start/pause
+export const sim={moving:false,resumeAt:null}; // set by the app: start/pause, and route distance to resume from
 
 // Stand-in for gps.watch. getRun() → {route,plan} or null. Emits one fix per simulated second.
 export function simWatch(getRun,onPos,onErr){
@@ -26,7 +26,7 @@ export function simWatch(getRun,onPos,onErr){
   return setInterval(()=>{
     const t=now(),dt=(t-lastT)/1000,r=getRun();lastT=t;
     if(!r)return onErr({message:'Sim: select a route on the Setup screen first'});
-    if(r.route.pts!==pts){pts=r.route.pts;d=0;mt=0}
+    if(r.route.pts!==pts){pts=r.route.pts;d=sim.resumeAt||0;sim.resumeAt=null;mt=0}
     const total=pts.at(-1).d;
     if(sim.moving&&d<total){
       const ph=mt%240,mult=ph<30?0.85:ph>=120&&ph<150?1.15:1;

@@ -30,5 +30,7 @@ export function createMatcher(pts,o={}){
     else Object.assign(m,{d:Math.min(total,e),off:true,err:best?best.err:Infinity});
     return m;
   };
+  // Carry on from a known position (resuming a saved run): d = route distance, g = GPS distance then
+  m.seed=(d,g)=>{lastD=d;lastG=g;Object.assign(m,{d,off:false,err:0,matched:true})};
   return m;
 }

@@ -9,26 +9,37 @@ export function hav(a,b){const r=Math.PI/180,dLa=(b.lat-a.lat)*r,dLo=(b.lon-a.lo
 // Track state: metres, last GPS point, rolling points, km split times (elapsed ms)
 export function createTrack(){
   const s={dist:0,last:null,pts:[],splits:[]};
-  // c = coords, ts = fix timestamp, el = pause-aware elapsed ms now
+  // c = coords, ts = fix timestamp, el = pause-aware elapsed ms now. True if the fix was used.
   s.add=(c,ts,el)=>{
-    if(c.accuracy>25)return;                       // ignore poor fixes
+    if(c.accuracy>25)return false;                 // ignore poor fixes
     const q={lat:c.latitude,lon:c.longitude,t:ts};
-    if(!s.last){s.last=q;s.pts.push({t:el,d:s.dist});return}
+    if(!s.last){s.last=q;s.pts.push({t:el,d:s.dist});return true}
     const d=hav(s.last,q);
-    if(d<3)return;                                 // GPS jitter while standing
-    if(d/Math.max((q.t-s.last.t)/1000,1)>10){s.last=q;return} // >36 km/h = glitch
+    if(d<3)return false;                           // GPS jitter while standing
+    if(d/Math.max((q.t-s.last.t)/1000,1)>10){s.last=q;return false} // >36 km/h = glitch
     s.dist+=d;s.last=q;
     s.pts.push({t:el,d:s.dist});
     while(s.dist>=(s.splits.length+1)*1000)s.splits.push(el); // km split times
+    return true;
   };
-  // Drop points older than WINDOW; returns {sec,km} covered since the oldest kept point, or null
-  s.rolling=t=>{
-    s.pts=s.pts.filter(p=>t-p.t<=WINDOW);
+  // Drop points older than win ms; returns {sec,km} covered since the oldest kept point, or null
+  s.rolling=(t,win=WINDOW)=>{
+    s.pts=s.pts.filter(p=>t-p.t<=win);
     const o=s.pts[0];
     return o?{sec:(t-o.t)/1000,km:(s.dist-o.d)/1000}:null;
   };
   s.reset=()=>{s.dist=0;s.last=null;s.pts=[];s.splits=[]};
   return s;
+}
+
+// Pace (s/km) from a least-squares fit of distance against time over pts [{t ms, d m}].
+// Less jumpy than first-to-last point. Null if under 3 points, under 10 s, or slower than 30:00/km.
+export function fitPace(pts){
+  if(pts.length<3||pts.at(-1).t-pts[0].t<10000)return null;
+  const n=pts.length,tm=pts.reduce((a,p)=>a+p.t,0)/n,dm=pts.reduce((a,p)=>a+p.d,0)/n;
+  let sx=0,sy=0;for(const p of pts){sx+=(p.t-tm)*(p.d-dm);sy+=(p.t-tm)**2}
+  const v=sx/sy*1000; // m/s
+  return v>1000/1800?1000/v:null;
 }
 
 export const watch=(onPos,onErr)=>navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:0});

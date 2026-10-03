@@ -1,7 +1,7 @@
 // Offline cache. Network-first so a new Netlify deploy is picked up as soon as there's signal;
 // falls back to the cached copy when offline. Bump VERSION when the file list changes.
-const VERSION='pace-v2';
-const FILES=['./','index.html','css/app.css','js/app.js','js/gps.js','js/route.js','js/pacing.js','js/storage.js','js/setup.js','manifest.json','icons/icon-180.png','icons/icon-192.png','icons/icon-512.png'];
+const VERSION='pace-v3';
+const FILES=['./','index.html','css/app.css','js/app.js','js/gps.js','js/route.js','js/pacing.js','js/storage.js','js/setup.js','js/match.js','js/sim.js','manifest.json','icons/icon-180.png','icons/icon-192.png','icons/icon-512.png'];
 
 self.addEventListener('install',e=>{e.waitUntil(caches.open(VERSION).then(c=>c.addAll(FILES)));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==VERSION).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});

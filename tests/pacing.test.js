@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {effort,plan,perKm,fmt,parseTime} from '../js/pacing.js';
+import {effort,plan,perKm,fmt,parseTime,segAt,timeAt,band,hysteresis} from '../js/pacing.js';
 
 const seg=(d0,len,g)=>({d0,d1:d0+len,len,g});
 const close=(a,b,e=1e-6)=>assert.ok(Math.abs(a-b)<e,`${a} vs ${b}`);
@@ -37,4 +37,24 @@ test('parseTime / fmt',()=>{
   assert.equal(parseTime('1:35:00'),5700);assert.equal(parseTime('300'),300);
   for(const b of ['4:5','4:60','a','','1:2:3:4','4:'])assert.ok(Number.isNaN(parseTime(b)),b);
   assert.equal(fmt(270),'4:30');assert.equal(fmt(5700),'1:35:00');
+});
+
+test('segAt / timeAt: segment lookup and cumulative target time',()=>{
+  const segs=[{d0:0,d1:1000,target:300},{d0:1000,d1:1500,target:360},{d0:1500,d1:2500,target:240}];
+  assert.equal(segAt(segs,0),0);assert.equal(segAt(segs,999),0);assert.equal(segAt(segs,1000),1);assert.equal(segAt(segs,9999),2);
+  close(timeAt(segs,0),0);close(timeAt(segs,500),150);close(timeAt(segs,1250),390);close(timeAt(segs,2500),720);
+});
+
+test('band: green within S, optional amber to 2S, red beyond, both directions',()=>{
+  assert.equal(band(305,300,5,false),'green');assert.equal(band(295,300,5,false),'green');
+  assert.equal(band(308,300,5,false),'red');assert.equal(band(292,300,5,true),'amber');
+  assert.equal(band(311,300,5,true),'red');
+});
+
+test('hysteresis: changes only after 2 consecutive readings',()=>{
+  const h=hysteresis(2);
+  assert.equal(h('green'),null);assert.equal(h('green'),'green');
+  assert.equal(h('red'),'green');assert.equal(h('green'),'green');   // single flicker ignored
+  assert.equal(h('red'),'green');assert.equal(h('red'),'red');
+  assert.equal(h(null),'red');assert.equal(h(null),null);
 });

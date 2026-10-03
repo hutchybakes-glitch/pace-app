@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {hav,createTrack} from '../js/gps.js';
+import {hav,createTrack,fitPace} from '../js/gps.js';
 
 const fix=(lat,lon,accuracy=5)=>({latitude:lat,longitude:lon,accuracy});
 const M=1/111195; // degrees latitude per metre (R=6371 km)
@@ -30,4 +30,13 @@ test('track: km splits and rolling pace',()=>{
   assert.ok(r.sec<=30);
   tr.reset();
   assert.equal(tr.dist,0);assert.equal(tr.splits.length,0);
+});
+
+test('fitPace: steady pace recovered through noise; null when too little data or stopped',()=>{
+  const n=(i)=>[1.5,-1,0.5,-1.5,1][i%5];
+  const pts=[];for(let i=0;i<=20;i++)pts.push({t:i*1000,d:i*1000/300+n(i)}); // 5:00/km ± 1.5 m
+  assert.ok(Math.abs(fitPace(pts)-300)<12);
+  assert.equal(fitPace(pts.slice(0,2)),null);
+  assert.equal(fitPace(pts.slice(0,8)),null);              // under 10 s
+  assert.equal(fitPace(pts.map(p=>({t:p.t,d:5}))),null);   // standing still
 });

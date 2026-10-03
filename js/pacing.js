@@ -27,6 +27,30 @@ export function perKm(segs){
   return out;
 }
 
+// Index of the segment containing route distance d
+export const segAt=(segs,d)=>{let i=0;while(i<segs.length-1&&segs[i].d1<=d)i++;return i};
+
+// Cumulative target time (s) to reach route distance d
+export function timeAt(segs,d){
+  let t=0;
+  for(const x of segs){if(d<=x.d0)break;t+=(Math.min(d,x.d1)-x.d0)*x.target/1000}
+  return t;
+}
+
+// Status colour for current pace vs target, both s/km; S = sensitivity (s/km)
+export const band=(cur,target,S,amber)=>{const e=Math.abs(cur-target);return e<=S?'green':amber&&e<=2*S?'amber':'red'};
+
+// Returns f(reading) → shown value, which only changes after n consecutive identical readings
+export function hysteresis(n=2){
+  let shown=null,cand=null,c=0;
+  return v=>{
+    if(v===shown){cand=null;c=0}
+    else if(v===cand){if(++c>=n){shown=v;cand=null;c=0}}
+    else{cand=v;c=1;if(c>=n){shown=v;cand=null;c=0}}
+    return shown;
+  };
+}
+
 export const fmt=s=>{s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=String(s%60).padStart(2,'0');return h?`${h}:${String(m).padStart(2,'0')}:${x}`:`${m}:${x}`};
 
 // "4:30" → 270, "1:35:00" → 5700. A dot works as a colon ("4.30"). NaN if malformed.

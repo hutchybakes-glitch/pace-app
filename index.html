@@ -35,13 +35,26 @@
       <label>Finish time<input id="tf" autocomplete="off" placeholder="45:00"></label>
     </div>
     <div id="rbase" class="sub"></div>
+    <div class="tg">
+      <label>Colour band ± s/km<input id="sens" inputmode="numeric" autocomplete="off"></label>
+      <label class="chk"><input type="checkbox" id="amber">Amber band (± to 2×)</label>
+    </div>
     <table id="segs"></table>
     <button id="startr" class="btn go">Run this route</button>
   </div>
 </section>
 <section id="run" hidden>
   <button id="back" aria-label="Back to setup">‹ Setup</button>
+  <div id="off" hidden></div>
   <div class="l">Current pace /km</div><div class="big" id="cur">--:--</div>
+  <div id="rt" hidden>
+    <div class="tgt"><span id="tgt">--:--</span> <span id="seg"></span></div>
+    <div id="nxt"></div>
+    <div class="row">
+      <div><div class="l">This km</div><div class="mid" id="ckm">--:--</div></div>
+      <div><div class="l" id="dlab">Plan</div><div class="mid" id="dl">0:00</div></div>
+    </div>
+  </div>
   <div class="l">Average pace /km</div><div class="mid" id="avg">--:--</div>
   <div class="row">
     <div><div class="l">Time</div><div class="mid" id="tm">0:00</div></div>

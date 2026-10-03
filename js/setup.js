@@ -4,13 +4,15 @@ import {plan,fmt,parseTime} from './pacing.js';
 import {saveRoute,listRoutes,deleteRoute} from './storage.js';
 
 const $=id=>document.getElementById(id);
-const COL={up:'#e07a2e',down:'#3b82f6',flat:'#6b7280'},ICON={up:'▲',down:'▼',flat:'▬'},NAME={up:'Climb',down:'Descent',flat:'Flat'};
+const COL={up:'#e07a2e',down:'#3b82f6',flat:'#6b7280'};
+export const ICON={up:'▲',down:'▼',flat:'▬'},NAME={up:'Climb',down:'Descent',flat:'Flat'};
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const ok=p=>p>=120&&p<1800; // 2:00–30:00 /km
 
 let routes=[],cur=null;               // cur = {route, a: analysis, p: plan}
 let pace=parseTime(ls.get('pace')||'')||300;
+let S=+ls.get('sens')||5,amber=ls.get('amber')==='1'; // colour band ± s/km, amber band on/off
 
 const msg=(t,err)=>{$('msg').textContent=t;$('msg').className=err?'err':''};
 
@@ -18,10 +20,16 @@ export function initSetup({onStart}){
   $('gpx').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)load(f)};
   $('tp').onchange=()=>setPace(parseTime($('tp').value),'tp');
   $('tf').onchange=()=>setPace(parseTime($('tf').value)/(cur.a.dist/1000),'tf');
+  $('sens').value=S;$('amber').checked=amber;
+  $('sens').onchange=()=>{const v=+$('sens').value;if(v>=1&&v<=60){S=v;ls.set('sens',v);$('sens').classList.remove('bad')}else $('sens').classList.add('bad')};
+  $('amber').onchange=()=>{amber=$('amber').checked;ls.set('amber',amber?'1':'0')};
   $('free').onclick=()=>onStart(null);
-  $('startr').onclick=()=>onStart({route:cur.route,analysis:cur.a,plan:cur.p,pace});
+  $('startr').onclick=()=>onStart({route:cur.route,analysis:cur.a,plan:cur.p,pace,S,amber});
   refresh().catch(e=>msg('Could not open saved routes: '+e.message,true));
 }
+
+// The route currently shown on Setup (sim mode replays it even for a free run)
+export const selected=()=>cur&&{route:cur.route,plan:cur.p};
 
 function setPace(p,id){
   if(!ok(p)){$(id).classList.add('bad');return}

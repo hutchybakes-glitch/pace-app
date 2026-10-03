@@ -4,13 +4,13 @@
 import {DEF} from './route.js';
 import {COEF,effort} from './pacing.js';
 
-export const DEFAULTS={S:5,amber:false,speed:false,
+export const DEFAULTS={S:5,amber:false,speed:false,autoStart:true,zone:25,
   up:DEF.up,down:DEF.down,minLen:DEF.minLen,smooth:DEF.smooth,
   cUp:COEF.up,cDown:COEF.down,taper:COEF.taper};
 
 // Editable number fields as shown: pct = shown as % (stored /100), neg = shown positive (stored negative)
 export const FIELDS={
-  S:{min:1,max:60},up:{min:0.5,max:10},down:{min:0.5,max:10,neg:true},minLen:{min:50,max:2000},smooth:{min:20,max:300},
+  S:{min:1,max:60},zone:{min:10,max:100},up:{min:0.5,max:10},down:{min:0.5,max:10,neg:true},minLen:{min:50,max:2000},smooth:{min:20,max:300},
   cUp:{min:0,max:10,pct:true},cDown:{min:0,max:5,pct:true},taper:{min:2,max:30,neg:true},
 };
 // Shown text → stored value, or null if out of range
@@ -46,7 +46,7 @@ const $=id=>document.getElementById(id);
 export function initSettings({onChange,preview}){
   const fill=()=>{
     for(const k in FIELDS){$('s-'+k).value=showField(k,cur[k]);$('s-'+k).classList.remove('bad')}
-    $('s-amber').checked=cur.amber;
+    $('s-amber').checked=cur.amber;$('s-autoStart').checked=cur.autoStart;
     $('s-speed-'+(cur.speed?'on':'off')).checked=true;
     drawEffort();$('s-preview').textContent=preview();
   };
@@ -57,6 +57,7 @@ export function initSettings({onChange,preview}){
     e.target.classList.remove('bad');setSettings({[k]:v});changed();
   };
   $('s-amber').onchange=e=>{setSettings({amber:e.target.checked});changed()};
+  $('s-autoStart').onchange=e=>{setSettings({autoStart:e.target.checked});changed()};
   for(const id of ['s-speed-on','s-speed-off'])$(id).onchange=()=>{setSettings({speed:$('s-speed-on').checked});changed()};
   $('s-reset').onclick=()=>{if(!confirm('Reset all settings to defaults?'))return;setSettings({...DEFAULTS});fill();onChange()};
   fill();

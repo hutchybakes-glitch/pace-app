@@ -82,7 +82,7 @@ function render(){
     `${a.segs.length} segments`,`${n.up} ▲ · ${n.flat} ▬ · ${n.down} ▼`,`elevation: ${route.src}`].map(t=>`<span>${esc(t)}</span>`).join('');
   $('tp').value=fmt(pace);$('tf').value=fmt(p.T);$('tp').classList.remove('bad');$('tf').classList.remove('bad');
   $('rbase').textContent=`Flat pace for even effort: ${fmt(p.base)} /km`;
-  $('fbsum').textContent=`Colour band ±${s.S} s/km · amber ${s.amber?'on':'off'} · pace from ${s.speed?'GPS speed':'position'}`;
+  $('fbsum').textContent=`Colour band ±${s.S} s/km · amber ${s.amber?'on':'off'} · pace from ${s.speed?'GPS speed':'position'} · ${s.autoStart?`starts at the line (${s.zone} m zone)`:'starts on tap'}`;
   drawMap(route.pts,a.segs);
   drawProfile(route.pts,a);
   $('segs').innerHTML='<tr><th>Segment</th><th>From km</th><th>Length</th><th>Grade</th><th>Target</th></tr>'+

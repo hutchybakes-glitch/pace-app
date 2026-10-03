@@ -9,6 +9,7 @@ import {initHistory,refreshHistory,settlePending,showRun} from './history.js';
 import {saveRun,deleteRun} from './storage.js';
 import {I,worthKeeping} from './record.js';
 import {SIM,SPEED,now,every,sim,simWatch} from './sim.js';
+import {createStartGate,compass} from './start.js';
 
 // State: running flag, banked ms, segment start, watch id, wake lock, draw tick
 let run=false,acc=0,t0=0,wid=null,lock=null,tick=0;
@@ -19,6 +20,8 @@ const track=createTrack();
 let active=null,matcher=null,rd=0,rsplits=[],rpts=[],spts=[],hyst=hysteresis(2);
 // Recording: rec = run record being written (see record.js), dirty = unsaved fixes, saving = save queue
 let rec=null,dirty=false,saving=Promise.resolve();
+// Start gate: armed = Start pressed on a route run, waiting for the runner to cross the start line
+let armed=false,gate=null;
 const ROUTE_WINDOW=20000,ROUTE_EVERY=2; // route mode: 20 s rolling pace (fitted, route distance), a reading every 2 s
 const AUTOSAVE=10000,RESUME_GAP=15*60000; // autosave interval; a reload within this keeps the clock running
 const $=id=>document.getElementById(id);
@@ -27,6 +30,7 @@ const el=()=>acc+(run?now()-t0:0); // pause-aware elapsed ms
 
 function onPos(p){
   $('gps').textContent=`GPS accuracy: ±${Math.round(p.coords.accuracy)} m`;
+  if(armed)armFix(p);
   if(!run)return;
   const t=el(),c=p.coords;
   if(!track.add(c,p.timestamp,t))return;
@@ -140,6 +144,46 @@ async function endRun(){
   if(r.id)await deleteRun(r.id);
 }
 
+// ---- Start gate ----
+// Guide the runner to the start; the clock starts as they cross the line, back-dated to the crossing
+function arm(){
+  armed=true;gate=createStartGate(active.route.pts,{zone:settings().zone});
+  if(SIM){sim.jump=-150;sim.moving=true}
+  if(wid===null)wid=SIM?simWatch(()=>active||selected(),onPos,gpsErr):watch(onPos,gpsErr);
+  $('arm').className='far';$('armh').textContent='Finding your position…';$('armdist').textContent='';$('arms').textContent='';
+  $('armarrow').style.visibility='hidden';
+  $('arm').hidden=false;$('back').hidden=true;
+  $('go').textContent='Cancel';$('go').style.background='#333';$('rs').disabled=true;
+  wake();
+}
+function disarm(){
+  armed=false;gate=null;sim.moving=false;$('arm').hidden=true;$('rs').disabled=false;
+  $('go').textContent='Start';$('go').style.background='';
+}
+function armFix(p){
+  const c=p.coords,g=gate.update(c.latitude,c.longitude,c.accuracy,p.timestamp);
+  if(g.state==='go'){
+    disarm();
+    const t=now();start(Math.min(t,Math.max(g.crossTs,t-60000))); // trust the crossing time, within reason
+    return;
+  }
+  const head=c.heading!=null&&!isNaN(c.heading)&&c.speed>0.8?c.heading:null; // direction of travel, when moving
+  const rel=head==null?null:(g.bearing-head+360)%360;
+  const T={weak:['Waiting for GPS',`Accuracy ±${Math.round(g.acc)} m · needs ±20 m or better`],
+    far:['Head to the start',''],
+    ready:['At the start ✓','Clock starts as you cross the start line'],
+    crossing:['At the start ✓','Crossing the line…'],
+    past:["You're over the start line",'Step back behind it, or tap Start now']}[g.state];
+  $('arm').className=g.state==='crossing'?'ready':g.state;
+  $('armh').textContent=T[0];
+  $('armdist').textContent=g.state==='weak'?'':`${Math.round(g.dist)} m`;
+  $('arms').textContent=g.state==='far'?(rel==null?`Start is ${compass(g.bearing)} of you`:
+    rel<30||rel>330?'Straight ahead':rel<150?'Ahead to your right':rel<=210?'Behind you':'Ahead to your left'):T[1];
+  $('armarrow').style.visibility=g.state==='far'&&rel!=null?'visible':'hidden';
+  if(rel!=null)$('armarrow').style.transform=`rotate(${rel}deg)`;
+}
+$('armgo').onclick=()=>{disarm();start()};
+
 // ---- Run controls ----
 async function wake(){try{lock=await navigator.wakeLock?.request('screen')}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(run&&document.visibilityState==='visible')wake()});
@@ -147,9 +191,10 @@ document.addEventListener('visibilitychange',()=>{if(run&&document.visibilitySta
 const neutral=()=>{hyst=hysteresis(2);document.body.className=''};
 const gpsErr=e=>$('gps').textContent='GPS error: '+e.message;
 
-function start(){
+// at = when the clock started (start-line crossing), default now
+function start(at){
   if(!rec){newRecord();settlePending().catch(()=>{})}
-  run=true;t0=now();track.last=null;tick=0;rpts=[];spts=[];sim.moving=true;
+  run=true;t0=at??now();track.last=null;tick=0;rpts=[];spts=[];sim.moving=true;
   if(wid===null)wid=SIM?simWatch(()=>active||selected(),onPos,gpsErr):watch(onPos,gpsErr);
   $('back').hidden=true;
   wake();$('go').textContent='Pause';$('go').style.background='#b35900';
@@ -159,16 +204,17 @@ function pause(){
   $('go').textContent='Resume';$('go').style.background='#1a7f37';
   save();
 }
-$('go').onclick=()=>run?pause():start();
+$('go').onclick=()=>run?pause():armed?disarm():matcher&&!rec&&settings().autoStart?arm():start();
 
 function resetRun(){
+  if(armed)disarm();
   acc=0;tick=0;track.reset();rd=0;rsplits=[];rpts=[];spts=[];rec=null;dirty=false;sim.restart=true;
   matcher=active?createMatcher(active.route.pts):null;
   neutral();$('off').hidden=true;
   $('go').textContent='Start';$('go').style.background='#1a7f37';$('cur').textContent='--:--';draw();
 }
 $('rs').onclick=async()=>{
-  if(run)return;
+  if(run||armed)return;
   if(rec){snapshot();if(worthKeeping(rec)){
     if(!confirm('Finish and save this run?'))return;
     const id=await endRun();resetRun();await refreshHistory();showRun(id);show('setup');return;
@@ -194,7 +240,7 @@ initSetup({onSettings:()=>openSettings(),onStart:async sel=>{
   if(!same)resetRun();
   applyActive();show('run');draw();
 }});
-$('back').onclick=()=>{if(!run){neutral();refreshHistory();show('setup')}};
+$('back').onclick=()=>{if(!run&&!armed){neutral();refreshHistory();show('setup')}};
 const fillSettings=initSettings({onChange:refreshRoute,preview:routePreview});
 function openSettings(){fillSettings();show('settings')}
 $('gear').onclick=openSettings;
@@ -208,7 +254,7 @@ initHistory({currentId:()=>rec?.id,onResume:r=>{
   resetRun();
   rec=r;rd=r.rd;rsplits=[...r.rsplits];track.dist=r.dist;track.splits=[...r.splits];
   if(matcher)matcher.seed(r.rd,r.dist);
-  sim.resumeAt=r.route?r.rd:null;
+  if(r.route)sim.jump=r.rd;
   const gap=(Date.now()-r.saved)*SPEED,last=r.fixes.at(-1);
   applyActive();show('run');
   if(r.running&&gap<RESUME_GAP){

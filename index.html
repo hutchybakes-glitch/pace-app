@@ -64,6 +64,11 @@
       <div class="seg2"><input type="radio" name="spd" id="s-speed-off"><label for="s-speed-off">Position</label><input type="radio" name="spd" id="s-speed-on"><label for="s-speed-on">GPS speed</label></div></div>
   </div>
   <div class="card">
+    <div class="h">Start</div>
+    <label class="set"><span><b>Start at the start line</b><small>Route runs: Start guides you to the start, then the clock starts as you cross the line</small></span><input type="checkbox" id="s-autoStart" class="switch"></label>
+    <label class="set"><span><b>Start zone</b><small>How close to the start counts as "at the start". GPS is often ±5–10 m, so don't go too tight.</small></span><span class="in"><input id="s-zone" inputmode="decimal" autocomplete="off"><em>m</em></span></label>
+  </div>
+  <div class="card">
     <div class="h">Segments</div>
     <label class="set"><span><b>Climb</b><small>Steeper than this uphill</small></span><span class="in"><input id="s-up" inputmode="decimal" autocomplete="off"><em>%</em></span></label>
     <label class="set"><span><b>Descent</b><small>Steeper than this downhill</small></span><span class="in">−<input id="s-down" inputmode="decimal" autocomplete="off"><em>%</em></span></label>
@@ -86,6 +91,12 @@
 <section id="run" hidden>
   <button id="back" aria-label="Back to setup">‹ Setup</button>
   <div id="off" hidden></div>
+  <div id="arm" hidden>
+    <div id="armh"></div>
+    <div class="arm-m"><svg id="armarrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l7.5 19L12 16.5 4.5 21z" fill="currentColor"/></svg><span id="armdist"></span></div>
+    <div id="arms"></div>
+    <button id="armgo" class="btn ghost">Start now</button>
+  </div>
   <div class="l">Current pace /km</div><div class="big" id="cur">--:--</div>
   <div id="rt" hidden>
     <div class="tgt"><span id="tgt">--:--</span> <span id="seg"></span></div>

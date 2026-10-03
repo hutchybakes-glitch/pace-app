@@ -9,19 +9,49 @@
 <meta name="theme-color" content="#000000">
 <title>Pace</title>
 <link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-<div class="l">Current pace /km</div><div class="big" id="cur">--:--</div>
-<div class="l">Average pace /km</div><div class="mid" id="avg">--:--</div>
-<div class="row">
-  <div><div class="l">Time</div><div class="mid" id="tm">0:00</div></div>
-  <div><div class="l">Km</div><div class="mid" id="km">0.00</div></div>
-</div>
-<div class="row"><button id="go">Start</button><button id="rs">Reset</button></div>
-<div id="gps">GPS: off</div>
-<div id="sp"></div>
+<section id="setup">
+  <h1>Pace</h1>
+  <button id="free" class="btn go">Free run</button>
+  <div class="card">
+    <div class="h">Routes</div>
+    <label class="btn">Load GPX file<input type="file" id="gpx" hidden></label>
+    <div id="msg"></div>
+    <ul id="routes"></ul>
+  </div>
+  <div id="rv" class="card" hidden>
+    <h2 id="rname"></h2>
+    <div id="rstats"></div>
+    <svg id="rmap" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Route outline"></svg>
+    <svg id="prof" viewBox="0 0 1000 160" preserveAspectRatio="none" role="img" aria-label="Elevation profile"></svg>
+    <div id="paxis" class="axis"></div>
+    <div class="key"><span><i style="background:#e07a2e"></i>▲ Climb</span><span><i style="background:#6b7280"></i>▬ Flat</span><span><i style="background:#3b82f6"></i>▼ Descent</span></div>
+    <div class="tg">
+      <label>Target pace /km<input id="tp" autocomplete="off" placeholder="4:30"></label>
+      <label>Finish time<input id="tf" autocomplete="off" placeholder="45:00"></label>
+    </div>
+    <div id="rbase" class="sub"></div>
+    <table id="segs"></table>
+    <button id="startr" class="btn go">Run this route</button>
+  </div>
+</section>
+<section id="run" hidden>
+  <button id="back" aria-label="Back to setup">‹ Setup</button>
+  <div class="l">Current pace /km</div><div class="big" id="cur">--:--</div>
+  <div class="l">Average pace /km</div><div class="mid" id="avg">--:--</div>
+  <div class="row">
+    <div><div class="l">Time</div><div class="mid" id="tm">0:00</div></div>
+    <div><div class="l">Km</div><div class="mid" id="km">0.00</div></div>
+  </div>
+  <div class="row"><button id="go">Start</button><button id="rs">Reset</button></div>
+  <div id="gps">GPS: off</div>
+  <div id="rlabel"></div>
+  <div id="sp"></div>
+</section>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

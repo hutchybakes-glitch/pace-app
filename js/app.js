@@ -1,10 +1,11 @@
 import {createTrack,watch} from './gps.js';
+import {fmt} from './pacing.js';
+import {initSetup} from './setup.js';
 
 // State: running flag, banked ms, segment start, watch id, wake lock, draw tick
 let run=false,acc=0,t0=0,wid=null,lock=null,tick=0;
 const track=createTrack();
 const $=id=>document.getElementById(id);
-const fmt=s=>{s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=String(s%60).padStart(2,'0');return h?`${h}:${String(m).padStart(2,'0')}:${x}`:`${m}:${x}`};
 const pace=(sec,km)=>km>0.005&&sec/km<1800?fmt(sec/km):'--:--';
 const el=()=>acc+(run?Date.now()-t0:0); // pause-aware elapsed ms
 
@@ -33,9 +34,10 @@ $('go').onclick=()=>{
   if(!run){
     run=true;t0=Date.now();track.last=null;tick=0;
     if(wid===null)wid=watch(onPos,e=>$('gps').textContent='GPS error: '+e.message);
+    $('back').hidden=true;
     wake();$('go').textContent='Pause';$('go').style.background='#b35900';
   }else{
-    acc=el();run=false;lock?.release();lock=null;
+    acc=el();run=false;lock?.release();lock=null;$('back').hidden=false;
     $('go').textContent='Resume';$('go').style.background='#1a7f37';
   }
 };
@@ -45,5 +47,15 @@ $('rs').onclick=()=>{
   $('go').textContent='Start';$('cur').textContent='--:--';draw();
 };
 setInterval(draw,1000);
+
+// Screens. The chosen route + plan is held for phase 3 (live targets); the run itself is still a free run.
+let active=null;
+const show=id=>{$('setup').hidden=id!=='setup';$('run').hidden=id!=='run';scrollTo(0,0)};
+initSetup({onStart:sel=>{
+  active=sel;
+  $('rlabel').textContent=sel?`${sel.route.name} · target ${fmt(sel.pace)} /km`:'';
+  show('run');
+}});
+$('back').onclick=()=>{if(!run)show('setup')};
 
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});

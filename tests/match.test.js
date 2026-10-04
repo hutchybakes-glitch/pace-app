@@ -71,3 +71,14 @@ test('seed: carries on from a saved position instead of searching from the start
   m.seed(1500,1500);
   near(m.update(...at(8,480),1520).d,1528);   // return leg, not the outbound 480 m
 });
+
+test('out-and-back: approaching the turnaround with GPS drifting towards the return leg does not jump ahead',()=>{
+  // Out 1000 m north, turn around, back down a lane 8 m to the east (like the field-test route)
+  const m=createMatcher(route([[0,0],[0,1000],[8,1000],[8,0]]));
+  let g=0,r;
+  for(let y=0;y<=840;y+=20){g=y;r=m.update(...at(0,y),g)}
+  // 140 m to go: GPS now reads 6 m east, i.e. nearer the return lane than the outbound one
+  for(let y=860;y<=980;y+=20){g=y;r=m.update(...at(6,y),g);near(r.d,y,3)}
+  // through the turnaround and back: counts on past 1000 m
+  r=m.update(...at(8,990),g+30);assert.ok(r.d>1005,`${r.d}`);
+});

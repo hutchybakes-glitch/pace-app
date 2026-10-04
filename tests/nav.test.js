@@ -36,7 +36,8 @@ test('real route: plotaroute cues placed in order near real bends',()=>{
   const xml=fs.readFileSync(new URL('./fixtures/ribble-valley-10k-2023.gpx',import.meta.url),'utf8'),g=parseGPX(xml);
   assert.equal(g.cues.length,12);
   const t=turnsFor({pts:resample(g.pts),cues:g.cues});
-  assert.equal(t.length,10);
+  assert.equal(t.length,11);
+  assert.ok(t.some(x=>x.kind==='uturn'&&Math.abs(x.d-5410)<40),'turnaround added from the shape');
   for(let i=1;i<t.length;i++)assert.ok(t[i].d>t[i-1].d);
   assert.equal(t.at(-1).text,'Turn left onto New Lane');
   assert.ok(Math.abs(t.find(x=>/sharp/.test(x.text)&&x.d>5000).d-5760)<60);

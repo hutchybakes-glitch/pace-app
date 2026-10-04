@@ -1,6 +1,8 @@
 // Match: snap GPS fixes to distance along the resampled route.
-// back/ahead = search window (m) around the expected position, off = max distance (m) from the route.
-export const MDEF={back:50,ahead:300,off:40};
+// back/ahead = search window (m) around the expected position, off = max distance (m) from the route,
+// jump = metres of sideways error worth one metre of jumping along the route away from where GPS distance
+// says you should be (keeps you on the outbound leg when the return leg runs alongside it).
+export const MDEF={back:50,ahead:300,off:40,jump:0.1};
 
 // pts = resampled route [{d,lat,lon}]. update(lat,lon,gpsDist) returns {d,off,err,matched}:
 // d is route distance when on route, else last matched d + GPS distance since then.
@@ -23,8 +25,12 @@ export function createMatcher(pts,o={}){
       // First match: the earliest pass within range, so a loop's start isn't mistaken for its finish
       for(let i=0;i<=last;i++){const c=near(x,y,i);if(c.err<=o.off){if(!best||c.err<best.err)best=c}else if(best)break}
     }else{
-      // Only search a forward window, so out-and-back and looping routes don't jump
-      for(let i=leg(e-o.back),j=leg(e+o.ahead);i<=j;i++){const c=near(x,y,i);if(!best||c.err<best.err)best=c}
+      // Only search a forward window, and among points within range prefer the one that continues
+      // smoothly from the last match: a return leg a few metres away but 260 m further on loses
+      for(let i=leg(e-o.back),j=leg(e+o.ahead);i<=j;i++){
+        const c=near(x,y,i);c.cost=c.err+o.jump*Math.abs(c.d-e);
+        if(!best||(c.err<=o.off)>(best.err<=o.off)||(c.err<=o.off)===(best.err<=o.off)&&c.cost<best.cost)best=c;
+      }
     }
     if(best&&best.err<=o.off){m.matched=true;lastD=best.d;lastG=g;Object.assign(m,{d:best.d,off:false,err:best.err})}
     else Object.assign(m,{d:Math.min(total,e),off:true,err:best?best.err:Infinity});

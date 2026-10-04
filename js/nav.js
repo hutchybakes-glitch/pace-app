@@ -83,7 +83,14 @@ export function cueTurns(pts,cues,{near=30}={}){
   return out;
 }
 
-export const turnsFor=route=>route.cues?.length?cueTurns(route.pts,route.cues):detectTurns(route.pts);
+// The GPX's cues when it has them, plus any U-turn the shape shows that no cue covers (route planners
+// often don't write one for a turnaround); otherwise turns from the shape alone
+export function turnsFor(route){
+  const shape=detectTurns(route.pts),cues=route.cues?.length?cueTurns(route.pts,route.cues):[];
+  if(!cues.length)return shape;
+  const extra=shape.filter(t=>t.kind==='uturn'&&!cues.some(c=>Math.abs(c.d-t.d)<60));
+  return [...cues,...extra].sort((a,b)=>a.d-b.d);
+}
 
 // First turn more than 5 m ahead of route distance rd, or null
 export const nextTurn=(turns,rd)=>turns.find(t=>t.d>rd+5)||null;

@@ -184,7 +184,12 @@ function updateNav(){
   const pts=active.route.pts,total=pts.at(-1).d,t=nextTurn(turns,rd),left=(t?t.d:total)-rd;
   $('ticon').innerHTML=turnIcon(t);
   $('ttext').textContent=t?turnText(t):'Finish';
-  $('tdist').textContent=inDist(Math.max(0,left));
+  let dist=inDist(Math.max(0,left));
+  if(t?.kind==='uturn'&&dist==='now'&&lastLL){ // only "now" when you're physically at the turnaround
+    const tp=pts[Math.min(pts.length-1,Math.round(t.d/10))],k=Math.cos(tp.lat*Math.PI/180)*111195;
+    if(Math.hypot((lastLL.lon-tp.lon)*k,(lastLL.lat-tp.lat)*111195)>25)dist='in 20 m';
+  }
+  $('tdist').textContent=dist;
   $('nav').className=left<=60?'soon':'';
   // Mini map: done part, next turn, you
   const n=Math.min(pts.length-1,Math.floor(rd/10));
@@ -203,7 +208,7 @@ $('mini').onclick=()=>{miniClose=!miniClose;try{localStorage.setItem('miniClose'
 // ---- Start gate ----
 // Guide the runner to the start; the clock starts as they cross the line, back-dated to the crossing
 function arm(){
-  armed=true;gate=createStartGate(active.route.pts,{zone:settings().zone});
+  clearUndo();armed=true;gate=createStartGate(active.route.pts,{zone:settings().zone});
   if(SIM){sim.jump=-150;sim.moving=true}
   if(wid===null)wid=SIM?simWatch(()=>active||selected(),onPos,gpsErr):watch(onPos,gpsErr);
   $('arm').className='far';$('armh').textContent='Finding your position…';$('armdist').textContent='';$('arms').textContent='';
@@ -247,8 +252,18 @@ document.addEventListener('visibilitychange',()=>{if(run&&document.visibilitySta
 const neutral=()=>{hyst=hysteresis(2);document.body.className=''};
 const gpsErr=e=>$('gps').textContent='GPS error: '+e.message;
 
+// iOS offers "Undo Typing" when the phone is shaken after text was typed on the page. Before a run,
+// drop focus and swap typed-in inputs for fresh copies (handlers carried over) so there's nothing to undo.
+function clearUndo(){
+  document.activeElement?.blur?.();
+  document.querySelectorAll('input:not([type=file]):not([type=checkbox]):not([type=radio])').forEach(i=>{
+    const c=i.cloneNode(true);c.value=i.value;c.onchange=i.onchange;c.oninput=i.oninput;i.replaceWith(c);
+  });
+}
+
 // at = when the clock started (start-line crossing), default now
 function start(at){
+  clearUndo();
   if(!rec){newRecord();settlePending().catch(()=>{})}
   run=true;t0=at??now();track.last=null;tick=0;rpts=[];spts=[];sim.moving=true;
   if(wid===null)wid=SIM?simWatch(()=>active||selected(),onPos,gpsErr):watch(onPos,gpsErr);

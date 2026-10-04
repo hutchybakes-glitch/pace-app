@@ -50,3 +50,23 @@ export function speedPace(pts){
 }
 
 export const watch=(onPos,onErr)=>navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:0});
+
+// Smooths running speed for display: an exponential average with time constant tau (s), so a steady
+// change shows within a few seconds while single wild readings (GPS jumps, tree cover) barely register.
+// A reading more than 35 % away from the smoothed speed counts a sixth as much, unless 3 in a row agree.
+export function createSmoother(tau=6){
+  let v=null,last=0,odd=0;
+  return {
+    update(raw,tMs){
+      if(raw==null||!isFinite(raw))return v;
+      if(v==null){v=raw;last=tMs;return v}
+      const dt=Math.max(0,(tMs-last)/1000);last=tMs;
+      const far=Math.abs(raw-v)>0.35*v;odd=far?odd+1:0;
+      const k=(1-Math.exp(-dt/tau))*(far&&odd<3?1/6:1);
+      v+=(raw-v)*k;
+      return v;
+    },
+    get value(){return v},
+    reset(){v=null;odd=0},
+  };
+}

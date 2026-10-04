@@ -22,14 +22,14 @@ export const gapText=g=>{const a=Math.abs(g),sign=a<0.05?'':g>0?'+':'−';return
 export function createView(canvas){
   const ctx=canvas.getContext('2d');
   let W=1,H=1,R=null,hd=null,cd=null; // R: prepared route; hd: smoothed map heading; cd: smoothed 3D camera direction
-  let top=0,bot=0,rgt=0;      // screen covered by overlays at the top, bottom and right, px
+  let top=0,bot=0,rgt=0,lft=0; // screen covered by overlays at the top, bottom, right and left, px
 
   function resize(){
     const dpr=Math.min(2,window.devicePixelRatio||1);
     W=canvas.clientWidth||1;H=canvas.clientHeight||1;
     canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);
   }
-  function setInsets(t,b,r=0){top=t;bot=b;rgt=r}
+  function setInsets(t,b,r=0,l=0){top=t;bot=b;rgt=r;lft=l}
 
   // pts: route points every 10 m; P: pacer (smoothed elevation, grade, pace); turns: nav turns
   function setRoute(pts,P,turns){
@@ -64,7 +64,7 @@ export function createView(canvas){
   function windBadge(wind,view,travel){
     if(!wind||wind.speed<0.4)return;
     const rel=Math.cos((wind.dir-travel)*Math.PI/180),kind=rel>0.4?'head':rel<-0.4?'tail':'cross';
-    const x=14,y=H-bot-46,r=16;
+    const x=lft+(W-rgt-lft-128)/2,y=H-bot-46,r=16;
     ctx.save();ctx.fillStyle='rgba(2,6,23,.82)';ctx.strokeStyle='rgba(255,255,255,.14)';
     ctx.beginPath();ctx.roundRect?ctx.roundRect(x,y,128,36,18):ctx.rect(x,y,128,36);ctx.fill();ctx.stroke();
     ctx.translate(x+18,y+18);ctx.rotate(((wind.dir+180-view)%360)*Math.PI/180);
@@ -100,8 +100,8 @@ export function createView(canvas){
     if(L<1){hx=me.tx;hy=me.ty;L=1}
     hx/=L;hy/=L;
     if(!hd)hd={x:hx,y:hy};else{hd.x+=(hx-hd.x)*0.15;hd.y+=(hy-hd.y)*0.15;const l=Math.hypot(hd.x,hd.y)||1;hd.x/=l;hd.y/=l}
-    const vw=Math.max(160,W-rgt),vh=Math.max(160,H-top-bot);
-    const sc=Math.min(vw*1.25,vh)*0.78/220,ax=vw/2,ay=top+vh*0.72; // px per m; you sit low in the visible area
+    const vw=Math.max(140,W-rgt-lft),vh=Math.max(160,H-top-bot);
+    const sc=Math.min(vw*1.6,vh)*0.78/220,ax=lft+vw/2,ay=top+vh*0.72; // px per m; you sit low in the visible area
     const T=(x,y)=>{const dx=x-me.x,dy=y-me.y;return [ax+(dx*hd.y-dy*hd.x)*sc,ay-(dx*hd.x+dy*hd.y)*sc]};
 
     // Background with a faint world-aligned grid (it turns as you turn, which reads as movement)
@@ -157,7 +157,7 @@ export function createView(canvas){
     ctx.shadowBlur=0;ctx.strokeStyle=ME;ctx.lineWidth=2.5;ctx.stroke();ctx.restore();
     // Labels last so nothing covers them: PACER beside its line, your gap above you
     // Labels last so nothing covers them: live paces at the line ends, your gap above you
-    const clampX=(x,w)=>Math.max(w/2+4,Math.min(vw-w/2-4,x));
+    const clampX=(x,w)=>Math.max(lft+w/2+2,Math.min(lft+vw-w/2-2,x));
     if(pq){dot(pq.c[0],pq.c[1],8,ORANGE);pill(`PACER ${paceStr(s.pacerPace)}`,clampX(pq.right[0]+48,86),pq.right[1],ORANGE,'#1c1003',13)}
     if(s.youPace!==undefined)pill(paceStr(s.youPace),clampX(yq.left[0]-32,56),yq.left[1],ME,'#06142e',14);
     gapLabel(s.gap,ax,ay-34,16);
@@ -188,7 +188,7 @@ export function createView(canvas){
     let f=[Tg[0]-E[0],Tg[1]-E[1],Tg[2]-E[2]];const fl=Math.hypot(...f);f=f.map(v=>v/fl);
     let r=[f[1],-f[0],0];const rl=Math.hypot(r[0],r[1])||1;r=r.map(v=>v/rl);
     const u=[r[1]*f[2]-r[2]*f[1],r[2]*f[0]-r[0]*f[2],r[0]*f[1]-r[1]*f[0]];
-    const vw=Math.max(160,W-rgt),vh=Math.max(160,H-top-bot),F=Math.max(vw,vh*0.9)*0.95,cx=vw/2,cy=top+vh*0.36;
+    const vw=Math.max(140,W-rgt-lft),vh=Math.max(160,H-top-bot),F=Math.max(vw*1.3,vh*0.9)*0.95,cx=lft+vw/2,cy=top+vh*0.36;
     const P=(x,y,z)=>{const v=[x-E[0],y-E[1],z-E[2]],zc=v[0]*f[0]+v[1]*f[1]+v[2]*f[2];if(zc<0.8)return null;return [cx+F*(v[0]*r[0]+v[1]*r[1]+v[2]*r[2])/zc,cy-F*(v[0]*u[0]+v[1]*u[1]+v[2]*u[2])/zc,zc]};
     const onRoad=(d,lift=0)=>{const p=at(d);return P(p.x,p.y,(p.z-z0)*ZE+lift)};
 
@@ -248,8 +248,9 @@ export function createView(canvas){
       ctx.save();if(ghost)ctx.globalAlpha=0.4;figure(o.base,head,o.col,F);ctx.restore();
       const lift=Math.max(16,F*0.55/head[2]);
       const side=Math.max(44,F*1.1/head[2]);
-      if(o.me){gapLabel(s.gap,head[0],head[1]-lift-4,15);if(s.youPace!==undefined)pill(paceStr(s.youPace),head[0]-side,head[1]+lift*0.4,ME,'#06142e',13)}
-      else pill(`PACER ${paceStr(s.pacerPace)}`,head[0]+side+16,head[1],ORANGE,'#1c1003',12,ghost?0.6:1);
+      const inView=(x,w)=>Math.max(lft+w/2+2,Math.min(lft+vw-w/2-2,x)); // keep tags clear of the side columns
+      if(o.me){gapLabel(s.gap,head[0],head[1]-lift-4,15);if(s.youPace!==undefined)pill(paceStr(s.youPace),inView(head[0]-side,52),head[1]+lift*0.4,ME,'#06142e',13)}
+      else pill(`PACER ${paceStr(s.pacerPace)}`,inView(head[0]+side+16,84),head[1],ORANGE,'#1c1003',12,ghost?0.6:1);
     }
     const camDeg=(Math.atan2(f[0],f[1])*180/Math.PI+360)%360,runDeg=(Math.atan2(cd.x,cd.y)*180/Math.PI+360)%360;
     windBadge(s.wind,camDeg,runDeg);
@@ -258,7 +259,7 @@ export function createView(canvas){
       const pc=figs.find(o=>!o.me),gap=s.pacer-s.you;
       if(!pc.base||Math.abs(gap)>700){
         const ahead=gap>0,toward=rear?!ahead:ahead;
-        pill(`PACER ${Math.round(Math.abs(gap))} m ${ahead?'ahead':'behind'}`,vw/2,toward?Math.max(top+14,hy+18):H-bot-18,ORANGE,'#1c1003');
+        pill(`PACER ${Math.round(Math.abs(gap))} m ${ahead?'ahead':'behind'}`,lft+vw/2,toward?Math.max(top+14,hy+18):H-bot-18,ORANGE,'#1c1003');
       }
     }
   }

@@ -1,7 +1,7 @@
 // Pacer (v2): race a virtual pacer who runs the route at a gradient-aware pace.
 // Screens: Home (route, target, pacer profile, options, history) → Run (full-screen view,
 // you vs pacer) → Result.
-import {createTrack,watch,fitPace,speedPace} from './gps.js';
+import {createTrack,watch,fitPace,speedPace,createSmoother} from './gps.js';
 import {parseGPX,resample,fillElevation} from './route.js';
 import {createMatcher} from './match.js';
 import {turnsFor,nextTurn,turnText,inDist} from './nav.js';
@@ -217,7 +217,8 @@ const track=createTrack();
 let phase='idle',acc=0,t0=0,wid=null,lock=null;
 let matcher=null,rd=0,rsplits=[],rpts=[],spts=[],curPace=null,vNow=0,lastFixAt=0,lastLL=null,offRoute=false;
 let gate=null,rec=null,dirty=false,saving=Promise.resolve(),runP=null,runRoute=null,runTurns=[];
-let shownD=0,raf=0,lastFrame=0,gapNow=null; // gapNow: s, + = you ahead of the pacer
+let shownD=0,raf=0,lastFrame=0,lastFrameAt=0,gapNow=null;
+const smoother=createSmoother(6); // displayed pace settles over ~6 s; lone wild readings barely count // gapNow: s, + = you ahead of the pacer
 const el=()=>acc+(phase==='running'?now()-t0:0); // pause-aware elapsed ms
 const ROUTE_WINDOW=20000,AUTOSAVE=10000,RESUME_GAP=15*60000;
 
@@ -233,7 +234,7 @@ function enterRun(r=route,p=P,tr=turns,rc=cond()){
   cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);
 }
 function resetRun(){
-  phase='idle';acc=0;track.reset();rd=0;rsplits=[];rpts=[];spts=[];curPace=null;vNow=0;shownD=0;offRoute=false;
+  phase='idle';acc=0;track.reset();smoother.reset();rd=0;rsplits=[];rpts=[];spts=[];curPace=null;vNow=0;shownD=0;offRoute=false;
   rec=null;dirty=false;gate=null;sim.restart=true;sim.moving=false;
   matcher=createMatcher(runRoute.pts);
   $('off').hidden=true;$('arm').hidden=true;
@@ -242,9 +243,10 @@ function resetRun(){
 // The map stops at the top of the control bar; the side panel runs from below the top cards to it
 function layout(){
   const bar=$('ctrls').getBoundingClientRect().height,top=document.querySelector('.ovtop .row2').getBoundingClientRect().bottom;
-  $('cv').style.height=`${Math.max(100,$('run').clientHeight-bar)}px`;$('side').style.top=`${top+8}px`;$('side').style.bottom=`${bar+8}px`;
+  $('cv').style.height=`${Math.max(100,$('run').clientHeight-bar)}px`;
+  for(const id of ['side','lside']){$(id).style.top=`${top+8}px`;$(id).style.bottom=`${bar+8}px`}
   view.resize();
-  view.setInsets(top+6,8,$('side').getBoundingClientRect().width+12);
+  view.setInsets(top+6,8,$('side').getBoundingClientRect().width+12,$('lside').getBoundingClientRect().width+12);
 }
 addEventListener('resize',()=>{if(!$('run').hidden)layout()});
 function setView(m){o.view=m;opt.set('view',m);$('views').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===m))}
@@ -255,7 +257,7 @@ function setPhaseUI(){
   go.textContent={idle:'Start',armed:'Cancel',running:'Pause',paused:'Resume',done:'Start'}[phase];
   if(phase==='running')go.classList.add('pause');if(phase==='armed')go.classList.add('cancel');
   $('finbtn').hidden=phase!=='paused';
-  $('side').hidden=phase==='idle'||phase==='armed'; // nothing to show yet, and the start card needs the width
+  $('side').hidden=$('lside').hidden=phase==='idle'||phase==='armed'; // nothing to show yet, and the start card needs the width
   if(!$('run').hidden)requestAnimationFrame(layout);
   $('back').hidden=phase==='running'||phase==='armed';
 }
@@ -278,8 +280,9 @@ function onPos(p){
   while(rd>=(rsplits.length+1)*1000)rsplits.push(t);
   rpts.push({t,d:rd});if(c.speed!=null&&c.speed>=0)spts.push({t,v:c.speed});
   rpts=rpts.filter(q=>t-q.t<=ROUTE_WINDOW);spts=spts.filter(q=>t-q.t<=ROUTE_WINDOW);
-  curPace=(o.speed&&speedPace(spts))||fitPace(rpts);
-  vNow=curPace?1000/curPace:0;lastFixAt=now();
+  // Raw speed from the last 20 s (GPS speed if chosen, else the fit on route distance), then smoothed for display
+  const raw=(o.speed&&speedPace(spts))||fitPace(rpts),v=smoother.update(raw?1000/raw:null,t);
+  curPace=v&&v>1000/1800?1000/v:null;vNow=v||0;lastFixAt=now();
   rec.fixes.push([p.timestamp,t,c.latitude,c.longitude,c.accuracy,track.dist,rd,curPace]);dirty=true;
   if(rd>=runP.total-8)finishRun(true);
 }
@@ -366,9 +369,13 @@ async function finishRun(complete){
 function loop(ts){
   raf=requestAnimationFrame(loop);
   if(ts-lastFrame<33)return;lastFrame=ts;
-  let target=rd;
-  if(phase==='running'&&lastFixAt)target=Math.min(runP.total,rd+Math.min(3,(now()-lastFixAt)/1000)*vNow);
-  shownD=Math.abs(target-shownD)>60?target:shownD+(target-shownD)*0.25;
+  // You glide at your smoothed speed; each GPS position eases the arrow in over ~1.5 s rather than jumping
+  const tn=now(),dt=lastFrameAt?Math.min(0.5,(tn-lastFrameAt)/1000):0;lastFrameAt=tn;
+  if(phase==='running'){
+    shownD+=vNow*dt;const err=rd-shownD;
+    shownD=Math.abs(err)>80?rd:shownD+err*Math.min(1,dt/1.5);
+    shownD=Math.min(runP.total,Math.max(0,shownD));
+  }else shownD+=(rd-shownD)*0.3;
   const started=phase==='running'||phase==='paused'||phase==='done';
   const pd=started?distAt(runP,el()/1000):0;
   let wind=null;
@@ -410,7 +417,7 @@ function splits(t){
     rows.push(`<tr><td>${k+1}</td><td class="y ${you<pc-1?'faster':you>pc+1?'slower':''}">${fmt(you)}</td><td class="p">${fmt(pc)}</td></tr>`);
   }
   if(live)rows.push(`<tr class="live"><td>${n+1}</td><td class="y">${fmt(t-(rsplits.at(-1)||0)/1000)}</td><td class="p">${fmt(timeAt(runP,rd)-timeAt(runP,k0))}</td></tr>`);
-  $('spl').innerHTML=rows.join('')||'<tr><td colspan="3" style="text-align:left;font-style:normal;font-weight:500">After 1 km</td></tr>';
+  $('spl').innerHTML=rows.join('')||'<tr class="wait"><td colspan="3">Splits appear as you go</td></tr>';
   if(n!==splitsShown){splitsShown=n;const w=document.querySelector('.splw');w.scrollTop=w.scrollHeight}
 }
 
@@ -422,10 +429,7 @@ function hud(){
   splits(t);
   const cls=(id,you,pc)=>{$(id).className='y '+(you&&pc?(you<pc-1?'faster':you>pc+1?'slower':''):'')};
   if(started&&rd>20){
-    const k0=rsplits.length*1000,tk=(rsplits.at(-1)||0)/1000;
-    const ky=rd-k0>50?(t-tk)/((rd-k0)/1000):null,kp=rd-k0>50?avgBetween(runP,k0,rd):null;
     const ay=t/(rd/1000),ap=timeAt(runP,rd)/(rd/1000);
-    $('ky').textContent=fmtP(ky);$('kp').textContent=fmtP(kp);cls('ky',ky,kp);
     $('ay').textContent=fmtP(ay);$('ap').textContent=fmtP(ap);cls('ay',ay,ap);
     gapNow=timeAt(runP,rd)-t;$('gap').hidden=true;
     // Projected finish: how you're doing against the pacer's hill-aware plan, applied to what's left
@@ -434,7 +438,7 @@ function hud(){
     $('cv').setAttribute('aria-label',`Gap to the pacer ${gapText(gapNow)} seconds`);
   }else{
     gapNow=started?0:null;$('gap').hidden=false;
-    for(const id of ['ky','ay','kp','ap'])$(id).textContent='--:--';
+    for(const id of ['ay','ap'])$(id).textContent='--:--';
     $('proj').textContent=fmt(runP.finish);$('projd').textContent='target';$('projd').className='';
     $('gap').className='gap';$('gap').textContent=phase==='armed'?'Pacer waiting at the start':started?'And you\'re off…':'Pacer ready at the start';
   }

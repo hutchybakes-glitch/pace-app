@@ -147,7 +147,7 @@ function renderOptions(){
   $('o-tones').onclick=()=>{o.tones=!o.tones;opt.set('tones',o.tones);speaker.setOpts({tones:o.tones});renderOptions()};
   $('o-rate').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===o.rate);b.onclick=()=>{o.rate=b.dataset.v;opt.set('rate',o.rate);speaker.setOpts({rate:RATES[o.rate]});renderOptions()}});
   $('o-test').onclick=()=>{speaker.unlock();speaker.setMuted(false);o.muted=false;opt.set('muted',false);
-    speaker.play([{text:'Turn left in 200 metres',pri:3,tone:'turn'},{text:'Climb ahead. Pacer eases to 5:20',pri:2,tone:'down'},{text:'Kilometre 3. 4:58. Pacer 5:01. 6 seconds ahead.',pri:2,tone:'split'}])};
+    speaker.play([{text:'Climb ahead. Pacer eases to 5:20',pri:3,tone:'down'},{text:'Kilometre 3. 4:58. Pacer 5:01. 6 seconds ahead.',pri:2,tone:'split'}])};
   $('o-zone').querySelector('b').textContent=`${o.zone} m`;
   $('o-zone').querySelectorAll('button').forEach(b=>b.onclick=()=>{o.zone=Math.max(10,Math.min(100,o.zone+ +b.dataset.d));opt.set('zone',o.zone);renderOptions()});
 }
@@ -171,7 +171,7 @@ const ROUTE_WINDOW=20000,AUTOSAVE=10000,RESUME_GAP=15*60000;
 let coach=null,armSaid=null;
 function enterRun(r=route,p=P,tr=turns){
   runRoute=r;runP=p;runTurns=tr;
-  coach=createCoach({P:p,turns:tr,marks:paceMarks(p),level:o.voice==='key'?'key':'full'});armSaid=null;
+  coach=createCoach({P:p,marks:paceMarks(p),level:o.voice==='key'?'key':'full'});armSaid=null;
   setMuteUI();
   resetRun();
   view.setRoute(r.pts,p,tr);
@@ -389,7 +389,7 @@ function hud(){
   if(nt?.kind==='uturn'&&dist==='now'&&!uturnHere(nt))dist='in 20 m'; // "now" only when you're physically at the turnaround
   $('tdist').textContent=dist;$('turn').className=left<=60?'soon':'';
   if(phase==='running'&&voiceOn()&&coach&&rd>0)speaker.play(coach.update({rd,t,gap:gapNow??0,cur:curPace,splits:rsplits.map(x=>x/1000),
-    off:offRoute,uturnHere:uturnHere(nt),proj:projectFinish(runP,rd,t,timeOneKmBack())}));
+    proj:projectFinish(runP,rd,t,timeOneKmBack())}));
 }
 setInterval(hud,250);
 

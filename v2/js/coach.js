@@ -1,47 +1,31 @@
 // Voice coach: decides what to say during a run (createCoach, pure: runs under node --test) and says
 // it (createSpeaker: speech synthesis plus short tones, browser only).
 //
-// Cues, most urgent first (pri 3 interrupts anything quieter):
-//   3  turns ("Turn left in 200 metres", "… now"), off route / back on route
-//   2  pace changes ahead (marks on the road changing ≥ 8 s/km, ≥ 300 m apart), lead changes (3 s
-//      clear, ≥ 60 s apart), km splits
+// It talks about pace only (directions are on screen). Cues, most urgent first (pri 3 interrupts):
+//   3  pace changes ahead (pace marks changing ≥ 8 s/km, ≥ 300 m apart)
+//   2  km splits vs the pacer, lead changes (3 s clear, ≥ 60 s apart)
 //   1  gap every 5 s it moves, drifting off the pacer's pace for 30 s, halfway, last km
-// Levels: 'key' = turns, off route, pace changes, lead changes, km splits; 'full' adds the rest.
+// Levels: 'key' = pace changes, km splits, lead changes; 'full' adds the rest.
 import {timeAt,paceAt} from './pacer.js';
-import {turnText} from './nav.js';
 
 const mmss=s=>{s=Math.round(s);return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`};
 const hms=s=>{s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=String(s%60).padStart(2,'0');return h?`${h}:${String(m).padStart(2,'0')}:${x}`:`${m}:${x}`};
 const secs=s=>{s=Math.round(s);if(s<60)return `${s} second${s===1?'':'s'}`;const m=Math.floor(s/60),r=s%60;return `${m} minute${m>1?'s':''}${r?` ${r} second${r===1?'':'s'}`:''}`};
 export const gapPhrase=g=>Math.abs(g)<1?'Level with the pacer':`${secs(Math.abs(g))} ${g>0?'ahead':'behind'}`;
 
-// P: pacer; turns: nav turns; marks: pace marks [{d,pace}]; level: 'key' | 'full'
-export function createCoach({P,turns,marks,level='full'}){
+// P: pacer; marks: where the pace changes [{d,pace}] (pacer.paceMarks); level: 'key' | 'full'
+export function createCoach({P,marks,level='full'}){
   const said=new Set();
-  let splits=0,lead=null,leadAt=-1e9,paceAtD=-1e9,gapStep=0,gapAt=-1e9,driftFrom=null,driftAt=-1e9,off=false,offFrom=null,offSaid=false;
+  let splits=0,lead=null,leadAt=-1e9,paceAtD=-1e9,gapStep=0,gapAt=-1e9,driftFrom=null,driftAt=-1e9;
   const total=P.total;
 
-  // s: {rd m, t s, gap s (+ = you ahead), cur s/km or null, splits [your elapsed s at each km],
-  //     off bool, uturnHere bool (physically at the turnaround), proj s or null}
+  // s: {rd m, t s, gap s (+ = you ahead), cur s/km or null, splits [your elapsed s at each km], proj s or null}
   // Returns [{key, text, pri, tone}] to say now.
   function update(s){
     const out=[];
     const add=(key,lvl,pri,text,tone)=>{if(said.has(key))return;said.add(key);if(lvl==='full'&&level!=='full')return;out.push({key,text,pri,tone})};
 
     // Turns: once ~200 m out (or as soon as we're closer, if a run starts near one), then "now"
-    // Turns within 80 m of each other are announced together: "Turn left, then sharp left, in 200 metres"
-    turns.forEach((tn,i)=>{
-      const left=tn.d-s.rd;if(left<=0)return;
-      if(left<=210&&left>40&&!said.has('t'+i)){
-        const nx=turns[i+1],pair=nx&&nx.d-tn.d<=80;
-        const what=pair?`${turnText(tn)}, then ${turnText(nx).replace(/^Turn /,'').toLowerCase()},`:turnText(tn);
-        if(pair)said.add('t'+(i+1));
-        add('t'+i,'key',3,`${what} in ${left>175?200:Math.max(50,Math.round(left/50)*50)} metres`,'turn');
-      }
-      if(left<=30&&(tn.kind!=='uturn'||s.uturnHere))add('n'+i,'key',3,tn.kind==='uturn'?'Turn around now':`${turnText(tn)} now`,'turn');
-    });
-
-    // Pace changes ahead: about 100 m before a mark whose pace differs by 6 s/km or more from now
     // Wording follows what the road does: "Climb ahead" (slower), "Climb eases" (gentler climb, quicker)…
     marks.forEach((m,i)=>{
       const left=m.d-s.rd;if(left<=40||left>140||said.has('m'+i))return;
@@ -50,7 +34,7 @@ export function createCoach({P,turns,marks,level='full'}){
       const g=P.grade[Math.min(P.grade.length-1,Math.round(m.d/10))],slower=dp>0;
       const what=g>1?(slower?'Climb ahead. ':'Climb eases. '):g<-1?(slower?'Downhill eases. ':'Downhill ahead. '):'';
       paceAtD=m.d;
-      add('m'+i,'key',2,`${what}Pacer ${slower?'eases to':'picks up to'} ${mmss(m.pace)}`,slower?'down':'up');
+      add('m'+i,'key',3,`${what}Pacer ${slower?'eases to':'picks up to'} ${mmss(m.pace)}`,slower?'down':'up');
     });
 
     // Km splits: yours, the pacer's, and where that leaves you
@@ -82,12 +66,6 @@ export function createCoach({P,turns,marks,level='full'}){
     const proj=s.proj?` On course for ${hms(s.proj)}.`:'';
     if(s.rd>=total/2)add('half','full',1,`Halfway. ${hms(s.t)}. ${gapPhrase(s.gap)}.${proj}`);
     if(total>1500&&total-s.rd<=1000)add('last','full',1,`Last kilometre. ${gapPhrase(s.gap)}.${proj}`);
-
-    // Off route: after 8 s off, and when back on
-    if(s.off&&!off)offFrom=s.t;
-    off=s.off;
-    if(off&&!offSaid&&s.t-offFrom>=8){offSaid=true;out.push({key:'off'+s.t,text:'Off route',pri:3,tone:'turn'})}
-    if(!off&&offSaid){offSaid=false;out.push({key:'on'+s.t,text:'Back on route',pri:3})}
 
     return out.sort((a,b)=>b.pri-a.pri);
   }
@@ -122,8 +100,8 @@ export function createSpeaker(){
       if(synth()){pickVoice();if(!voice&&synth().onvoiceschanged!==undefined)synth().onvoiceschanged=pickVoice;synth().speak(new SpeechSynthesisUtterance(''))}
     }catch(e){}
   }
-  // Tones: two quick equal beeps = turn; rising = pick up / you passed; falling = ease / pacer passed
-  const TONES={turn:[880,880],up:[660,990],down:[990,660],pass:[523,659,784],passed:[784,659,523],split:[740],start:[523,784]};
+  // Tones: rising = pick up / you passed; falling = ease off / pacer passed
+  const TONES={up:[660,990],down:[990,660],pass:[523,659,784],passed:[784,659,523],split:[740],start:[523,784]};
   function tone(kind){
     const f=TONES[kind];if(!f||!ac||!opts.tones)return 0;
     const t0=ac.currentTime+0.02;

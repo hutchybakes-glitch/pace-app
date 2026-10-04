@@ -2,10 +2,10 @@
 //   map   heading-up map of the road around you
 //   front 3D chase view down the road ahead (hills raised so you can see them coming)
 //   rear  3D view looking back down the road behind you
-// The pacer's target pace is written on the road wherever it changes, your line carries an F1-style
+// The pacer's exact pace is written on the road every 50 m, your line carries an F1-style
 // time gap (+ you're ahead, − the pacer is), and each line shows that runner's live pace: yours on
 // the left end of the blue line, the pacer's on the right end of the orange one.
-import {gradeRGB,paceMarks} from './pacer.js';
+import {gradeRGB,roadMarks} from './pacer.js';
 
 const ZE=1.7;                     // 3D: vertical exaggeration of the terrain
 const HALF=4.5;                   // 3D: half road width, m
@@ -37,7 +37,7 @@ export function createView(canvas){
     const X=pts.map(p=>(p.lon-lon0)*k),Y=pts.map(p=>(p.lat-lat0)*111195);
     const TX=[],TY=[];
     for(let i=0;i<n;i++){const a=Math.max(0,i-2),b=Math.min(n-1,i+2),dx=X[b]-X[a],dy=Y[b]-Y[a],L=Math.hypot(dx,dy)||1;TX.push(dx/L);TY.push(dy/L)}
-    R={n,D:pts.map(p=>p.d),X,Y,Z:P.es,TX,TY,C:P.grade.map(gradeRGB),total:pts[n-1].d,turns:turns||[],marks:paceMarks(P),lat0,lon0,k};
+    R={n,D:pts.map(p=>p.d),X,Y,Z:P.es,TX,TY,C:P.grade.map(gradeRGB),total:pts[n-1].d,turns:turns||[],marks:roadMarks(P),lat0,lon0,k};
     hd=null;cd=null;
   }
 
@@ -121,7 +121,7 @@ export function createView(canvas){
     across(0,'#22c55e',5);across(R.total,'#ffffff',6,true);
 
     // Target pace written on the road ahead, wherever it changes
-    const near=d=>Math.abs(d-s.you)<25||(s.pacer!=null&&Math.abs(d-s.pacer)<30)||R.turns.some(t=>Math.abs(t.d-d)<25);
+    const near=d=>Math.abs(d-s.you)<20||(s.pacer!=null&&Math.abs(d-s.pacer)<20)||R.turns.some(t=>Math.abs(t.d-d)<20);
     for(const m of R.marks){
       if(m.d<s.you+20||m.d>s.you+reach*0.75||near(m.d))continue;
       const p=at(m.d),q=T(p.x,p.y);paceText(mmss(m.pace),q[0],q[1],Math.max(13,Math.min(17,roadW*0.8)));
@@ -215,9 +215,9 @@ export function createView(canvas){
 
     // Target pace painted on the road ahead (front view)
     if(!rear)for(const m of R.marks){
-      if(m.d<s.you+12||m.d>s.you+450||(s.pacer!=null&&Math.abs(m.d-s.pacer)<15))continue;
-      const pt=onRoad(m.d,0.1);if(!pt||hidden(pt))continue;
-      const size=Math.max(10,Math.min(30,F*2.4/pt[2]));paceText(mmss(m.pace),pt[0],pt[1],size,Math.max(0.35,1-pt[2]/500));
+      if(m.d<s.you+12||m.d>s.you+350||(s.pacer!=null&&Math.abs(m.d-s.pacer)<12))continue;
+      const pt=onRoad(m.d,0.1);if(!pt||hidden(pt)||pt[2]>320)continue;
+      const size=Math.max(9,Math.min(28,F*2.2/pt[2]));paceText(mmss(m.pace),pt[0],pt[1],size,Math.max(0.3,1-pt[2]/340));
     }
 
     // Runners, farther one first; each with its line across the road

@@ -125,3 +125,10 @@ export function projectFinish(P,d,t,tBack=null){
   if(tBack!=null&&d>=1200){const plan=timeAt(P,d)-timeAt(P,d-1000);if(plan>0)r=0.5*overall+0.5*(t-tBack)/plan}
   return t+(P.finish-timeAt(P,d))*r;
 }
+
+// Pace written on the road: the pacer's exact pace at that spot, every `step` m from `step` in
+export function roadMarks(P,step=50){
+  const out=[];
+  for(let d=step;d<P.total-step/2;d+=step)out.push({d,pace:paceAt(P,d)});
+  return out;
+}

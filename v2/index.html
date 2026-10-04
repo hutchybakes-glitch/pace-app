@@ -67,6 +67,12 @@
       <div class="h">Options</div>
       <div class="set col"><span><b>Current pace from</b><small>GPS speed is often steadier on iPhone</small></span>
         <div class="seg" id="o-speed"><button data-v="0">Position</button><button data-v="1">GPS speed</button></div></div>
+      <div class="set col"><span><b>Voice coach</b><small>Turns, pace changes ahead, km splits and the race with your pacer, spoken</small></span>
+        <div class="seg" id="o-voice"><button data-v="off">Off</button><button data-v="key">Key moments</button><button data-v="full">Full coach</button></div></div>
+      <div class="set"><span><b>Tones</b><small>A short chime before each cue: rising = pick up, falling = ease off, double = turn</small></span><button id="o-tones" class="switch" role="switch"></button></div>
+      <div class="set col"><span><b>Voice speed</b></span>
+        <div class="seg" id="o-rate"><button data-v="slow">Slower</button><button data-v="normal">Normal</button><button data-v="fast">Faster</button></div>
+        <button id="o-test" class="btn ghost testv">🔊 Test the voice</button></div>
       <div class="set"><span><b>Start at the start line</b><small>The clock starts as you cross it, like a chip mat</small></span><button id="o-auto" class="switch" role="switch"></button></div>
       <div class="set"><span><b>Start zone</b><small>How close counts as "at the start"</small></span><div class="mini-step" id="o-zone"><button data-d="-5">−</button><b>25 m</b><button data-d="5">+</button></div></div>
     </div>
@@ -92,6 +98,7 @@
     </div>
     <div class="row2">
       <div id="gap" class="gap"></div>
+      <button id="mute" class="round mute" aria-label="Mute voice coach">🔊</button>
       <div id="views" class="views" role="tablist"><button data-v="map">Map</button><button data-v="front">Front</button><button data-v="rear">Rear</button></div>
     </div>
     <div id="off" hidden></div>

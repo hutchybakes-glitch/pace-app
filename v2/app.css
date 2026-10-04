@@ -107,6 +107,8 @@ b{font-variant-numeric:tabular-nums}
 .gap{font-weight:800;font-size:15px;padding:8px 12px;border-radius:999px;background:rgba(2,6,23,.82);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-variant-numeric:tabular-nums}
 .gap.lead{color:#052e16;background:var(--good);border-color:transparent}
 .gap.behind{color:#1c1003;background:var(--pacer);border-color:transparent}
+.mute{width:40px;height:38px;font-size:18px;margin-left:auto}
+.testv{margin-top:10px;font-size:15px;padding:11px}
 .views{display:flex;background:rgba(2,6,23,.82);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:3px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .views button{border:0;background:none;color:var(--mut2);font-size:13px;font-weight:700;padding:7px 10px;border-radius:9px}
 .views button.on{background:#fff;color:#0f172a}

@@ -6,10 +6,11 @@ import {parseGPX,resample,fillElevation} from './route.js';
 import {createMatcher} from './match.js';
 import {turnsFor,nextTurn,turnText,inDist} from './nav.js';
 import {createStartGate,compass} from './start.js';
-import {buildPacer,timeAt,distAt,paceAt,avgBetween,extremes,gradeColor,projectFinish,PROFILES,TRAIT_NAMES} from './pacer.js';
+import {buildPacer,timeAt,distAt,paceAt,avgBetween,extremes,gradeColor,projectFinish,paceMarks,PROFILES,TRAIT_NAMES} from './pacer.js';
 import {createView,gapText} from './view.js';
 import {saveRoute,listRoutes,deleteRoute,saveRun,listRuns,deleteRun,opt,importV1Routes} from './store.js';
 import {SIM,SPEED,now,every,sim,simWatch} from './sim.js';
+import {createCoach,createSpeaker,gapPhrase} from './coach.js';
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -24,7 +25,11 @@ const show=id=>{for(const s of ['home','run','result'])$(s).hidden=s!==id;if(id!
 // =====================================================================================
 let routes=[],route=null,P=null,turns=[];
 let prof=opt.get('profile',{id:'even',climb:'average',descent:'average',strategy:'even'});
-const o={speed:opt.get('speed',false),auto:opt.get('auto',true),zone:opt.get('zone',25),view:opt.get('view','map')};
+const o={speed:opt.get('speed',false),auto:opt.get('auto',true),zone:opt.get('zone',25),view:opt.get('view','map'),
+  voice:opt.get('voice','full'),tones:opt.get('tones',true),rate:opt.get('rate','normal'),muted:opt.get('muted',false)};
+const RATES={slow:0.9,normal:1,fast:1.12};
+const speaker=createSpeaker();speaker.setOpts({tones:o.tones,rate:RATES[o.rate]});speaker.setMuted(o.muted);
+const voiceOn=()=>o.voice!=='off'&&!o.muted;
 const finishFor=r=>opt.get('finish:'+r.id,Math.round(r.pts.at(-1).d/1000*300/15)*15); // default 5:00/km
 const msg=(t,err)=>{$('msg').textContent=t;$('msg').className=err?'err':''};
 if(SIM)document.querySelector('.brand h1').textContent='Pacer · SIM';
@@ -137,6 +142,12 @@ function renderOptions(){
   $('o-speed').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',(b.dataset.v==='1')===o.speed);b.onclick=()=>{o.speed=b.dataset.v==='1';opt.set('speed',o.speed);renderOptions()}});
   $('o-auto').classList.toggle('on',o.auto);$('o-auto').setAttribute('aria-checked',o.auto);
   $('o-auto').onclick=()=>{o.auto=!o.auto;opt.set('auto',o.auto);renderOptions()};
+  $('o-voice').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===o.voice);b.onclick=()=>{o.voice=b.dataset.v;opt.set('voice',o.voice);renderOptions()}});
+  $('o-tones').classList.toggle('on',o.tones);$('o-tones').setAttribute('aria-checked',o.tones);
+  $('o-tones').onclick=()=>{o.tones=!o.tones;opt.set('tones',o.tones);speaker.setOpts({tones:o.tones});renderOptions()};
+  $('o-rate').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===o.rate);b.onclick=()=>{o.rate=b.dataset.v;opt.set('rate',o.rate);speaker.setOpts({rate:RATES[o.rate]});renderOptions()}});
+  $('o-test').onclick=()=>{speaker.unlock();speaker.setMuted(false);o.muted=false;opt.set('muted',false);
+    speaker.play([{text:'Turn left in 200 metres',pri:3,tone:'turn'},{text:'Climb ahead. Pacer eases to 5:20',pri:2,tone:'down'},{text:'Kilometre 3. 4:58. Pacer 5:01. 6 seconds ahead.',pri:2,tone:'split'}])};
   $('o-zone').querySelector('b').textContent=`${o.zone} m`;
   $('o-zone').querySelectorAll('button').forEach(b=>b.onclick=()=>{o.zone=Math.max(10,Math.min(100,o.zone+ +b.dataset.d));opt.set('zone',o.zone);renderOptions()});
 }
@@ -157,8 +168,11 @@ let shownD=0,raf=0,lastFrame=0,gapNow=null; // gapNow: s, + = you ahead of the p
 const el=()=>acc+(phase==='running'?now()-t0:0); // pause-aware elapsed ms
 const ROUTE_WINDOW=20000,AUTOSAVE=10000,RESUME_GAP=15*60000;
 
+let coach=null,armSaid=null;
 function enterRun(r=route,p=P,tr=turns){
   runRoute=r;runP=p;runTurns=tr;
+  coach=createCoach({P:p,turns:tr,marks:paceMarks(p),level:o.voice==='key'?'key':'full'});armSaid=null;
+  setMuteUI();
   resetRun();
   view.setRoute(r.pts,p,tr);
   show('run');layout();setView(o.view);
@@ -187,6 +201,7 @@ function setPhaseUI(){
   go.textContent={idle:'Start',armed:'Cancel',running:'Pause',paused:'Resume',done:'Start'}[phase];
   if(phase==='running')go.classList.add('pause');if(phase==='armed')go.classList.add('cancel');
   $('finbtn').hidden=phase!=='paused';
+  $('side').hidden=phase==='idle'||phase==='armed'; // nothing to show yet, and the start card needs the width
   if(!$('run').hidden)requestAnimationFrame(layout);
   $('back').hidden=phase==='running'||phase==='armed';
 }
@@ -227,6 +242,8 @@ function disarm(){phase='idle';gate=null;sim.moving=false;$('arm').hidden=true;s
 function armFix(p){
   const c=p.coords,g=gate.update(c.latitude,c.longitude,c.accuracy,p.timestamp);
   if(g.state==='go'){$('arm').hidden=true;const t=now();start(Math.min(t,Math.max(g.crossTs,t-60000)));return}
+  if(g.state==='ready'&&armSaid!=='ready'&&voiceOn())speaker.say('At the start. The clock starts as you cross the line.',2,'start');
+  if(g.state!=='crossing')armSaid=g.state;
   const head=c.heading!=null&&!isNaN(c.heading)&&c.speed>0.8?c.heading:null,rel=head==null?null:(g.bearing-head+360)%360;
   const T={weak:['Waiting for GPS',`Accuracy ±${Math.round(g.acc)} m · needs ±20 m or better`],far:['Head to the start',''],
     ready:['At the start ✓','Your pacer is waiting. Clock starts as you cross the line'],crossing:['At the start ✓','Go!'],
@@ -244,13 +261,15 @@ async function wake(){try{lock=await navigator.wakeLock?.request('screen')}catch
 document.addEventListener('visibilitychange',()=>{if((phase==='running'||phase==='armed')&&document.visibilityState==='visible')wake()});
 
 function start(at){
+  if(voiceOn())speaker.say(rec?'Resumed':"Go! Your pacer's away.",3,'start');
   if(!rec)rec={started:Date.now(),status:'active',sim:SIM,route:{id:runRoute.id,name:runRoute.name,src:runRoute.src,pts:runRoute.pts,cues:runRoute.cues||[]},
     finish:runP.finish,prof:{...prof},speed:o.speed,fixes:[]};
   phase='running';t0=at??now();track.last=null;rpts=[];spts=[];sim.moving=true;
   ensureWatch();wake();setPhaseUI();
 }
-function pause(){acc=el();phase='paused';sim.moving=false;lock?.release();lock=null;setPhaseUI();save()}
+function pause(){acc=el();phase='paused';sim.moving=false;lock?.release();lock=null;setPhaseUI();save();if(voiceOn())speaker.say('Paused',2)}
 $('go').onclick=()=>{
+  speaker.unlock(); // iOS: audio must be started from a tap
   if(phase==='running')pause();
   else if(phase==='armed')disarm();
   else if(phase==='idle')o.auto?arm():start();
@@ -284,6 +303,7 @@ async function finishRun(complete){
   acc=el();phase='done';sim.moving=false;lock?.release();lock=null;
   if(complete)rd=runP.total;
   snapshot();Object.assign(rec,{status:'done',running:false,complete});
+  if(complete&&voiceOn()){const g=timeAt(runP,runP.total)-acc/1000;speaker.say(`Finished in ${fmt(acc/1000)}. ${Math.abs(g)<0.5?'A dead heat with the pacer!':g>0?`You beat the pacer by ${gapPhrase(g).replace(' ahead','')}!`:`The pacer won by ${gapPhrase(g).replace(' behind','')}.`}`,3,'pass')}
   await saving;rec.id=await saveRun(rec);
   cancelAnimationFrame(raf);showResult(rec);
 }
@@ -299,6 +319,21 @@ function loop(ts){
   const pd=started?distAt(runP,el()/1000):0;
   view.draw({mode:o.view,you:started?shownD:0,pacer:pd,gap:started?gapNow:null,youPace:started?curPace:undefined,pacerPace:paceAt(runP,pd),gps:(!started||offRoute)?lastLL:null});
 }
+
+// Are you physically within 25 m of this turn's point? (GPS, not just route distance)
+function uturnHere(tn){
+  if(!tn||!lastLL)return false;
+  const tp=runRoute.pts[Math.min(runRoute.pts.length-1,Math.round(tn.d/10))],k=Math.cos(tp.lat*Math.PI/180)*111195;
+  return Math.hypot((lastLL.lon-tp.lon)*k,(lastLL.lat-tp.lat)*111195)<=25;
+}
+
+// Mute button on the run screen
+function setMuteUI(){$('mute').textContent=o.muted||o.voice==='off'?'🔇':'🔊';$('mute').setAttribute('aria-label',o.muted?'Unmute voice coach':'Mute voice coach')}
+$('mute').onclick=()=>{
+  speaker.unlock();
+  if(o.voice==='off'){o.voice='full';opt.set('voice','full');coach?.setLevel('full')}else{o.muted=!o.muted;opt.set('muted',o.muted)}
+  speaker.setMuted(o.muted);setMuteUI();if(voiceOn())speaker.say('Voice coach on',2);
+};
 
 // Your elapsed time (s) when you were 1 km back from where you are now, from the recorded fixes
 function timeOneKmBack(){
@@ -351,11 +386,10 @@ function hud(){
   const nt=nextTurn(runTurns,rd),left=(nt?nt.d:D)-rd;
   $('ticon').innerHTML=turnIcon(nt);$('ttext').textContent=nt?turnText(nt):'Finish';
   let dist=inDist(Math.max(0,left));
-  if(nt?.kind==='uturn'&&dist==='now'&&lastLL){ // "now" only when you're physically at the turnaround
-    const tp=runRoute.pts[Math.min(runRoute.pts.length-1,Math.round(nt.d/10))],k=Math.cos(tp.lat*Math.PI/180)*111195;
-    if(Math.hypot((lastLL.lon-tp.lon)*k,(lastLL.lat-tp.lat)*111195)>25)dist='in 20 m';
-  }
+  if(nt?.kind==='uturn'&&dist==='now'&&!uturnHere(nt))dist='in 20 m'; // "now" only when you're physically at the turnaround
   $('tdist').textContent=dist;$('turn').className=left<=60?'soon':'';
+  if(phase==='running'&&voiceOn()&&coach&&rd>0)speaker.play(coach.update({rd,t,gap:gapNow??0,cur:curPace,splits:rsplits.map(x=>x/1000),
+    off:offRoute,uturnHere:uturnHere(nt),proj:projectFinish(runP,rd,t,timeOneKmBack())}));
 }
 setInterval(hud,250);
 
@@ -428,6 +462,7 @@ async function refreshHistory(){
 $('rssave').onclick=async()=>{const r=pending;if(!r)return;r.status='done';r.running=false;r.complete=false;await saveRun(r);refreshHistory()};
 $('rsdel').onclick=async()=>{if(!pending||!confirm('Discard this unfinished run?'))return;await deleteRun(pending.id);refreshHistory()};
 $('rsgo').onclick=()=>{
+  speaker.unlock();
   const r=pending;if(!r)return;$('resume').hidden=true;
   const Pr=buildPacer(r.route.pts,r.finish,r.prof);
   enterRun(r.route,Pr,turnsFor(r.route));

@@ -23,6 +23,8 @@ export function createView(canvas){
   const ctx=canvas.getContext('2d');
   let W=1,H=1,R=null,hd=null,cd=null; // R: prepared route; hd: smoothed map heading; cd: smoothed 3D camera direction
   let top=0,bot=0,rgt=0,lft=0; // screen covered by overlays at the top, bottom, right and left, px
+  let heads={view:0,travel:0};  // last frame: ° the screen's up faces, ° you're running (for the wind arrow)
+  const metres=m=>`${Math.round(m).toLocaleString('en-GB')} m`;
 
   function resize(){
     const dpr=Math.min(2,window.devicePixelRatio||1);
@@ -51,7 +53,7 @@ export function createView(canvas){
   const idxOf=d=>Math.max(0,Math.min(R.n-1,Math.round(d/10)));
 
   // s: {mode, you (route m), pacer (route m or null), gap (s, + = you ahead, or null),
-  //     youPace, pacerPace (s/km or null), gps {lat,lon} or null, wind {speed m/s felt, dir ° from} or null}
+  //     youPace, pacerPace (s/km or null), gps {lat,lon} or null}
   function draw(s){
     if(!R)return;
     ctx.clearRect(0,0,W,H);
@@ -59,21 +61,6 @@ export function createView(canvas){
   }
 
   // ---------- shared bits ----------
-  // Wind badge, bottom-left of the view: an arrow showing where the wind blows on screen, and head/tail/cross
-  // relative to your direction of travel. view = ° the screen's "up" faces; travel = ° you're running
-  function windBadge(wind,view,travel){
-    if(!wind||wind.speed<0.4)return;
-    const rel=Math.cos((wind.dir-travel)*Math.PI/180),kind=rel>0.4?'head':rel<-0.4?'tail':'cross';
-    const x=lft+(W-rgt-lft-128)/2,y=H-bot-46,r=16;
-    ctx.save();ctx.fillStyle='rgba(2,6,23,.82)';ctx.strokeStyle='rgba(255,255,255,.14)';
-    ctx.beginPath();ctx.roundRect?ctx.roundRect(x,y,128,36,18):ctx.rect(x,y,128,36);ctx.fill();ctx.stroke();
-    ctx.translate(x+18,y+18);ctx.rotate(((wind.dir+180-view)%360)*Math.PI/180);
-    ctx.fillStyle='#7dd3fc';ctx.beginPath();ctx.moveTo(0,-r*0.7);ctx.lineTo(r*0.45,r*0.4);ctx.lineTo(0,r*0.15);ctx.lineTo(-r*0.45,r*0.4);ctx.closePath();ctx.fill();
-    ctx.restore();
-    ctx.save();ctx.font=`800 13px ${FONT}`;ctx.fillStyle='#fff';ctx.textBaseline='middle';
-    ctx.fillText(`${Math.round(wind.speed*2.237)} mph ${kind}`,x+40,y+18.5);ctx.restore();
-  }
-
   function dot(x,y,r,col){ctx.save();ctx.shadowColor=col;ctx.shadowBlur=14;ctx.fillStyle=col;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.shadowBlur=0;ctx.lineWidth=2.5;ctx.strokeStyle='#fff';ctx.stroke();ctx.restore()}
   function pill(text,x,y,bg,fg,size=11,alpha=1){
     ctx.save();ctx.globalAlpha=alpha;ctx.font=`800 ${size}px ${FONT}`;const w=ctx.measureText(text).width+size*1.1,h=size*1.65;
@@ -160,8 +147,9 @@ export function createView(canvas){
     const clampX=(x,w)=>Math.max(lft+w/2+2,Math.min(lft+vw-w/2-2,x));
     if(pq){dot(pq.c[0],pq.c[1],8,ORANGE);pill(`PACER ${paceStr(s.pacerPace)}`,clampX(pq.right[0]+48,86),pq.right[1],ORANGE,'#1c1003',13)}
     if(s.youPace!==undefined)pill(paceStr(s.youPace),clampX(yq.left[0]-32,56),yq.left[1],ME,'#06142e',14);
+    pill(metres(s.you),clampX(yq.right[0]+40,72),yq.right[1]+(pq&&Math.abs(pq.right[1]-yq.right[1])<22?24:0),'rgba(2,6,23,.85)','#e2e8f0',13);
     gapLabel(s.gap,ax,ay-34,16);
-    const hdDeg=(Math.atan2(hd.x,hd.y)*180/Math.PI+360)%360;windBadge(s.wind,hdDeg,hdDeg);
+    const hdDeg=(Math.atan2(hd.x,hd.y)*180/Math.PI+360)%360;heads={view:hdDeg,travel:hdDeg};
   }
 
   // White disc with an arrow showing the turn relative to the road at that point
@@ -249,11 +237,12 @@ export function createView(canvas){
       const lift=Math.max(16,F*0.55/head[2]);
       const side=Math.max(44,F*1.1/head[2]);
       const inView=(x,w)=>Math.max(lft+w/2+2,Math.min(lft+vw-w/2-2,x)); // keep tags clear of the side columns
-      if(o.me){gapLabel(s.gap,head[0],head[1]-lift-4,15);if(s.youPace!==undefined)pill(paceStr(s.youPace),inView(head[0]-side,52),head[1]+lift*0.4,ME,'#06142e',13)}
+      if(o.me){gapLabel(s.gap,head[0],head[1]-lift-4,15);if(s.youPace!==undefined)pill(paceStr(s.youPace),inView(head[0]-side,52),head[1]+lift*0.4,ME,'#06142e',13);
+        pill(metres(s.you),inView(head[0]-side,72),head[1]+lift*0.4+24,'rgba(2,6,23,.85)','#e2e8f0',12)}
       else pill(`PACER ${paceStr(s.pacerPace)}`,inView(head[0]+side+16,84),head[1],ORANGE,'#1c1003',12,ghost?0.6:1);
     }
     const camDeg=(Math.atan2(f[0],f[1])*180/Math.PI+360)%360,runDeg=(Math.atan2(cd.x,cd.y)*180/Math.PI+360)%360;
-    windBadge(s.wind,camDeg,runDeg);
+    heads={view:camDeg,travel:runDeg};
     // Pacer out of view: an edge hint
     if(s.pacer!=null){
       const pc=figs.find(o=>!o.me),gap=s.pacer-s.you;
@@ -274,5 +263,5 @@ export function createView(canvas){
     ctx.restore();
   }
 
-  return {resize,setRoute,setInsets,draw};
+  return {resize,setRoute,setInsets,draw,headings:()=>heads};
 }

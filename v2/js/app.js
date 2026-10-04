@@ -391,9 +391,7 @@ function loop(ts){
   }else shownD+=(rd-shownD)*0.3;
   const started=phase==='running'||phase==='paused'||phase==='done';
   const pd=started?distAt(runP,el()/1000):0;
-  let wind=null;
-  if(runCond){const c=wxAt(runCond.w,runCond.start+(started?el():0));wind={speed:c.wind*(SHELTER[runCond.shelter]??0.55),dir:c.dir}}
-  view.draw({mode:o.view,wind,you:started?shownD:0,pacer:pd,gap:started?gapNow:null,youPace:started?curPace:undefined,pacerPace:paceAt(runP,pd),gps:(!started||offRoute)?lastLL:null});
+  view.draw({mode:o.view,you:started?shownD:0,pacer:pd,gap:started?gapNow:null,youPace:started?curPace:undefined,pacerPace:paceAt(runP,pd),gps:(!started||offRoute)?lastLL:null});
 }
 
 // Are you physically within 25 m of this turn's point? (GPS, not just route distance)
@@ -420,6 +418,20 @@ function timeOneKmBack(){
   return (a[1]+(b[1]-a[1])*Math.max(0,Math.min(1,k)))/1000;
 }
 
+// Wind and weather in the side panel: the wind you feel (arrow shows where it blows, as you see the
+// screen), head/tail/cross for your direction of running, then temperature, dew point, humidity, rain
+function sideWeather(t){
+  $('wxb').hidden=$('wxt').hidden=!runCond;
+  if(!runCond)return;
+  const c=wxAt(runCond.w,runCond.start+t*1000),felt=c.wind*(SHELTER[runCond.shelter]??0.55),h=view.headings();
+  const rel=Math.cos((c.dir-h.travel)*Math.PI/180),kind=felt<0.4?'calm':rel>0.4?'head':rel<-0.4?'tail':'cross';
+  $('wxarr').style.transform=`rotate(${(c.dir+180-h.view+360)%360}deg)`;$('wxarr').style.visibility=kind==='calm'?'hidden':'visible';
+  $('wxspd').textContent=`${Math.round(mph(felt))} mph`;
+  $('wxkind').textContent={calm:'calm',head:'headwind',tail:'tailwind',cross:'crosswind'}[kind];$('wxkind').className=kind;
+  $('wxtemp').textContent=`${Math.round(c.temp)}°C`;
+  $('wxmore').textContent=`dew ${Math.round(c.dew)}° · ${Math.round(c.rh)}% humid · ${c.rain>=0.3?`rain ${c.rain.toFixed(1)} mm/h`:c.rad>400?'sunny':'dry'}`;
+}
+
 // Splits table: every completed km for you and the pacer, then the km in progress (live, faint)
 let splitsShown=-1;
 function splits(t){
@@ -429,7 +441,12 @@ function splits(t){
     const you=(rsplits[k]-(rsplits[k-1]||0))/1000,pc=timeAt(runP,(k+1)*1000)-timeAt(runP,k*1000);
     rows.push(`<tr><td>${k+1}</td><td class="y ${you<pc-1?'faster':you>pc+1?'slower':''}">${fmt(you)}</td><td class="p">${fmt(pc)}</td></tr>`);
   }
-  if(live)rows.push(`<tr class="live"><td>${n+1}</td><td class="y">${fmt(t-(rsplits.at(-1)||0)/1000)}</td><td class="p">${fmt(timeAt(runP,rd)-timeAt(runP,k0))}</td></tr>`);
+  // The km in progress: average pace so far for you and the pacer over the same stretch; it becomes the
+  // km's split time (the same number for a full km) when the km is done
+  if(live){
+    const you=(t-(rsplits.at(-1)||0)/1000)/((rd-k0)/1000),pc=avgBetween(runP,k0,rd);
+    rows.push(`<tr class="live"><td>${n+1}</td><td class="y ${you<pc-1?'faster':you>pc+1?'slower':''}">${fmtP(you)}</td><td class="p">${fmtP(pc)}</td></tr>`);
+  }
   $('spl').innerHTML=rows.join('')||'<tr class="wait"><td colspan="3">Splits appear as you go</td></tr>';
   if(n!==splitsShown){splitsShown=n;const w=document.querySelector('.splw');w.scrollTop=w.scrollHeight}
 }
@@ -445,6 +462,7 @@ function hud(){
     const ay=t/(rd/1000),ap=timeAt(runP,rd)/(rd/1000);
     $('ay').textContent=fmtP(ay);$('ap').textContent=fmtP(ap);cls('ay',ay,ap);
     gapNow=timeAt(runP,rd)-t;$('gap').hidden=true;
+    sideWeather(t);
     // Projected finish: how you're doing against the pacer's hill-aware plan, applied to what's left
     const proj=projectFinish(runP,rd,t,timeOneKmBack());
     if(proj){const dlt=proj-runP.finish;$('proj').textContent=fmt(proj);$('projd').textContent=Math.abs(dlt)<0.5?'on target':`${dlt<0?'−':'+'}${gapFmt(Math.abs(dlt))} vs target`;$('projd').className=dlt<-0.5?'ahead':dlt>0.5?'behind':''}

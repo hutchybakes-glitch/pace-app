@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pacer">
+<meta name="theme-color" content="#070d1c">
+<title>Pacer</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- ============ Home ============ -->
+<section id="home">
+  <header class="top">
+    <div class="brand"><img src="icons/icon-192.png" alt=""><div><h1>Pacer</h1><span>Race a pacer who knows every hill</span></div></div>
+  </header>
+
+  <div id="resume" class="card warn" hidden>
+    <div class="h">Unfinished run</div>
+    <div id="rsinfo"></div>
+    <div class="bt3"><button id="rsgo" class="btn go">Resume</button><button id="rssave" class="btn">Save</button><button id="rsdel" class="btn">Discard</button></div>
+  </div>
+
+  <div class="card">
+    <div class="h">Route</div>
+    <ul id="routes"></ul>
+    <label class="btn ghost">＋ Load GPX file<input type="file" id="gpx" hidden></label>
+    <div id="msg"></div>
+  </div>
+
+  <div id="plan" hidden>
+    <div class="card">
+      <h2 id="rname"></h2>
+      <div id="rchips" class="chips"></div>
+      <svg id="pmap" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Route coloured by gradient"></svg>
+      <div class="key"><span><i class="kup"></i>Uphill</span><span><i class="kflat"></i>Flat</span><span><i class="kdown"></i>Downhill</span><span class="kshade">darker = steeper</span></div>
+    </div>
+
+    <div class="card">
+      <div class="h">Target</div>
+      <div class="stepper" id="st-finish"><button data-d="-1" aria-label="Decrease">−</button><div><b id="v-finish">–</b><span>finish time</span></div><button data-d="1" aria-label="Increase">+</button></div>
+      <div class="stepper" id="st-pace"><button data-d="-1" aria-label="Decrease">−</button><div><b id="v-pace">–</b><span>average pace /km</span></div><button data-d="1" aria-label="Increase">+</button></div>
+    </div>
+
+    <div class="card">
+      <div class="h">Your pacer</div>
+      <div id="profiles" class="profiles"></div>
+      <div class="tune">
+        <div class="trow"><span>Climbing</span><div class="seg" id="t-climb"></div></div>
+        <div class="trow"><span>Descending</span><div class="seg" id="t-descent"></div></div>
+        <div class="trow"><span>Strategy</span><div class="seg" id="t-strategy"></div></div>
+      </div>
+      <div class="h sp">The pacer's run</div>
+      <div class="pchart"><svg id="pchart" viewBox="0 0 1000 220" preserveAspectRatio="none" role="img" aria-label="Pacer's pace along the route over the elevation"></svg><div id="pylab"></div></div>
+      <div id="paxis" class="axis"></div>
+      <div class="key"><span><i class="kpace"></i>Pacer's pace (higher = faster)</span></div>
+      <div id="pinsight" class="insight"></div>
+    </div>
+
+    <div class="card">
+      <div class="h">Options</div>
+      <div class="set col"><span><b>Current pace from</b><small>GPS speed is often steadier on iPhone</small></span>
+        <div class="seg" id="o-speed"><button data-v="0">Position</button><button data-v="1">GPS speed</button></div></div>
+      <div class="set"><span><b>Start at the start line</b><small>The clock starts as you cross it, like a chip mat</small></span><button id="o-auto" class="switch" role="switch"></button></div>
+      <div class="set"><span><b>Start zone</b><small>How close counts as "at the start"</small></span><div class="mini-step" id="o-zone"><button data-d="-5">−</button><b>25 m</b><button data-d="5">+</button></div></div>
+    </div>
+  </div>
+
+  <button id="race" class="btn go hero sticky" disabled>Race the pacer</button>
+
+  <div class="card">
+    <div class="h">History</div>
+    <div id="noruns" class="sub">No runs yet.</div>
+    <ul id="runs"></ul>
+  </div>
+  <p class="foot"><a href="../">Classic Pace (v1)</a></p>
+</section>
+
+<!-- ============ Run ============ -->
+<section id="run" hidden>
+  <canvas id="cv"></canvas>
+  <div class="ovtop">
+    <div class="toprow">
+      <button id="back" class="round" aria-label="Back">‹</button>
+      <div id="turn"><svg id="ticon" viewBox="0 0 48 48" aria-hidden="true"></svg><div><b id="ttext"></b><span id="tdist"></span></div></div>
+    </div>
+    <div class="row2">
+      <div id="gap" class="gap"></div>
+      <div id="views" class="views" role="tablist"><button data-v="map">Map</button><button data-v="front">Front</button><button data-v="rear">Rear</button></div>
+    </div>
+    <div id="off" hidden></div>
+    <div id="arm" hidden>
+      <div id="armh"></div>
+      <div class="arm-m"><svg id="armarrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l7.5 19L12 16.5 4.5 21z" fill="currentColor"/></svg><span id="armdist"></span></div>
+      <div id="arms"></div>
+      <button id="armgo" class="btn ghost">Start now</button>
+    </div>
+  </div>
+  <div class="sheet" id="sheet">
+    <div class="srow">
+      <div><b id="tm">0:00</b><span>time</span></div>
+      <div><b id="km">0.00</b><span>km</span></div>
+      <div><b id="togo">–</b><span>km to go</span></div>
+    </div>
+    <table class="cmp">
+      <tr><th></th><th class="you">You</th><th class="pc">Pacer</th></tr>
+      <tr><td>Pace now</td><td id="cy">--:--</td><td id="cp">--:--</td></tr>
+      <tr><td>This km</td><td id="ky">--:--</td><td id="kp">--:--</td></tr>
+      <tr><td>Average</td><td id="ay">--:--</td><td id="ap">--:--</td></tr>
+    </table>
+    <div class="ctrl"><button id="go" class="btn go">Start</button><button id="finbtn" class="btn">Finish</button></div>
+    <div id="gpsline"></div>
+  </div>
+</section>
+
+<!-- ============ Result ============ -->
+<section id="result" hidden>
+  <div class="res">
+    <div id="rbadge"></div>
+    <h1 id="rtitle"></h1>
+    <div id="rsub" class="sub"></div>
+    <div class="rbig"><div class="you"><b id="ryou"></b><span>You</span></div><div class="pc"><b id="rpacer"></b><span>Pacer</span></div></div>
+    <div class="card"><table class="kt" id="rkm"></table></div>
+    <div class="ctrl"><button id="rgpx" class="btn ghost">Export GPX</button><button id="rdone" class="btn go">Done</button></div>
+  </div>
+</section>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

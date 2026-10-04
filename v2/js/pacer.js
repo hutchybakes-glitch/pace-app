@@ -1,0 +1,104 @@
+// The pacer: a virtual runner who paces the route metre by metre. Their pace follows the local
+// gradient through a runner profile (how hard climbs feel, how much descents give back, how effort is
+// spread over the race) and is scaled so they finish exactly on the target time.
+// Paces are seconds per km, distances metres, times seconds. No DOM access: runs under node --test.
+import {smooth} from './route.js';
+
+// Profile traits
+export const CLIMB={none:0,strong:0.024,average:0.033,weak:0.045};          // slower per +1 % grade
+export const DESCENT={none:{gain:0,taper:-10},cautious:{gain:0.008,taper:-6},
+  average:{gain:0.018,taper:-10},strong:{gain:0.026,taper:-14}};              // faster per −1 %, braking from taper %
+export const STRATEGY={even:0,negative:0.03,positive:-0.03};                 // + = start slower, finish faster
+export const TRAIT_NAMES={
+  climb:{weak:'Weak',average:'Average',strong:'Strong',none:'Ignores hills'},
+  descent:{cautious:'Cautious',average:'Average',strong:'Strong',none:'Ignores hills'},
+  strategy:{even:'Even',negative:'Negative split',positive:'Fast start'},
+};
+
+export const PROFILES=[
+  {id:'even',name:'Even effort',icon:'⚖️',desc:'Eases off on climbs and uses the descents. The classic way to pace hills.',climb:'average',descent:'average',strategy:'even'},
+  {id:'climber',name:'Strong climber',icon:'⛰️',desc:'Attacks the uphills, steady on the way down.',climb:'strong',descent:'average',strategy:'even'},
+  {id:'descender',name:'Strong descender',icon:'🪂',desc:'Holds back on climbs, flies down the hills.',climb:'weak',descent:'strong',strategy:'even'},
+  {id:'hills',name:'Hill specialist',icon:'🐐',desc:'Strong up and down: banks time on every hill.',climb:'strong',descent:'strong',strategy:'even'},
+  {id:'flat',name:'Flat-road runner',icon:'🛣️',desc:'Quick on the flat, careful on hills both ways.',climb:'weak',descent:'cautious',strategy:'even'},
+  {id:'negative',name:'Negative splitter',icon:'📈',desc:'Even effort, but starts 3 % easy and finishes 3 % quicker.',climb:'average',descent:'average',strategy:'negative'},
+  {id:'metronome',name:'Metronome',icon:'⏱️',desc:'Exactly the same pace everywhere, hills or not.',climb:'none',descent:'none',strategy:'even'},
+];
+
+// Effort factor at grade g % (pace multiplier). Descents help down to the taper grade, then braking
+// takes the benefit back. Grades beyond ±25 % are treated as ±25 %.
+export function effort(g,climb,descent){
+  g=Math.max(-25,Math.min(25,g));
+  if(g>=0)return 1+climb*g;
+  if(g>=descent.taper)return 1+descent.gain*g;
+  return Math.min(1,1+descent.gain*(2*descent.taper-g));
+}
+
+// Centred moving average of values v over route points pts within ±win/2 m
+function smoothVals(v,pts,win){
+  const h=win/2,out=[];let a=0,b=0,sum=0;
+  for(let i=0;i<v.length;i++){
+    while(b<v.length&&pts[b].d<=pts[i].d+h)sum+=v[b++];
+    while(pts[a].d<pts[i].d-h)sum-=v[a++];
+    out.push(sum/(b-a));
+  }
+  return out;
+}
+
+// Build the pacer for route points pts (every 10 m, with ele), finish time (s) and profile traits.
+// Returns {d[], grade[], pace[], time[], es[], base, finish, total}: arrays per route point.
+//   smoothM elevation smoothing, gradeM span grade is measured over, easeM how gradually pace changes
+//   (a real pacemaker eases into a change over a couple of hundred metres; map noise shouldn't twitch it)
+export function buildPacer(pts,finish,prof,{smoothM=120,gradeM=100,easeM=200}={}){
+  const n=pts.length,D=pts[n-1].d,es=smooth(pts,smoothM),h=Math.max(1,Math.round(gradeM/20));
+  const grade=pts.map((p,i)=>{const a=Math.max(0,i-h),b=Math.min(n-1,i+h);return pts[b].d>pts[a].d?(es[b]-es[a])/(pts[b].d-pts[a].d)*100:0});
+  const c=CLIMB[prof.climb],ds=DESCENT[prof.descent],s=STRATEGY[prof.strategy];
+  const q=smoothVals(grade.map((g,i)=>effort(g,c,ds)*(1+s*(1-2*pts[i].d/D))),pts,easeM);
+  let W=0;for(let i=1;i<n;i++)W+=(q[i-1]+q[i])/2*(pts[i].d-pts[i-1].d);
+  const base=finish*1000/W,pace=q.map(x=>x*base);
+  const time=[0];for(let i=1;i<n;i++)time.push(time[i-1]+(pace[i-1]+pace[i])/2*(pts[i].d-pts[i-1].d)/1000);
+  return {d:pts.map(p=>p.d),grade,pace,time,es,base,finish,total:D};
+}
+
+// Index of the last point at or before distance d
+function idx(P,d){let lo=0,hi=P.d.length-2;while(lo<hi){const m=(lo+hi+1)>>1;if(P.d[m]<=d)lo=m;else hi=m-1}return lo}
+const lerp=(a,b,f)=>a+(b-a)*f;
+
+// Pacer's elapsed time (s) on reaching distance d, and pace (s/km) there
+export function timeAt(P,d){
+  if(d<=0)return 0;if(d>=P.total)return P.finish;
+  const i=idx(P,d),f=(d-P.d[i])/(P.d[i+1]-P.d[i]);
+  return P.time[i]+(lerp(P.pace[i],P.pace[i+1],f/2)*(d-P.d[i]))/1000; // trapezoid to d
+}
+export function paceAt(P,d){
+  d=Math.max(0,Math.min(P.total,d));
+  const i=idx(P,d),f=(d-P.d[i])/((P.d[i+1]-P.d[i])||1);
+  return lerp(P.pace[i],P.pace[i+1]??P.pace[i],f);
+}
+// Pacer's distance (m) at elapsed time t (s)
+export function distAt(P,t){
+  if(t<=0)return 0;if(t>=P.finish)return P.total;
+  let lo=0,hi=P.time.length-1;while(hi-lo>1){const m=(lo+hi)>>1;if(P.time[m]<=t)lo=m;else hi=m}
+  // within the step: pace changes linearly, solve the trapezoid for the distance
+  const L=P.d[hi]-P.d[lo],p0=P.pace[lo],p1=P.pace[hi],dt=(t-P.time[lo])*1000,k=(p1-p0)/L;
+  const x=Math.abs(k)<1e-9?dt/p0:(-p0+Math.sqrt(p0*p0+2*k*dt))/k;
+  return P.d[lo]+Math.max(0,Math.min(L,x));
+}
+// Pacer's average pace (s/km) between distances a and b
+export const avgBetween=(P,a,b)=>b-a>1?(timeAt(P,b)-timeAt(P,a))/((b-a)/1000):paceAt(P,a);
+
+// Fastest and slowest points of the pacer's run: {d, pace}
+export function extremes(P){
+  let lo=0,hi=0;P.pace.forEach((p,i)=>{if(p<P.pace[lo])lo=i;if(p>P.pace[hi])hi=i});
+  return {fast:{d:P.d[lo],pace:P.pace[lo],grade:P.grade[lo]},slow:{d:P.d[hi],pace:P.pace[hi],grade:P.grade[hi]}};
+}
+
+// Road colour for a grade: grey when flat, light → dark red as climbs steepen, light → dark green as
+// descents steepen. Returns an rgb() string.
+export function gradeRGB(g){
+  const mix=(a,b,t)=>a.map((x,i)=>Math.round(x+(b[i]-x)*t));
+  if(Math.abs(g)<1)return [148,163,184];
+  const t=Math.min(1,(Math.abs(g)-1)/8);
+  return g>0?mix([252,165,165],[185,28,28],t):mix([134,239,172],[21,128,61],t);
+}
+export const gradeColor=g=>`rgb(${gradeRGB(g).join(',')})`;

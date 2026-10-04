@@ -3,6 +3,7 @@
 // spread over the race) and is scaled so they finish exactly on the target time.
 // Paces are seconds per km, distances metres, times seconds. No DOM access: runs under node --test.
 import {smooth} from './route.js';
+import {weatherFactors} from './weather.js';
 
 // Profile traits
 export const CLIMB={none:0,strong:0.024,average:0.033,weak:0.045};          // slower per +1 % grade
@@ -45,19 +46,35 @@ function smoothVals(v,pts,win){
   return out;
 }
 
-// Build the pacer for route points pts (every 10 m, with ele), finish time (s) and profile traits.
-// Returns {d[], grade[], pace[], time[], es[], base, finish, total}: arrays per route point.
+// Build the pacer for route points pts (every 10 m, with ele), target finish time (s) and profile traits.
+// Returns {d[], grade[], pace[], time[], es[], base, finish, total, wx}: arrays per route point.
 //   smoothM elevation smoothing, gradeM span grade is measured over, easeM how gradually pace changes
 //   (a real pacemaker eases into a change over a couple of hundred metres; map noise shouldn't twitch it)
-export function buildPacer(pts,finish,prof,{smoothM=120,gradeM=100,easeM=200}={}){
+//   cond    weather: {w (fetchWeather), start (ms), shelter, mode: 'keep' (same finish, effort spread for
+//           the conditions) | 'adjust' (conditions move the finish time)}. wx then reports the effect.
+export function buildPacer(pts,finish,prof,{smoothM=120,gradeM=100,easeM=200,cond=null}={}){
   const n=pts.length,D=pts[n-1].d,es=smooth(pts,smoothM),h=Math.max(1,Math.round(gradeM/20));
   const grade=pts.map((p,i)=>{const a=Math.max(0,i-h),b=Math.min(n-1,i+h);return pts[b].d>pts[a].d?(es[b]-es[a])/(pts[b].d-pts[a].d)*100:0});
   const c=CLIMB[prof.climb],ds=DESCENT[prof.descent],s=STRATEGY[prof.strategy];
-  const q=smoothVals(grade.map((g,i)=>effort(g,c,ds)*(1+s*(1-2*pts[i].d/D))),pts,easeM);
-  let W=0;for(let i=1;i<n;i++)W+=(q[i-1]+q[i])/2*(pts[i].d-pts[i-1].d);
-  const base=finish*1000/W,pace=q.map(x=>x*base);
-  const time=[0];for(let i=1;i<n;i++)time.push(time[i-1]+(pace[i-1]+pace[i])/2*(pts[i].d-pts[i-1].d)/1000);
-  return {d:pts.map(p=>p.d),grade,pace,time,es,base,finish,total:D};
+  const shape=(wet,wf)=>smoothVals(grade.map((g,i)=>effort(g,c,wet?.[i]?{...ds,gain:ds.gain/2}:ds)*(1+s*(1-2*pts[i].d/D))*(wf?.[i]??1)),pts,easeM);
+  const total=q=>{let W=0;for(let i=1;i<n;i++)W+=(q[i-1]+q[i])/2*(pts[i].d-pts[i-1].d);return W};
+  const times=(q,base)=>{const t=[0];for(let i=1;i<n;i++)t.push(t[i-1]+(q[i-1]+q[i])/2*base*(pts[i].d-pts[i-1].d)/1000);return t};
+  let q=shape(),W0=total(q),base=finish*1000/W0,wx=null;
+  if(cond?.w){
+    // Weather depends on when the pacer gets to each point, so place them twice: once on the plain plan,
+    // then again on the weather-adjusted one
+    const v=D/finish;let f=null;
+    for(let pass=0;pass<2;pass++){
+      const t=times(q,pass?base:finish*1000/W0);
+      f=weatherFactors(pts,t,cond.w,cond.start,{shelter:cond.shelter,v});
+      q=shape(f.wet,f.f);
+      base=cond.mode==='adjust'?finish*1000/W0:finish*1000/total(q);
+    }
+    const Ww=total(q),avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+    wx={mode:cond.mode,costPct:(Ww/W0-1)*100,suggested:finish*Ww/W0,heatPct:avg(f.heat),head:f.head,wet:f.wet.some(Boolean),start:cond.start,shelter:cond.shelter};
+  }
+  const pace=q.map(x=>x*base),time=times(q,base);
+  return {d:pts.map(p=>p.d),grade,pace,time,es,base,finish:time[n-1],target:finish,total:D,wx};
 }
 
 // Index of the last point at or before distance d

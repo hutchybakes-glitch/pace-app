@@ -48,6 +48,20 @@
       <div class="stepper" id="st-pace"><button data-d="-1" aria-label="Decrease">−</button><div><b id="v-pace">–</b><span>average pace /km</span></div><button data-d="1" aria-label="Increase">+</button></div>
     </div>
 
+    <div class="card" id="wxcard">
+      <div class="h">Conditions</div>
+      <div class="set"><span><b>Race start</b><small id="wx-when"></small></span><div class="wxstart"><input type="datetime-local" id="wx-start" step="900"><button id="wx-now" class="chip">Now</button></div></div>
+      <div id="wx-now-line" class="wxline"></div>
+      <div id="wx-impact" class="wximpact"></div>
+      <div class="set"><span><b>Pace for the conditions</b><small>Heat, humidity, sun, wind on each stretch of road, and rain</small></span><button id="wx-on" class="switch" role="switch"></button></div>
+      <div class="set col" id="wx-opts"><span><b>Target</b></span>
+        <div class="seg" id="wx-mode"><button data-v="keep">Keep my target</button><button data-v="adjust">Adjust for conditions</button></div>
+        <small id="wx-modenote" class="note"></small>
+        <span class="sp2"><b>Wind shelter</b><small>How exposed the course is: hedges, buildings and trees cut the wind</small></span>
+        <div class="seg" id="wx-shelter"><button data-v="open">Open</button><button data-v="some">Some shelter</button><button data-v="sheltered">Sheltered</button></div>
+      </div>
+    </div>
+
     <div class="card">
       <div class="h">Your pacer</div>
       <div id="profiles" class="profiles"></div>

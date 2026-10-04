@@ -79,6 +79,17 @@ b{font-variant-numeric:tabular-nums}
 .insight{margin-top:10px;font-size:14px;color:var(--mut2);line-height:1.45}
 .insight b{color:#fff}
 
+.wxstart{display:flex;gap:6px;align-items:center}
+#wx-start{background:#020617;color:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;font:inherit;font-size:14px;color-scheme:dark;max-width:190px}
+.chip{border:0;border-radius:999px;background:var(--card2);color:#fff;padding:8px 12px;font-weight:700;font-size:13px}
+.wxline{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.wxline span{background:var(--card2);border-radius:999px;padding:5px 10px;font-size:13px;color:var(--mut2)}
+.wxline span b{color:#fff}
+.wximpact{margin:10px 0 2px;font-size:14px;color:var(--mut2);line-height:1.5}
+.wximpact b{color:#fff}.wximpact .tot{display:block;margin-top:4px;font-size:16px}
+.wximpact .up{color:#fdba74}.wximpact .down{color:var(--good)}
+.note{display:block;color:var(--mut);font-size:13px;margin-top:6px}
+.sp2{display:block;margin-top:14px}
 .set{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
 .h+.set{margin-top:8px}
 .set.col{flex-direction:column;align-items:stretch}

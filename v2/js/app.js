@@ -11,6 +11,7 @@ import {createView,gapText} from './view.js';
 import {saveRoute,listRoutes,deleteRoute,saveRun,listRuns,deleteRun,opt,importV1Routes} from './store.js';
 import {SIM,SPEED,now,every,sim,simWatch} from './sim.js';
 import {createCoach,createSpeaker,gapPhrase} from './coach.js';
+import {fetchWeather,at as wxAt,windStretches,compass16,mph,SHELTER} from './weather.js';
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -27,6 +28,7 @@ let routes=[],route=null,P=null,turns=[];
 let prof=opt.get('profile',{id:'even',climb:'average',descent:'average',strategy:'even'});
 const o={speed:opt.get('speed',false),auto:opt.get('auto',true),zone:opt.get('zone',25),view:opt.get('view','map'),
   voice:opt.get('voice','full'),tones:opt.get('tones',true),rate:opt.get('rate','normal'),muted:opt.get('muted',false)};
+o.wxOn=opt.get('wxOn',true);o.wxMode=opt.get('wxMode','keep');o.shelter=opt.get('shelter','some');
 const RATES={slow:0.9,normal:1,fast:1.12};
 const speaker=createSpeaker();speaker.setOpts({tones:o.tones,rate:RATES[o.rate]});speaker.setMuted(o.muted);
 const voiceOn=()=>o.voice!=='off'&&!o.muted;
@@ -67,13 +69,58 @@ function selectRoute(r){
   route=r;if(r)opt.set('route',r.id);
   renderRoutes();
   $('plan').hidden=!r;$('race').disabled=!r;
-  if(r){turns=turnsFor(r);rebuild()}
+  if(r){turns=turnsFor(r);rebuild();loadWeather()}
+}
+
+// =====================================================================================
+// Conditions: forecast for the race start, folded into the pacer's plan
+// =====================================================================================
+let raceStart=Math.ceil(Date.now()/900e3)*900e3,wx={w:null,key:null,err:null,loading:false};
+const cond=()=>o.wxOn&&wx.w?{w:wx.w,start:raceStart,shelter:o.shelter,mode:o.wxMode}:null;
+const localInput=ms=>{const d=new Date(ms),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`};
+async function loadWeather(force){
+  if(!route)return;
+  const mid=route.pts[Math.floor(route.pts.length/2)],key=`${route.id}@${Math.floor(raceStart/3600e3)}`;
+  if(!force&&wx.key===key&&wx.w&&Date.now()-wx.w.fetched<3600e3)return;
+  wx={...wx,key,loading:true,err:null};renderWx();
+  try{wx.w=await fetchWeather(mid.lat,mid.lon,raceStart)}catch(e){wx.w=null;wx.err=e.message||'Weather unavailable'}
+  wx.loading=false;if(route)rebuild();
+}
+$('wx-start').onchange=e=>{const v=Date.parse(e.target.value);if(!isNaN(v)){raceStart=v;loadWeather()}};
+$('wx-now').onclick=()=>{raceStart=Math.ceil(Date.now()/900e3)*900e3;loadWeather()};
+$('wx-on').onclick=()=>{o.wxOn=!o.wxOn;opt.set('wxOn',o.wxOn);rebuild()};
+$('wx-mode').querySelectorAll('button').forEach(b=>b.onclick=()=>{o.wxMode=b.dataset.v;opt.set('wxMode',o.wxMode);rebuild()});
+$('wx-shelter').querySelectorAll('button').forEach(b=>b.onclick=()=>{o.shelter=b.dataset.v;opt.set('shelter',o.shelter);rebuild()});
+
+function renderWx(){
+  $('wx-start').value=localInput(raceStart);
+  const mins=Math.round((raceStart-Date.now())/60000);
+  $('wx-when').textContent=Math.abs(mins)<20?'Now':new Date(raceStart).toLocaleString(undefined,{weekday:'long',hour:'2-digit',minute:'2-digit'});
+  $('wx-on').classList.toggle('on',o.wxOn);$('wx-on').setAttribute('aria-checked',o.wxOn);
+  $('wx-opts').hidden=!o.wxOn||!wx.w;
+  $('wx-mode').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===o.wxMode));
+  $('wx-shelter').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===o.shelter));
+  if(wx.loading){$('wx-now-line').innerHTML='<span>Getting the forecast…</span>';$('wx-impact').textContent='';return}
+  if(!wx.w){$('wx-now-line').innerHTML=`<span>${esc(wx.err||'No forecast yet')}</span>`;$('wx-impact').textContent='';return}
+  const c=wxAt(wx.w,raceStart);
+  $('wx-now-line').innerHTML=[`🌡 <b>${Math.round(c.temp)}°C</b>`,`dew point <b>${Math.round(c.dew)}°</b>`,
+    `💨 <b>${Math.round(mph(c.wind))} mph</b> from ${compass16(c.dir)}`,c.rain>=0.3?`🌧 <b>${c.rain.toFixed(1)} mm/h</b>`:'dry',c.rad>400?'☀️ sunny':''].filter(Boolean).map(x=>`<span>${x}</span>`).join('');
+  if(!P?.wx){$('wx-impact').textContent=o.wxOn?'':'Not used: the pacer runs for still, cool conditions.';$('wx-modenote').textContent='';return}
+  const w=P.wx,windPct=w.costPct-w.heatPct,all=windStretches(P.d,w.head),longest=k=>all.filter(s=>s.kind===k).sort((a,b)=>(b.to-b.from)-(a.to-a.from))[0];
+  const st=[longest('head'),longest('tail')].filter(Boolean);
+  const pct=x=>`${x>=0?'+':'−'}${Math.abs(x).toFixed(1)} %`,diff=w.suggested-P.target;
+  $('wx-impact').innerHTML=`Heat &amp; humidity <b>${pct(w.heatPct)}</b> · wind${w.wet?' &amp; rain':''} <b>${pct(windPct)}</b>`+
+    (st.length?`<br>${st.map(s=>`${s.kind==='head'?'Headwind':'Tailwind'} ${kmStr(s.from)}–${kmStr(s.to)} km`).join(' · ')}`:'')+
+    `<span class="tot ${diff>0.5?'up':diff<-0.5?'down':''}">Conditions ${diff>=0?'cost':'save'} about <b>${gapFmt(Math.abs(diff))}</b> on ${fmt(P.target)}</span>`;
+  $('wx-modenote').textContent=o.wxMode==='keep'?`The pacer still finishes in ${fmt(P.finish)}, spending more effort where the conditions are kind and less where they're tough.`
+    :`The pacer finishes in ${fmt(P.finish)}: your target plus what today's conditions cost.`;
 }
 
 // Rebuild the pacer after any change of route, target or profile
 function rebuild(){
   const fin=finishFor(route);
-  P=buildPacer(route.pts,fin,prof);
+  P=buildPacer(route.pts,fin,prof,{cond:cond()});
+  renderWx();
   const D=P.total,up=P.es.reduce((a,e,i)=>a+(i&&e>P.es[i-1]?e-P.es[i-1]:0),0);
   $('rname').textContent=route.name;
   $('rchips').innerHTML=[`${kmStr(D)} km`,`${Math.round(up)} m climb`,`${turns.length} turns`,`elevation: ${route.src}`].map(t=>`<span>${esc(t)}</span>`).join('');
@@ -81,7 +128,7 @@ function rebuild(){
   renderProfiles();drawPlanMap();drawPlanChart();
   const e=extremes(P),g=x=>`${x>0?'+':''}${x.toFixed(1)} %`;
   const pr=PROFILES.find(p=>p.id===prof.id);
-  $('pinsight').innerHTML=`${pr?esc(pr.desc)+'<br>':''}Slowest <b>${fmt(e.slow.pace)}</b>/km on the ${g(e.slow.grade)} at ${kmStr(e.slow.d)} km · quickest <b>${fmt(e.fast.pace)}</b>/km on the ${g(e.fast.grade)} at ${kmStr(e.fast.d)} km. Finishes in <b>${fmt(fin)}</b>.`;
+  $('pinsight').innerHTML=`${pr?esc(pr.desc)+'<br>':''}${P.wx?`Paced for the ${o.wxMode==='adjust'?'conditions':'conditions, same finish'}. `:''}Slowest <b>${fmt(e.slow.pace)}</b>/km on the ${g(e.slow.grade)} at ${kmStr(e.slow.d)} km · quickest <b>${fmt(e.fast.pace)}</b>/km on the ${g(e.fast.grade)} at ${kmStr(e.fast.d)} km. Finishes in <b>${fmt(P.finish)}</b>.`;
 }
 
 function drawPlanMap(){
@@ -92,6 +139,12 @@ function drawPlanMap(){
   for(let i=0;i<pts.length-1;i++)s+=`<line x1="${X(xy[i]).replace(',','" y1="')}" x2="${X(xy[i+1]).replace(',','" y2="')}" stroke="${gradeColor(P.grade[i])}" stroke-width="5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;
   const r=Math.max(w,h)*0.014+4,dot=(q,c)=>{const [x,y]=X(q).split(',');return `<circle cx="${x}" cy="${y}" r="${r}" fill="${c}" stroke="#000" stroke-width="2" vector-effect="non-scaling-stroke"/>`};
   s+=dot(xy.at(-1),'#fff')+dot(xy[0],'#22c55e');
+  const c=P.wx&&wx.w?wxAt(wx.w,raceStart):null;
+  if(c&&c.wind>0.5){ // wind arrow (pointing where the wind blows) in the top-right corner
+    const S=Math.max(w,h)+2*pad,R=S*0.07,cx=w+pad-R*1.2,cy=-pad+R*1.4;
+    s+=`<g transform="translate(${cx} ${cy}) rotate(${(c.dir+180)%360})"><circle r="${R}" fill="#0f172a" stroke="#334155" vector-effect="non-scaling-stroke"/><path d="M0 ${-R*0.7}L${R*0.4} ${R*0.35}L0 ${R*0.15}L${-R*0.4} ${R*0.35}Z" fill="#7dd3fc"/></g>`+
+      `<text x="${cx}" y="${cy+R*1.9}" fill="#7dd3fc" font-size="${R*0.65}" text-anchor="middle" font-weight="700">${Math.round(mph(c.wind))} mph</text>`;
+  }
   $('pmap').setAttribute('viewBox',`${-pad} ${-pad} ${w+2*pad} ${h+2*pad}`);$('pmap').innerHTML=s;
 }
 
@@ -168,8 +221,9 @@ let shownD=0,raf=0,lastFrame=0,gapNow=null; // gapNow: s, + = you ahead of the p
 const el=()=>acc+(phase==='running'?now()-t0:0); // pause-aware elapsed ms
 const ROUTE_WINDOW=20000,AUTOSAVE=10000,RESUME_GAP=15*60000;
 
-let coach=null,armSaid=null;
-function enterRun(r=route,p=P,tr=turns){
+let coach=null,armSaid=null,runCond=null;
+function enterRun(r=route,p=P,tr=turns,rc=cond()){
+  runCond=rc;
   runRoute=r;runP=p;runTurns=tr;
   coach=createCoach({P:p,marks:paceMarks(p),level:o.voice==='key'?'key':'full'});armSaid=null;
   setMuteUI();
@@ -263,7 +317,7 @@ document.addEventListener('visibilitychange',()=>{if((phase==='running'||phase==
 function start(at){
   if(voiceOn())speaker.say(rec?'Resumed':"Go! Your pacer's away.",3,'start');
   if(!rec)rec={started:Date.now(),status:'active',sim:SIM,route:{id:runRoute.id,name:runRoute.name,src:runRoute.src,pts:runRoute.pts,cues:runRoute.cues||[]},
-    finish:runP.finish,prof:{...prof},speed:o.speed,fixes:[]};
+    finish:runP.target??runP.finish,prof:{...prof},speed:o.speed,cond:runCond,fixes:[]};
   phase='running';t0=at??now();track.last=null;rpts=[];spts=[];sim.moving=true;
   ensureWatch();wake();setPhaseUI();
 }
@@ -317,7 +371,9 @@ function loop(ts){
   shownD=Math.abs(target-shownD)>60?target:shownD+(target-shownD)*0.25;
   const started=phase==='running'||phase==='paused'||phase==='done';
   const pd=started?distAt(runP,el()/1000):0;
-  view.draw({mode:o.view,you:started?shownD:0,pacer:pd,gap:started?gapNow:null,youPace:started?curPace:undefined,pacerPace:paceAt(runP,pd),gps:(!started||offRoute)?lastLL:null});
+  let wind=null;
+  if(runCond){const c=wxAt(runCond.w,runCond.start+(started?el():0));wind={speed:c.wind*(SHELTER[runCond.shelter]??0.55),dir:c.dir}}
+  view.draw({mode:o.view,wind,you:started?shownD:0,pacer:pd,gap:started?gapNow:null,youPace:started?curPace:undefined,pacerPace:paceAt(runP,pd),gps:(!started||offRoute)?lastLL:null});
 }
 
 // Are you physically within 25 m of this turn's point? (GPS, not just route distance)
@@ -406,7 +462,7 @@ function turnIcon(t){
 // =====================================================================================
 let shownRun=null;
 function compare(r){
-  const Pr=buildPacer(r.route.pts,r.finish,r.prof),you=r.elapsed/1000,d=r.complete?Pr.total:r.rd,pacer=timeAt(Pr,d);
+  const Pr=buildPacer(r.route.pts,r.finish,r.prof,{cond:r.cond}),you=r.elapsed/1000,d=r.complete?Pr.total:r.rd,pacer=timeAt(Pr,d);
   return {Pr,you,pacer,d,diff:you-pacer};
 }
 function showResult(r){
@@ -464,8 +520,8 @@ $('rsdel').onclick=async()=>{if(!pending||!confirm('Discard this unfinished run?
 $('rsgo').onclick=()=>{
   speaker.unlock();
   const r=pending;if(!r)return;$('resume').hidden=true;
-  const Pr=buildPacer(r.route.pts,r.finish,r.prof);
-  enterRun(r.route,Pr,turnsFor(r.route));
+  const Pr=buildPacer(r.route.pts,r.finish,r.prof,{cond:r.cond});
+  enterRun(r.route,Pr,turnsFor(r.route),r.cond||null);
   rec=r;rd=r.rd||0;rsplits=[...(r.rsplits||[])];track.dist=r.dist||0;matcher.seed(rd,track.dist);shownD=rd;
   sim.jump=rd;
   const gap=(Date.now()-r.saved)*SPEED,last=r.fixes.at(-1);

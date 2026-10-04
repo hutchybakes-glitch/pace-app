@@ -102,3 +102,15 @@ export function gradeRGB(g){
   return g>0?mix([252,165,165],[185,28,28],t):mix([134,239,172],[21,128,61],t);
 }
 export const gradeColor=g=>`rgb(${gradeRGB(g).join(',')})`;
+
+// Where to write the target pace on the road: about 100 m in, then wherever the pacer's pace for the
+// next 100 m differs by `change` s/km or more from the last mark (at least `minGap` m apart), and at
+// least every `maxGap` m on steady stretches. Returns [{d, pace}].
+export function paceMarks(P,{minGap=100,maxGap=400,change=6,ahead=100}={}){
+  const out=[],need=d=>avgBetween(P,d,Math.min(P.total,d+ahead));
+  for(let d=100;d<P.total-ahead/2;d+=10){
+    const p=need(d),last=out.at(-1);
+    if(!last||(d-last.d>=minGap&&Math.abs(p-last.pace)>=change)||d-last.d>=maxGap)out.push({d,pace:p});
+  }
+  return out;
+}

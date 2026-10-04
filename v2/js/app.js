@@ -7,7 +7,7 @@ import {createMatcher} from './match.js';
 import {turnsFor,nextTurn,turnText,inDist} from './nav.js';
 import {createStartGate,compass} from './start.js';
 import {buildPacer,timeAt,distAt,paceAt,avgBetween,extremes,gradeColor,PROFILES,TRAIT_NAMES} from './pacer.js';
-import {createView} from './view.js';
+import {createView,gapText} from './view.js';
 import {saveRoute,listRoutes,deleteRoute,saveRun,listRuns,deleteRun,opt,importV1Routes} from './store.js';
 import {SIM,SPEED,now,every,sim,simWatch} from './sim.js';
 
@@ -153,7 +153,7 @@ const track=createTrack();
 let phase='idle',acc=0,t0=0,wid=null,lock=null;
 let matcher=null,rd=0,rsplits=[],rpts=[],spts=[],curPace=null,vNow=0,lastFixAt=0,lastLL=null,offRoute=false;
 let gate=null,rec=null,dirty=false,saving=Promise.resolve(),runP=null,runRoute=null,runTurns=[];
-let shownD=0,raf=0,lastFrame=0;
+let shownD=0,raf=0,lastFrame=0,gapNow=null; // gapNow: s, + = you ahead of the pacer
 const el=()=>acc+(phase==='running'?now()-t0:0); // pause-aware elapsed ms
 const ROUTE_WINDOW=20000,AUTOSAVE=10000,RESUME_GAP=15*60000;
 
@@ -173,8 +173,9 @@ function resetRun(){
 }
 function layout(){
   view.resize();
-  const top=document.querySelector('.ovtop .row2').getBoundingClientRect().bottom,bot=$('sheet').getBoundingClientRect().height;
-  view.setInsets(top+6,bot);
+  const top=document.querySelector('.ovtop .row2').getBoundingClientRect().bottom;
+  $('side').style.top=`${top+8}px`;
+  view.setInsets(top+6,innerHeight-$('ctrls').getBoundingClientRect().top+8,$('side').getBoundingClientRect().width+12);
 }
 addEventListener('resize',()=>{if(!$('run').hidden)layout()});
 function setView(m){o.view=m;opt.set('view',m);$('views').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===m))}
@@ -184,7 +185,7 @@ function setPhaseUI(){
   const go=$('go');go.className='btn go';
   go.textContent={idle:'Start',armed:'Cancel',running:'Pause',paused:'Resume',done:'Start'}[phase];
   if(phase==='running')go.classList.add('pause');if(phase==='armed')go.classList.add('cancel');
-  $('finbtn').disabled=phase!=='paused';
+  $('finbtn').hidden=phase!=='paused';
   $('back').hidden=phase==='running'||phase==='armed';
 }
 
@@ -293,7 +294,7 @@ function loop(ts){
   if(phase==='running'&&lastFixAt)target=Math.min(runP.total,rd+Math.min(3,(now()-lastFixAt)/1000)*vNow);
   shownD=Math.abs(target-shownD)>60?target:shownD+(target-shownD)*0.25;
   const started=phase==='running'||phase==='paused'||phase==='done';
-  view.draw({mode:o.view,you:started?shownD:0,pacer:started?distAt(runP,el()/1000):0,gps:(!started||offRoute)?lastLL:null});
+  view.draw({mode:o.view,you:started?shownD:0,pacer:started?distAt(runP,el()/1000):0,gap:started?gapNow:null,gps:(!started||offRoute)?lastLL:null});
 }
 
 // ---- Heads-up numbers, turn card, gap ----
@@ -301,7 +302,7 @@ function hud(){
   if($('run').hidden||!runP)return;
   const t=el()/1000,D=runP.total,started=phase==='running'||phase==='paused';
   $('tm').textContent=fmt(t);$('km').textContent=kmStr(rd);$('togo').textContent=kmStr(Math.max(0,D-rd));
-  const cls=(id,you,pc)=>{$(id).className=you&&pc?(you<pc-1?'faster':you>pc+1?'slower':''):''};
+  const cls=(id,you,pc)=>{$(id).className='y '+(you&&pc?(you<pc-1?'faster':you>pc+1?'slower':''):'')};
   if(started&&rd>20){
     const pd=distAt(runP,t),k0=rsplits.length*1000,tk=(rsplits.at(-1)||0)/1000;
     const ky=rd-k0>50?(t-tk)/((rd-k0)/1000):null,kp=rd-k0>50?avgBetween(runP,k0,rd):null;
@@ -309,11 +310,10 @@ function hud(){
     $('cy').textContent=fmtP(curPace);$('cp').textContent=fmtP(pp);cls('cy',curPace,paceAt(runP,rd));
     $('ky').textContent=fmtP(ky);$('kp').textContent=fmtP(kp);cls('ky',ky,kp);
     $('ay').textContent=fmtP(ay);$('ap').textContent=fmtP(ap);cls('ay',ay,ap);
-    const tg=t-timeAt(runP,rd),dg=pd-rd,g=$('gap');
-    if(Math.abs(tg)<0.5){g.className='gap';g.textContent='Level with the pacer'}
-    else if(tg<0){g.className='gap lead';g.textContent=`You lead · ${gapFmt(-tg)} · ${Math.round(Math.abs(dg))} m`}
-    else{g.className='gap behind';g.textContent=`Pacer leads · ${gapFmt(tg)} · ${Math.round(Math.abs(dg))} m`}
+    gapNow=timeAt(runP,rd)-t;$('gap').hidden=true;
+    $('cv').setAttribute('aria-label',`Gap to the pacer ${gapText(gapNow)} seconds`);
   }else{
+    gapNow=started?0:null;$('gap').hidden=false;
     for(const id of ['cy','ky','ay','kp','ap'])$(id).textContent='--:--';
     $('cp').textContent=fmtP(paceAt(runP,0));
     $('gap').className='gap';$('gap').textContent=phase==='armed'?'Pacer waiting at the start':started?'And you\'re off…':'Pacer ready at the start';

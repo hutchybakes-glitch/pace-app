@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {buildPacer,timeAt,distAt,paceAt,avgBetween,effort,extremes,gradeColor,PROFILES,CLIMB,DESCENT} from '../../v2/js/pacer.js';
+import {buildPacer,timeAt,distAt,paceAt,avgBetween,effort,extremes,gradeColor,paceMarks,PROFILES,CLIMB,DESCENT} from '../../v2/js/pacer.js';
 import {parseGPX,resample} from '../../v2/js/route.js';
 
 const M=1/111195;
@@ -56,4 +56,14 @@ test('real route: Ribble Valley pacer is smooth and on time',()=>{
   const P=buildPacer(resample(g.pts),3000,prof('even'));
   close(P.time.at(-1),3000,1e-6);
   const e=extremes(P);assert.ok(e.slow.pace<400&&e.fast.pace>230,`${e.fast.pace} ${e.slow.pace}`);
+});
+
+test('paceMarks: at the start, at changes of pace, and at least every 400 m',()=>{
+  const flat=paceMarks(buildPacer(line(3000,()=>0),900,prof('even')));
+  assert.deepEqual(flat.map(m=>m.d),[100,500,900,1300,1700,2100,2500,2900]);
+  flat.forEach(m=>close(m.pace,300,1e-6));
+  const M=paceMarks(buildPacer(hilly,1500,prof('even')));
+  for(let i=1;i<M.length;i++)assert.ok(M[i].d-M[i-1].d>=100&&M[i].d-M[i-1].d<=400);
+  assert.ok(M.some(m=>m.d>850&&m.d<1100&&m.pace>310),'a mark announces the climb');
+  assert.ok(M.some(m=>m.d>2850&&m.d<3100&&m.pace<290),'and the descent');
 });

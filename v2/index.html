@@ -102,21 +102,16 @@
       <button id="armgo" class="btn ghost">Start now</button>
     </div>
   </div>
-  <div class="sheet" id="sheet">
-    <div class="srow">
-      <div><b id="tm">0:00</b><span>time</span></div>
-      <div><b id="km">0.00</b><span>km</span></div>
-      <div><b id="togo">–</b><span>km to go</span></div>
-    </div>
-    <table class="cmp">
-      <tr><th></th><th class="you">You</th><th class="pc">Pacer</th></tr>
-      <tr><td>Pace now</td><td id="cy">--:--</td><td id="cp">--:--</td></tr>
-      <tr><td>This km</td><td id="ky">--:--</td><td id="kp">--:--</td></tr>
-      <tr><td>Average</td><td id="ay">--:--</td><td id="ap">--:--</td></tr>
-    </table>
-    <div class="ctrl"><button id="go" class="btn go">Start</button><button id="finbtn" class="btn">Finish</button></div>
+  <aside id="side">
+    <div class="sb"><span>Time</span><b id="tm">0:00</b></div>
+    <div class="sb"><span>Km</span><b id="km">0.00</b><small><i id="togo">–</i> to go</small></div>
+    <div class="sb pr"><span>Pace now</span><b id="cy" class="y">--:--</b><b id="cp" class="p">--:--</b></div>
+    <div class="sb pr"><span>This km</span><b id="ky" class="y">--:--</b><b id="kp" class="p">--:--</b></div>
+    <div class="sb pr"><span>Average</span><b id="ay" class="y">--:--</b><b id="ap" class="p">--:--</b></div>
+    <div class="leg"><i class="y"></i>You <i class="p"></i>Pacer</div>
     <div id="gpsline"></div>
-  </div>
+  </aside>
+  <div id="ctrls"><button id="go" class="btn go">Start</button><button id="finbtn" class="btn">Finish</button></div>
 </section>
 
 <!-- ============ Result ============ -->

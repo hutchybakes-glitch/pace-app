@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {buildPacer,timeAt,distAt,paceAt,avgBetween,effort,extremes,gradeColor,paceMarks,PROFILES,CLIMB,DESCENT} from '../../v2/js/pacer.js';
+import {buildPacer,timeAt,distAt,paceAt,avgBetween,effort,extremes,gradeColor,paceMarks,projectFinish,PROFILES,CLIMB,DESCENT} from '../../v2/js/pacer.js';
 import {parseGPX,resample} from '../../v2/js/route.js';
 
 const M=1/111195;
@@ -66,4 +66,14 @@ test('paceMarks: at the start, at changes of pace, and at least every 400 m',()=
   for(let i=1;i<M.length;i++)assert.ok(M[i].d-M[i-1].d>=100&&M[i].d-M[i-1].d<=400);
   assert.ok(M.some(m=>m.d>850&&m.d<1100&&m.pace>310),'a mark announces the climb');
   assert.ok(M.some(m=>m.d>2850&&m.d<3100&&m.pace<290),'and the descent');
+});
+
+test('projectFinish: on plan → target; 2 % slow → 2 % slower; follows a recent change',()=>{
+  const P=buildPacer(hilly,1500,prof('even'));
+  close(projectFinish(P,2500,timeAt(P,2500)),1500,1e-6);
+  close(projectFinish(P,2500,timeAt(P,2500)*1.02),1530,1e-6);
+  assert.equal(projectFinish(P,150,40),null);
+  // on plan overall, but the last km was 10 % slower than the plan → projection drifts slower
+  const t=timeAt(P,3000),back=t-(timeAt(P,3000)-timeAt(P,2000))*1.1;
+  assert.ok(projectFinish(P,3000,t,back)>1500);
 });

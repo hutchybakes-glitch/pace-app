@@ -6,7 +6,7 @@ import {parseGPX,resample,fillElevation} from './route.js';
 import {createMatcher} from './match.js';
 import {turnsFor,nextTurn,turnText,inDist} from './nav.js';
 import {createStartGate,compass} from './start.js';
-import {buildPacer,timeAt,distAt,paceAt,avgBetween,extremes,gradeColor,PROFILES,TRAIT_NAMES} from './pacer.js';
+import {buildPacer,timeAt,distAt,paceAt,avgBetween,extremes,gradeColor,projectFinish,PROFILES,TRAIT_NAMES} from './pacer.js';
 import {createView,gapText} from './view.js';
 import {saveRoute,listRoutes,deleteRoute,saveRun,listRuns,deleteRun,opt,importV1Routes} from './store.js';
 import {SIM,SPEED,now,every,sim,simWatch} from './sim.js';
@@ -171,11 +171,12 @@ function resetRun(){
   $('off').hidden=true;$('arm').hidden=true;
   setPhaseUI();hud();
 }
+// The map stops at the top of the control bar; the side panel runs from below the top cards to it
 function layout(){
+  const bar=$('ctrls').getBoundingClientRect().height,top=document.querySelector('.ovtop .row2').getBoundingClientRect().bottom;
+  $('cv').style.height=`${Math.max(100,$('run').clientHeight-bar)}px`;$('side').style.top=`${top+8}px`;$('side').style.bottom=`${bar+8}px`;
   view.resize();
-  const top=document.querySelector('.ovtop .row2').getBoundingClientRect().bottom;
-  $('side').style.top=`${top+8}px`;
-  view.setInsets(top+6,innerHeight-$('ctrls').getBoundingClientRect().top+8,$('side').getBoundingClientRect().width+12);
+  view.setInsets(top+6,8,$('side').getBoundingClientRect().width+12);
 }
 addEventListener('resize',()=>{if(!$('run').hidden)layout()});
 function setView(m){o.view=m;opt.set('view',m);$('views').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===m))}
@@ -186,6 +187,7 @@ function setPhaseUI(){
   go.textContent={idle:'Start',armed:'Cancel',running:'Pause',paused:'Resume',done:'Start'}[phase];
   if(phase==='running')go.classList.add('pause');if(phase==='armed')go.classList.add('cancel');
   $('finbtn').hidden=phase!=='paused';
+  if(!$('run').hidden)requestAnimationFrame(layout);
   $('back').hidden=phase==='running'||phase==='armed';
 }
 
@@ -294,7 +296,31 @@ function loop(ts){
   if(phase==='running'&&lastFixAt)target=Math.min(runP.total,rd+Math.min(3,(now()-lastFixAt)/1000)*vNow);
   shownD=Math.abs(target-shownD)>60?target:shownD+(target-shownD)*0.25;
   const started=phase==='running'||phase==='paused'||phase==='done';
-  view.draw({mode:o.view,you:started?shownD:0,pacer:started?distAt(runP,el()/1000):0,gap:started?gapNow:null,gps:(!started||offRoute)?lastLL:null});
+  const pd=started?distAt(runP,el()/1000):0;
+  view.draw({mode:o.view,you:started?shownD:0,pacer:pd,gap:started?gapNow:null,youPace:started?curPace:undefined,pacerPace:paceAt(runP,pd),gps:(!started||offRoute)?lastLL:null});
+}
+
+// Your elapsed time (s) when you were 1 km back from where you are now, from the recorded fixes
+function timeOneKmBack(){
+  const f=rec?.fixes,want=rd-1000;if(!f?.length||want<0)return null;
+  let lo=0,hi=f.length-1;if(f[lo][6]>want)return null;
+  while(hi-lo>1){const m=(lo+hi)>>1;if(f[m][6]<=want)lo=m;else hi=m}
+  const a=f[lo],b=f[hi],k=b[6]>a[6]?(want-a[6])/(b[6]-a[6]):0;
+  return (a[1]+(b[1]-a[1])*Math.max(0,Math.min(1,k)))/1000;
+}
+
+// Splits table: every completed km for you and the pacer, then the km in progress (live, faint)
+let splitsShown=-1;
+function splits(t){
+  const n=rsplits.length,k0=n*1000,live=rd-k0>50&&phase!=='idle';
+  const rows=[];
+  for(let k=0;k<n;k++){
+    const you=(rsplits[k]-(rsplits[k-1]||0))/1000,pc=timeAt(runP,(k+1)*1000)-timeAt(runP,k*1000);
+    rows.push(`<tr><td>${k+1}</td><td class="y ${you<pc-1?'faster':you>pc+1?'slower':''}">${fmt(you)}</td><td class="p">${fmt(pc)}</td></tr>`);
+  }
+  if(live)rows.push(`<tr class="live"><td>${n+1}</td><td class="y">${fmt(t-(rsplits.at(-1)||0)/1000)}</td><td class="p">${fmt(timeAt(runP,rd)-timeAt(runP,k0))}</td></tr>`);
+  $('spl').innerHTML=rows.join('')||'<tr><td colspan="3" style="text-align:left;font-style:normal;font-weight:500">After 1 km</td></tr>';
+  if(n!==splitsShown){splitsShown=n;const w=document.querySelector('.splw');w.scrollTop=w.scrollHeight}
 }
 
 // ---- Heads-up numbers, turn card, gap ----
@@ -302,20 +328,23 @@ function hud(){
   if($('run').hidden||!runP)return;
   const t=el()/1000,D=runP.total,started=phase==='running'||phase==='paused';
   $('tm').textContent=fmt(t);$('km').textContent=kmStr(rd);$('togo').textContent=kmStr(Math.max(0,D-rd));
+  splits(t);
   const cls=(id,you,pc)=>{$(id).className='y '+(you&&pc?(you<pc-1?'faster':you>pc+1?'slower':''):'')};
   if(started&&rd>20){
-    const pd=distAt(runP,t),k0=rsplits.length*1000,tk=(rsplits.at(-1)||0)/1000;
+    const k0=rsplits.length*1000,tk=(rsplits.at(-1)||0)/1000;
     const ky=rd-k0>50?(t-tk)/((rd-k0)/1000):null,kp=rd-k0>50?avgBetween(runP,k0,rd):null;
-    const ay=t/(rd/1000),ap=timeAt(runP,rd)/(rd/1000),pp=paceAt(runP,pd);
-    $('cy').textContent=fmtP(curPace);$('cp').textContent=fmtP(pp);cls('cy',curPace,paceAt(runP,rd));
+    const ay=t/(rd/1000),ap=timeAt(runP,rd)/(rd/1000);
     $('ky').textContent=fmtP(ky);$('kp').textContent=fmtP(kp);cls('ky',ky,kp);
     $('ay').textContent=fmtP(ay);$('ap').textContent=fmtP(ap);cls('ay',ay,ap);
     gapNow=timeAt(runP,rd)-t;$('gap').hidden=true;
+    // Projected finish: how you're doing against the pacer's hill-aware plan, applied to what's left
+    const proj=projectFinish(runP,rd,t,timeOneKmBack());
+    if(proj){const dlt=proj-runP.finish;$('proj').textContent=fmt(proj);$('projd').textContent=Math.abs(dlt)<0.5?'on target':`${dlt<0?'−':'+'}${gapFmt(Math.abs(dlt))} vs target`;$('projd').className=dlt<-0.5?'ahead':dlt>0.5?'behind':''}
     $('cv').setAttribute('aria-label',`Gap to the pacer ${gapText(gapNow)} seconds`);
   }else{
     gapNow=started?0:null;$('gap').hidden=false;
-    for(const id of ['cy','ky','ay','kp','ap'])$(id).textContent='--:--';
-    $('cp').textContent=fmtP(paceAt(runP,0));
+    for(const id of ['ky','ay','kp','ap'])$(id).textContent='--:--';
+    $('proj').textContent=fmt(runP.finish);$('projd').textContent='target';$('projd').className='';
     $('gap').className='gap';$('gap').textContent=phase==='armed'?'Pacer waiting at the start':started?'And you\'re off…':'Pacer ready at the start';
   }
   // Next turn

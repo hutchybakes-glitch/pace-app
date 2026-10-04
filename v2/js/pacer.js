@@ -114,3 +114,14 @@ export function paceMarks(P,{minGap=100,maxGap=400,change=6,ahead=100}={}){
   }
   return out;
 }
+
+// Projected finish time (s) for a runner at route distance d after t seconds, using how they're doing
+// against the pacer's plan (which already knows the hills ahead): half their whole run so far, half
+// their last km (tBack = their elapsed time 1 km back, if known). Null until 200 m in.
+export function projectFinish(P,d,t,tBack=null){
+  if(d<200||t<=0)return null;
+  const overall=t/timeAt(P,d);
+  let r=overall;
+  if(tBack!=null&&d>=1200){const plan=timeAt(P,d)-timeAt(P,d-1000);if(plan>0)r=0.5*overall+0.5*(t-tBack)/plan}
+  return t+(P.finish-timeAt(P,d))*r;
+}

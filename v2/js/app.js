@@ -26,7 +26,8 @@ const show=id=>{for(const s of ['home','run','result'])$(s).hidden=s!==id;if(id!
 // =====================================================================================
 let routes=[],route=null,P=null,turns=[];
 let prof=opt.get('profile',{id:'even',climb:'average',descent:'average',strategy:'even'});
-const o={speed:opt.get('speed',false),auto:opt.get('auto',true),zone:opt.get('zone',25),view:opt.get('view','map'),
+// speed: live pace from GPS (Doppler) speed, falling back to position; live: how quickly live pace reacts
+const o={speed:opt.get('speedSrc',true),live:opt.get('live','balanced'),auto:opt.get('auto',true),zone:opt.get('zone',25),view:opt.get('view','map'),
   voice:opt.get('voice','full'),tones:opt.get('tones',true),rate:opt.get('rate','normal'),muted:opt.get('muted',false)};
 o.wxOn=opt.get('wxOn',true);o.wxMode=opt.get('wxMode','keep');o.shelter=opt.get('shelter','some');
 const RATES={slow:0.9,normal:1,fast:1.12};
@@ -192,7 +193,8 @@ function renderProfiles(){
 function setProf(p){prof=p;opt.set('profile',p);rebuild()}
 
 function renderOptions(){
-  $('o-speed').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',(b.dataset.v==='1')===o.speed);b.onclick=()=>{o.speed=b.dataset.v==='1';opt.set('speed',o.speed);renderOptions()}});
+  $('o-speed').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',(b.dataset.v==='1')===o.speed);b.onclick=()=>{o.speed=b.dataset.v==='1';opt.set('speedSrc',o.speed);renderOptions()}});
+  $('o-live').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===o.live);b.onclick=()=>{o.live=b.dataset.v;opt.set('live',o.live);smoother=createSmoother(LIVE[o.live].tau);renderOptions()}});
   $('o-auto').classList.toggle('on',o.auto);$('o-auto').setAttribute('aria-checked',o.auto);
   $('o-auto').onclick=()=>{o.auto=!o.auto;opt.set('auto',o.auto);renderOptions()};
   $('o-voice').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===o.voice);b.onclick=()=>{o.voice=b.dataset.v;opt.set('voice',o.voice);renderOptions()}});
@@ -218,9 +220,12 @@ let phase='idle',acc=0,t0=0,wid=null,lock=null;
 let matcher=null,rd=0,rsplits=[],rpts=[],spts=[],curPace=null,vNow=0,lastFixAt=0,lastLL=null,offRoute=false;
 let gate=null,rec=null,dirty=false,saving=Promise.resolve(),runP=null,runRoute=null,runTurns=[];
 let shownD=0,raf=0,lastFrame=0,lastFrameAt=0,gapNow=null;
-const smoother=createSmoother(6); // displayed pace settles over ~6 s; lone wild readings barely count // gapNow: s, + = you ahead of the pacer
+// Live pace: GPS speed averaged over spd s (or a fit on position over pos s if the phone gives no speed),
+// then smoothed with time constant tau s. Lone wild readings barely count (see createSmoother).
+const LIVE={responsive:{spd:2,pos:8,tau:1.2},balanced:{spd:4,pos:10,tau:3},smooth:{spd:7,pos:14,tau:4}}; // ~5 s / ~7 s / ~13 s to show a change
+let smoother=createSmoother(LIVE[o.live].tau); // gapNow: s, + = you ahead of the pacer
 const el=()=>acc+(phase==='running'?now()-t0:0); // pause-aware elapsed ms
-const ROUTE_WINDOW=20000,AUTOSAVE=10000,RESUME_GAP=15*60000;
+const AUTOSAVE=10000,RESUME_GAP=15*60000;
 
 let coach=null,armSaid=null,runCond=null;
 function enterRun(r=route,p=P,tr=turns,rc=cond()){
@@ -272,19 +277,27 @@ function onPos(p){
   if(c.accuracy<=50)lastLL={lat:c.latitude,lon:c.longitude};
   if(phase==='armed')armFix(p);
   if(phase!=='running')return;
-  const t=el();
-  if(!track.add(c,p.timestamp,t))return;
-  const m=matcher.update(c.latitude,c.longitude,track.dist);
-  rd=m.d;offRoute=m.off;
-  $('off').hidden=!m.off;$('off').textContent=(m.matched?'Off route':'Not on the route yet')+' · using GPS distance';
-  while(rd>=(rsplits.length+1)*1000)rsplits.push(t);
-  rpts.push({t,d:rd});if(c.speed!=null&&c.speed>=0)spts.push({t,v:c.speed});
-  rpts=rpts.filter(q=>t-q.t<=ROUTE_WINDOW);spts=spts.filter(q=>t-q.t<=ROUTE_WINDOW);
-  // Raw speed from the last 20 s (GPS speed if chosen, else the fit on route distance), then smoothed for display
-  const raw=(o.speed&&speedPace(spts))||fitPace(rpts),v=smoother.update(raw?1000/raw:null,t);
-  curPace=v&&v>1000/1800?1000/v:null;vNow=v||0;lastFixAt=now();
+  const t=el(),used=track.add(c,p.timestamp,t);
+  if(used){
+    const m=matcher.update(c.latitude,c.longitude,track.dist);
+    rd=m.d;offRoute=m.off;
+    $('off').hidden=!m.off;$('off').textContent=(m.matched?'Off route':'Not on the route yet')+' · using GPS distance';
+    while(rd>=(rsplits.length+1)*1000)rsplits.push(t);
+    rpts.push({t,d:rd});
+  }
+  // GPS speed from every decent fix, even ones too close together to count for distance
+  if(c.accuracy<=25&&c.speed!=null&&c.speed>=0)spts.push({t,v:c.speed});
+  updatePace(t);
+  if(!used)return;
   rec.fixes.push([p.timestamp,t,c.latitude,c.longitude,c.accuracy,track.dist,rd,curPace]);dirty=true;
   if(rd>=runP.total-8)finishRun(true);
+}
+
+function updatePace(t){
+  const L=LIVE[o.live]||LIVE.balanced;
+  rpts=rpts.filter(q=>t-q.t<=L.pos*1000);spts=spts.filter(q=>t-q.t<=L.spd*1000);
+  const raw=(o.speed&&speedPace(spts,L.spd*500))||fitPace(rpts,L.pos*600),v=smoother.update(raw?1000/raw:null,t);
+  curPace=v&&v>1000/1800?1000/v:null;vNow=v||0;lastFixAt=now();
 }
 
 // ---- Start gate (as v1): the clock starts as you cross the start line ----

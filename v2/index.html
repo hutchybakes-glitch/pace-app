@@ -79,8 +79,10 @@
 
     <div class="card">
       <div class="h">Options</div>
-      <div class="set col"><span><b>Current pace from</b><small>GPS speed is often steadier on iPhone</small></span>
-        <div class="seg" id="o-speed"><button data-v="0">Position</button><button data-v="1">GPS speed</button></div></div>
+      <div class="set col"><span><b>Live pace</b><small>How quickly your live pace reacts. Quicker shows changes sooner but wobbles more.</small></span>
+        <div class="seg" id="o-live"><button data-v="responsive">Responsive</button><button data-v="balanced">Balanced</button><button data-v="smooth">Smooth</button></div></div>
+      <div class="set col"><span><b>Live pace from</b><small>GPS speed is measured by the satellites directly and is far steadier second to second. Position is used automatically if the phone gives no speed.</small></span>
+        <div class="seg" id="o-speed"><button data-v="1">GPS speed</button><button data-v="0">Position</button></div></div>
       <div class="set col"><span><b>Voice coach</b><small>Pace only: changes ahead, km splits and the race with your pacer. Directions stay on screen.</small></span>
         <div class="seg" id="o-voice"><button data-v="off">Off</button><button data-v="key">Key moments</button><button data-v="full">Full coach</button></div></div>
       <div class="set"><span><b>Tones</b><small>A short chime before each cue: rising = pick up, falling = ease off</small></span><button id="o-tones" class="switch" role="switch"></button></div>

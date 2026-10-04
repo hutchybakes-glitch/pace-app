@@ -21,3 +21,13 @@ test('smoother: three wild readings in a row are believed',()=>{
   for(let i=0;i<10;i++)v=s.update(4.5,t+=1000);           // a genuine sprint: caught up within ~10 s
   assert.ok(v>4.0,`${v}`);
 });
+
+import {speedPace,fitPace} from '../../v2/js/gps.js';
+test('short windows: GPS speed over 4 s, position fit over 10 s',()=>{
+  const sp=[0,1000,2000,3000].map(t=>({t,v:1000/300}));
+  assert.ok(Math.abs(speedPace(sp,2000)-300)<1e-9);
+  assert.equal(speedPace(sp.slice(0,1),2000),null);
+  assert.equal(speedPace(sp,10000),null,'the old 10 s floor still applies by default');
+  const pos=[0,2000,4000,6000,8000].map(t=>({t,d:t/300}));
+  assert.ok(Math.abs(fitPace(pos,6000)-300)<1e-9);
+});

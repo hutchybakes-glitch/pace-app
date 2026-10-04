@@ -10,7 +10,8 @@ export const SEGCOL={up:'#e07a2e',down:'#3b82f6',flat:'#6b7280'},ICON={up:'▲',
 
 const ent=s=>s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&');
 
-// Returns {name, pts:[{lat,lon,ele|null}]}. Uses trkpt if present, else rtept.
+// Returns {name, pts:[{lat,lon,ele|null}], cues:[{lat,lon,text}]}. Uses trkpt if present, else rtept.
+// Cues are waypoints (and route points) carrying text, e.g. plotaroute's "Turn left onto New Lane".
 export function parseGPX(xml){
   // Route name: first <name> outside waypoints and points (those are cue names like "Turn left")
   const outer=xml.replace(/<(wpt|trkpt|rtept)\b[^>]*?(?:\/>|>[\s\S]*?<\/\1\s*>)/g,'');
@@ -21,12 +22,14 @@ export function parseGPX(xml){
       const lat=+(m[1].match(/\blat\s*=\s*["']([^"']+)/)||[])[1],lon=+(m[1].match(/\blon\s*=\s*["']([^"']+)/)||[])[1];
       if(!isFinite(lat)||!isFinite(lon))continue;
       const e=m[2]&&m[2].match(/<ele>\s*([^<\s]+)/);
-      out.push({lat,lon,ele:e&&isFinite(+e[1])?+e[1]:null});
+      const tx=m[2]&&(m[2].match(/<cmt>([\s\S]*?)<\/cmt>/)||m[2].match(/<desc>([\s\S]*?)<\/desc>/)||m[2].match(/<name>([\s\S]*?)<\/name>/));
+      out.push({lat,lon,ele:e&&isFinite(+e[1])?+e[1]:null,text:tx?ent(tx[1].replace(/<!\[CDATA\[|\]\]>/g,'')).trim():''});
     }
     return out;
   };
   let pts=read('trkpt');if(!pts.length)pts=read('rtept');
-  return {name:nm?ent(nm[1]).trim():'',pts};
+  const cues=[...read('wpt'),...pts].filter(p=>p.text).map(({lat,lon,text})=>({lat,lon,text}));
+  return {name:nm?ent(nm[1]).trim():'',pts:pts.map(({lat,lon,ele})=>({lat,lon,ele})),cues};
 }
 
 // Points every `step` metres along the route, plus the finish: [{d,lat,lon,ele|null}]

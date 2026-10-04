@@ -46,7 +46,7 @@ async function load(file){
       s=await fillElevation(s,fetch,5,(i,n)=>msg(`Fetching elevation ${i}/${n}…`));
       src='Open-Meteo';
     }
-    const route={name:g.name||file.name.replace(/\.[^.]+$/,''),created:Date.now(),src,pts:s};
+    const route={name:g.name||file.name.replace(/\.[^.]+$/,''),created:Date.now(),src,pts:s,cues:g.cues};
     route.id=await saveRoute(route);
     msg('');routes.unshift(route);select(route);
   }catch(e){msg(e.message,true)}

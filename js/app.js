@@ -10,6 +10,7 @@ import {saveRun,deleteRun} from './storage.js';
 import {I,worthKeeping} from './record.js';
 import {SIM,SPEED,now,every,sim,simWatch} from './sim.js';
 import {createStartGate,compass} from './start.js';
+import {turnsFor,nextTurn,turnText,inDist} from './nav.js';
 
 // State: running flag, banked ms, segment start, watch id, wake lock, draw tick
 let run=false,acc=0,t0=0,wid=null,lock=null,tick=0;
@@ -30,6 +31,7 @@ const el=()=>acc+(run?now()-t0:0); // pause-aware elapsed ms
 
 function onPos(p){
   $('gps').textContent=`GPS accuracy: ±${Math.round(p.coords.accuracy)} m`;
+  if(p.coords.accuracy<=50)lastLL={lat:p.coords.latitude,lon:p.coords.longitude};
   if(armed)armFix(p);
   if(!run)return;
   const t=el(),c=p.coords;
@@ -84,6 +86,7 @@ function drawRoute(t){
   $('dlab').textContent=Math.abs(dl)<0.5?'On plan':dl>0?'Behind plan':'Ahead of plan';
   $('dl').textContent=(dl>=0.5?'+':dl<=-0.5?'−':'')+fmt(Math.abs(dl));
   $('ckm').textContent=pace((t-(rsplits.at(-1)||0))/1000,(rd-rsplits.length*1000)/1000);
+  updateNav();
   const x=(rd/active.route.pts.at(-1).d*1000).toFixed(1);
   $('sdone')?.setAttribute('width',x);$('spos')?.setAttribute('x1',x);$('spos')?.setAttribute('x2',x);
   if(!$('run').hidden){
@@ -116,7 +119,7 @@ every(1000,draw);
 // ---- Recording ----
 function newRecord(){
   rec={started:Date.now(),status:'active',sim:SIM,fixes:[],
-    route:active?{id:active.route.id,name:active.route.name,src:active.route.src,pts:active.route.pts}:null,
+    route:active?{id:active.route.id,name:active.route.name,src:active.route.src,pts:active.route.pts,cues:active.route.cues||[]}:null,
     segs:active?active.plan.segs:null,pace:active?.pace??null,S:active?.S??null,amber:active?.amber??null,speed:active?.speed??false};
 }
 // Copy live state into the record
@@ -143,6 +146,59 @@ async function endRun(){
   if(worthKeeping(r)){r.status='done';r.running=false;r.id=await saveRun(r);return r.id}
   if(r.id)await deleteRun(r.id);
 }
+
+// ---- Navigation: next turn card and mini map ----
+// turns = this route's turns (nav.js); mm = mini-map projection; lastLL = latest GPS position
+let turns=[],mm=null,lastLL=null;
+let miniClose=(()=>{try{return localStorage.getItem('miniClose')==='1'}catch(e){return false}})();
+const MINI_HALF=350; // close-up: metres either side of you
+
+// Arrow for a turn of `a`° (+ right), a looped arrow for U-turns, in a 48×48 box
+function turnIcon(t){
+  const S='fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"';
+  if(!t)return `<path d="M15 44V6" ${S}/><path d="M15 8h22l-5 7 5 7H15" fill="currentColor"/>`; // finish flag
+  if(t.kind==='uturn'){
+    const s=t.dir==='left'?1:-1,x1=24+7*s,x2=24-7*s;
+    return `<path d="M${x1} 44V20a7 7 0 0 ${s===1?0:1} ${-14*s} 0v6" ${S}/><path d="M${x2-7} 25l7 10 7-10z" fill="currentColor"/>`;
+  }
+  const r=t.angle*Math.PI/180,sx=Math.sin(r),cy=Math.cos(r);
+  const ex=24+13*sx,ey=24-13*cy,tx=24+23*sx,ty=24-23*cy,px=7*cy,py=7*sx;
+  return `<path d="M24 45V24L${ex.toFixed(1)} ${ey.toFixed(1)}" ${S}/><path d="M${tx.toFixed(1)} ${ty.toFixed(1)}L${(ex+px).toFixed(1)} ${(ey+py).toFixed(1)}L${(ex-px).toFixed(1)} ${(ey-py).toFixed(1)}z" fill="currentColor"/>`;
+}
+
+function setupNav(){
+  const pts=active.route.pts,k=Math.cos(pts[0].lat*Math.PI/180)*111195;
+  turns=turnsFor(active.route);
+  const P=p=>[p.lon*k,-p.lat*111195],xy=pts.map(P);
+  const xs=xy.map(q=>q[0]),ys=xy.map(q=>q[1]),x0=Math.min(...xs),y0=Math.min(...ys);
+  mm={P,xy,box:[x0,y0,Math.max(...xs)-x0,Math.max(...ys)-y0]};
+  const line=xy.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ');
+  $('mini').innerHTML=`<polyline points="${line}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`+
+    `<polyline id="mdone" fill="none" stroke="#4ade80" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`+
+    `<circle id="mturn" fill="#facc15" stroke="#000" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`+
+    `<circle id="mpos" fill="#fff" stroke="#000" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+}
+
+function updateNav(){
+  if(!mm)return;
+  const pts=active.route.pts,total=pts.at(-1).d,t=nextTurn(turns,rd),left=(t?t.d:total)-rd;
+  $('ticon').innerHTML=turnIcon(t);
+  $('ttext').textContent=t?turnText(t):'Finish';
+  $('tdist').textContent=inDist(Math.max(0,left));
+  $('nav').className=left<=60?'soon':'';
+  // Mini map: done part, next turn, you
+  const n=Math.min(pts.length-1,Math.floor(rd/10));
+  $('mdone').setAttribute('points',mm.xy.slice(0,n+1).map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' '));
+  const me=lastLL?mm.P(lastLL):mm.xy[n];
+  let [bx,by,bw,bh]=mm.box;
+  if(miniClose){bx=me[0]-MINI_HALF;by=me[1]-MINI_HALF;bw=bh=2*MINI_HALF}
+  const pad=Math.max(bw,bh)*0.1+10,vw=Math.max(bw,bh)+2*pad;
+  $('mini').setAttribute('viewBox',`${(bx+bw/2-vw/2).toFixed(1)} ${(by+bh/2-vw/2).toFixed(1)} ${vw.toFixed(1)} ${vw.toFixed(1)}`);
+  const set=(id,q,r)=>{$(id).setAttribute('cx',q[0].toFixed(1));$(id).setAttribute('cy',q[1].toFixed(1));$(id).setAttribute('r',(vw*r).toFixed(1))};
+  set('mpos',me,0.055);
+  if(t){set('mturn',mm.xy[Math.min(pts.length-1,Math.round(t.d/10))],0.04);$('mturn').style.display=''}else $('mturn').style.display='none';
+}
+$('mini').onclick=()=>{miniClose=!miniClose;try{localStorage.setItem('miniClose',miniClose?'1':'0')}catch(e){};updateNav()};
 
 // ---- Start gate ----
 // Guide the runner to the start; the clock starts as they cross the line, back-dated to the crossing
@@ -227,7 +283,7 @@ $('rs').onclick=async()=>{
 const show=id=>{for(const s of ['setup','settings','run'])$(s).hidden=s!==id;scrollTo(0,0)};
 function applyActive(){
   $('rt').hidden=$('chart').hidden=!active;
-  if(active){$('chkey').textContent=`▲ faster · band ±${active.S} s`;drawStrip()}
+  if(active){$('chkey').textContent=`▲ faster · band ±${active.S} s`;drawStrip();setupNav()}else mm=null;
   $('rlabel').textContent=(SIM?`SIM ${SPEED}× · `:'')+(active?`${active.route.name} · target ${fmt(active.pace)} /km · ±${active.S} s`+(active.speed?' · GPS speed':''):'');
 }
 initSetup({onSettings:()=>openSettings(),onStart:async sel=>{

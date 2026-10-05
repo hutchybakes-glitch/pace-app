@@ -26,6 +26,11 @@
     <div class="sub">How the pretend runner races the pacer, so you can see and hear how Pacer reacts.</div>
     <div id="simsc" class="styles"></div>
   </div>
+  <div id="bkbanner" class="card note2" hidden>
+    <div class="h">Back up your runs</div>
+    <div class="sub" id="bktext"></div>
+    <button id="bknow" class="btn ghost">Back up now</button>
+  </div>
   <div id="resume" class="card warn" hidden>
     <div class="h">Unfinished run</div>
     <div id="rsinfo"></div>
@@ -36,6 +41,7 @@
     <div class="h">Route</div>
     <ul id="routes"></ul>
     <label class="btn ghost">＋ Load GPX file<input type="file" id="gpx" hidden></label>
+    <button id="recbtn" class="btn rec">● Record a new route</button>
     <div id="msg"></div>
   </div>
 
@@ -47,7 +53,7 @@
       <div class="key"><span><i class="kup"></i>Uphill</span><span><i class="kflat"></i>Flat</span><span><i class="kdown"></i>Downhill</span><span class="kshade">darker = steeper</span></div>
     </div>
 
-    <div class="card">
+    <div class="card" id="tgtcard">
       <div class="h">Target</div>
       <div class="stepper" id="st-finish"><button data-d="-1" aria-label="Decrease">−</button><div><b id="v-finish">–</b><span>finish time</span></div><button data-d="1" aria-label="Increase">+</button></div>
       <div class="stepper" id="st-pace"><button data-d="-1" aria-label="Decrease">−</button><div><b id="v-pace">–</b><span>average pace /km</span></div><button data-d="1" aria-label="Increase">+</button></div>
@@ -69,8 +75,11 @@
 
     <div class="card">
       <div class="h">Your pacer</div>
+      <div class="seg pcm" id="pc-mode"><button data-v="profile">A pacer profile</button><button data-v="ghost">One of your past runs</button></div>
+      <small id="pcnote" class="note"></small>
+      <div id="ghosts" class="styles" hidden></div>
       <div id="profiles" class="profiles"></div>
-      <div class="tune">
+      <div class="tune" id="tune">
         <div class="trow"><span>Climbing</span><div class="seg" id="t-climb"></div></div>
         <div class="trow"><span>Descending</span><div class="seg" id="t-descent"></div></div>
         <div class="trow"><span>Strategy</span><div class="seg" id="t-strategy"></div></div>
@@ -100,6 +109,8 @@
         <button id="o-test" class="btn ghost testv">🔊 Hear your coach</button></div>
       <div class="set"><span><b>Start at the start line</b><small>The clock starts as you cross it, like a chip mat</small></span><button id="o-auto" class="switch" role="switch"></button></div>
       <div class="set"><span><b>Start zone</b><small>How close counts as "at the start"</small></span><div class="mini-step" id="o-zone"><button data-d="-5">−</button><b>25 m</b><button data-d="5">+</button></div></div>
+      <div class="set col"><span><b>Your routes and runs</b><small id="st-status"></small></span>
+        <div class="bt2"><button id="bk" class="btn ghost">Back up everything</button><label class="btn ghost">Restore a backup<input type="file" id="rsfile" accept=".json,application/json" hidden></label></div></div>
     </div>
   </div>
 
@@ -135,20 +146,20 @@
     </div>
   </div>
   <aside id="lside">
-    <div class="lh"><span>Km</span><span class="y">You</span><span class="p">Pacer</span></div>
+    <div class="lh"><span>Km</span><span class="y">You</span><span class="p" id="lhp">Pacer</span></div>
     <div class="splw"><table id="spl"></table></div>
   </aside>
   <div id="bottom">
     <svg id="course" viewBox="0 0 1000 40" preserveAspectRatio="none" role="img" aria-label="Whole course by gradient, with you and the pacer"></svg>
     <div class="strip">
       <span><b id="tm">0:00</b></span>
-      <span><b id="km">0.00</b> km <i>(<em id="togo">–</em> left)</i></span>
-      <span>Est <b id="proj">–</b> <i id="projd"></i></span>
+      <span><b id="km">0.00</b> km <i id="togow">(<em id="togo">–</em> left)</i></span>
+      <span><em id="projl">Est</em> <b id="proj">–</b> <i id="projd"></i></span>
       <span id="wxs" hidden><svg id="wxarr" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l7 18-7-4.5L5 20z" fill="currentColor"/></svg><b id="wxspd"></b><i id="wxkind"></i></span>
     </div>
     <div class="tiles" id="tiles">
       <div id="youtile" class="tile you"><span>You</span><b id="ypace">--:--</b><small id="ystate"></small></div>
-      <div class="tile pc"><span>Pacer</span><b id="ppace">--:--</b><small id="pstate"></small></div>
+      <div class="tile pc"><span id="plab">Pacer</span><b id="ppace">--:--</b><small id="pstate"></small></div>
       <button id="pausebig" class="tile pausebig" aria-label="Pause the run"><i>⏸</i>Pause</button>
     </div>
     <div id="ctrls"><button id="go" class="btn go">Start</button><button id="finbtn" class="btn save">Save</button><button id="discbtn" class="btn disc">Discard</button></div>
@@ -162,8 +173,9 @@
     <div id="rbadge"></div>
     <h1 id="rtitle"></h1>
     <div id="rsub" class="sub"></div>
-    <div class="rbig"><div class="you"><b id="ryou"></b><span>You</span></div><div class="pc"><b id="rpacer"></b><span>Pacer</span></div></div>
+    <div class="rbig"><div class="you"><b id="ryou"></b><span>You</span></div><div class="pc" id="rpcbox"><b id="rpacer"></b><span id="rpclab">Pacer</span></div></div>
     <div class="card"><table class="kt" id="rkm"></table></div>
+    <button id="rrace" class="btn go" hidden>Race this route</button>
     <div class="ctrl"><button id="rgpx" class="btn ghost">Export GPX</button><button id="rdone" class="btn go">Done</button></div>
   </div>
 </section>

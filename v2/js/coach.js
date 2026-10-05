@@ -75,7 +75,8 @@ const EVERY={relaxed:{full:[120,180],key:[240,Infinity]},moderate:{full:[90,150]
 
 // P: pacer; prof: profile traits ({climb, descent}) for advice; level: 'key' | 'full';
 // style: 'relaxed' | 'moderate' | 'assertive'; band: the pace colour band (s/km), for assertive corrections
-export function createCoach({P,prof,level='full',style='moderate',band=5}){
+// who: what to call the other runner ('pacer', or 'ghost' when racing one of your past runs)
+export function createCoach({P,prof,level='full',style='moderate',band=5,who='pacer'}){
   const S=sections(P),good=strengths(prof),said=new Set(),total=P.total;
   let splits=0,lead=null,leadAt=-1e9,lastTalk=-1e9,lastUpdate=-1e9,gaps=[],hillPace=null,tipsGiven=new Set(),driftFrom=null,driftAt=-1e9,awayCount=0,bigAhead=0;
   const typical=x=>{const v=P.pace.filter((_,i)=>P.d[i]>=x.d0&&P.d[i]<=x.d1).sort((a,b)=>a-b);return v[Math.floor(v.length/2)]};
@@ -174,6 +175,7 @@ export function createCoach({P,prof,level='full',style='moderate',band=5}){
       :s.gap<=-1?`Final 400 metres. Pacer ${secs(-s.gap)} ahead. ${style==='assertive'?'Go now, everything to the line.':"Everything you've got."}`
       :'Final 400 metres. Level with the pacer. Race it to the line.');
 
+    if(who!=='pacer')for(const x of out)x.text=x.text.replace(/\bPacer\b/g,who[0].toUpperCase()+who.slice(1)).replace(/\bpacer\b/g,who);
     return out.sort((a,b)=>b.pri-a.pri);
   }
 

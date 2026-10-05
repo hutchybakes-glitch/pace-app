@@ -54,7 +54,7 @@ export function createView(canvas){
   // s: {mode, you (route m), pacer (route m or null), gap (s, + = you ahead, or null),
   //     gap (s, + = you ahead, or null), youCol (your line's colour: red/green/gold, or null), gps {lat,lon} or null}
   function draw(s){
-    if(!R)return;
+    if(!R){ctx.clearRect(0,0,W,H);if(s.trail)drawTrail(s);return}
     ctx.clearRect(0,0,W,H);
     if(s.mode==='map')drawMap(s);else draw3D(s,s.mode==='rear');
   }
@@ -147,11 +147,49 @@ export function createView(canvas){
     // Labels last so nothing covers them: PACER beside its line, your gap above you
     // Labels last so nothing covers them: live paces at the line ends, your gap above you
     const clampX=(x,w)=>Math.max(lft+w/2+2,Math.min(lft+vw-w/2-2,x));
-    if(pq){dot(pq.c[0],pq.c[1],8,ORANGE);pill('PACER',clampX(pq.right[0]+34,58),pq.right[1],ORANGE,'#1c1003',12)}
+    if(pq){dot(pq.c[0],pq.c[1],8,ORANGE);pill(s.label||'PACER',clampX(pq.right[0]+34,58),pq.right[1],ORANGE,'#1c1003',12)}
     pill(metres(s.you),clampX(yq.left[0]-42,76),yq.left[1],'rgba(2,6,23,.88)','#f1f5f9',14);
     gapLabel(s.gap,ax,ay-36,17);
     const hdDeg=(Math.atan2(hd.x,hd.y)*180/Math.PI+360)%360;heads={view:hdDeg,travel:hdDeg};
   }
+
+  // ---------- Recording a new route: your trail, heading-up ----------
+  // s.trail: [{lat,lon,p (pace s/km or null)}], s.avg: your average pace. The trail is coloured against
+  // your average: green quicker, orange slower, blue around it.
+  function drawTrail(s){
+    const T=s.trail,g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#070d1c');g.addColorStop(1,'#0d1527');
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    const vw=Math.max(140,W-rgt-lft),vh=Math.max(160,H-top-bot),ax=lft+vw/2,ay=top+vh*0.62,sc=Math.min(vw*1.6,vh)*0.78/220;
+    if(!T?.length){pill('Waiting for GPS…',ax,ay,'rgba(2,6,23,.85)','#e2e8f0',14);return}
+    const lat0=T[0].lat,lon0=T[0].lon,k=Math.cos(lat0*Math.PI/180)*111195,P=q=>[(q.lon-lon0)*k,(q.lat-lat0)*111195];
+    const me=P(T.at(-1));let back=T.length-1;
+    while(back>0&&Math.hypot(...P(T[back]).map((v,i)=>v-me[i]))<25)back--;
+    const b=P(T[back]);let hx=me[0]-b[0],hy=me[1]-b[1],L=Math.hypot(hx,hy);
+    if(L<3){hx=hd?.x??0;hy=hd?.y??1;L=1}
+    hx/=L;hy/=L;
+    if(!hd)hd={x:hx,y:hy};else{hd.x+=(hx-hd.x)*0.15;hd.y+=(hy-hd.y)*0.15;const l=Math.hypot(hd.x,hd.y)||1;hd.x/=l;hd.y/=l}
+    const Tf=q=>{const [x,y]=P(q),dx=x-me[0],dy=y-me[1];return [ax+(dx*hd.y-dy*hd.x)*sc,ay-(dx*hd.x+dy*hd.y)*sc]};
+    const reach=Math.hypot(W,H)/sc,step=50;
+    ctx.strokeStyle='rgba(148,163,184,.07)';ctx.lineWidth=1;ctx.beginPath();
+    const G=(x,y)=>Tf({lon:lon0+x/k,lat:lat0+y/111195});
+    for(let gx=Math.floor((me[0]-reach)/step)*step;gx<=me[0]+reach;gx+=step){ctx.moveTo(...G(gx,me[1]-reach));ctx.lineTo(...G(gx,me[1]+reach))}
+    for(let gy=Math.floor((me[1]-reach)/step)*step;gy<=me[1]+reach;gy+=step){ctx.moveTo(...G(me[0]-reach,gy));ctx.lineTo(...G(me[0]+reach,gy))}
+    ctx.stroke();
+    ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.strokeStyle='#020617';ctx.lineWidth=14;ctx.beginPath();T.forEach((q,i)=>{const p=Tf(q);i?ctx.lineTo(...p):ctx.moveTo(...p)});ctx.stroke();
+    ctx.lineWidth=9;
+    for(let i=1;i<T.length;i++){
+      const p=T[i].p,c=!p||!s.avg?'#60a5fa':p<s.avg-5?'#4ade80':p>s.avg+5?'#fb923c':'#60a5fa';
+      ctx.strokeStyle=c;ctx.beginPath();ctx.moveTo(...Tf(T[i-1]));ctx.lineTo(...Tf(T[i]));ctx.stroke();
+    }
+    dot(...Tf(T[0]),7,'#22c55e');
+    ctx.save();ctx.translate(ax,ay);ctx.shadowColor=ME;ctx.shadowBlur=18;
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(0,-15);ctx.lineTo(11,12);ctx.lineTo(0,6);ctx.lineTo(-11,12);ctx.closePath();ctx.fill();
+    ctx.shadowBlur=0;ctx.strokeStyle=ME;ctx.lineWidth=2.5;ctx.stroke();ctx.restore();
+    pill(metres(s.dist||0),Math.max(lft+44,ax-60),ay+2,'rgba(2,6,23,.88)','#f1f5f9',14);
+    heads={view:(Math.atan2(hd.x,hd.y)*180/Math.PI+360)%360,travel:(Math.atan2(hd.x,hd.y)*180/Math.PI+360)%360};
+  }
+  const clearRoute=()=>{R=null;hd=null;cd=null};
 
   // White disc with an arrow showing the turn relative to the road at that point
   function turnMarker(x,y,t,hd,p){
@@ -256,7 +294,7 @@ export function createView(canvas){
       const side=Math.max(44,F*1.1/head[2]);
       const inView=(x,w)=>Math.max(lft+w/2+2,Math.min(lft+vw-w/2-2,x)); // keep tags clear of the side columns
       if(o.me){pill(metres(s.you),inView(head[0]-side-10,76),head[1]+lift*0.4,'rgba(2,6,23,.88)','#f1f5f9',13);gapLabel(s.gap,inView(head[0],110),head[1]-lift-6,16)}
-      else pill('PACER',inView(head[0]+side,58),head[1],ORANGE,'#1c1003',12,ghost?0.6:1);
+      else pill(s.label||'PACER',inView(head[0]+side,58),head[1],ORANGE,'#1c1003',12,ghost?0.6:1);
     }
     const camDeg=(Math.atan2(f[0],f[1])*180/Math.PI+360)%360,runDeg=(Math.atan2(cd.x,cd.y)*180/Math.PI+360)%360;
     heads={view:camDeg,travel:runDeg};
@@ -265,7 +303,7 @@ export function createView(canvas){
       const pc=figs.find(o=>!o.me),gap=s.pacer-s.you;
       if(!pc.base||Math.abs(gap)>700){
         const ahead=gap>0,toward=rear?!ahead:ahead;
-        pill(`PACER ${Math.round(Math.abs(gap))} m ${ahead?'ahead':'behind'}`,lft+vw/2,toward?Math.max(top+14,hy+18):H-bot-18,ORANGE,'#1c1003');
+        pill(`${s.label||'PACER'} ${Math.round(Math.abs(gap))} m ${ahead?'ahead':'behind'}`,lft+vw/2,toward?Math.max(top+14,hy+18):H-bot-18,ORANGE,'#1c1003');
       }
     }
   }
@@ -280,5 +318,5 @@ export function createView(canvas){
     ctx.restore();
   }
 
-  return {resize,setRoute,setInsets,draw,headings:()=>heads};
+  return {resize,setRoute,clearRoute,setInsets,draw,headings:()=>heads};
 }

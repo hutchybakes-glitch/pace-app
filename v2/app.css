@@ -85,6 +85,11 @@ b{font-variant-numeric:tabular-nums}
 .stylec b{font-size:16px}.stylec b em{font-style:normal;font-weight:500;color:var(--mut2);margin-left:6px;font-size:14px}
 .stylec small{display:block;color:var(--mut2);font-size:13px;line-height:1.4;margin-top:4px}
 .stylec q{display:block;margin-top:8px;font-size:13px;color:#fdba74;font-style:italic;quotes:"\201C" "\201D"}
+.btn.rec{background:linear-gradient(180deg,#b91c1c,#7f1d1d);margin-top:8px}
+.bt2{display:flex;gap:8px;margin-top:8px}.bt2 .btn{flex:1;font-size:15px;padding:12px 6px;margin:0}
+.pcm{margin-top:10px}#ghosts{margin-top:8px}#pcnote:empty{display:none}
+.card.note2{background:#0c2340;border-color:#1d4ed8}
+.tile.you.rec{background:#1e3a8a}
 .wxstart{display:flex;gap:6px;align-items:center}
 #wx-start{background:#020617;color:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;font:inherit;font-size:14px;color-scheme:dark;max-width:190px}
 .chip{border:0;border-radius:999px;background:var(--card2);color:#fff;padding:8px 12px;font-weight:700;font-size:13px}

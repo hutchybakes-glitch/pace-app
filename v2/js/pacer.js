@@ -85,6 +85,7 @@ const lerp=(a,b,f)=>a+(b-a)*f;
 export function timeAt(P,d){
   if(d<=0)return 0;if(d>=P.total)return P.finish;
   const i=idx(P,d),f=(d-P.d[i])/(P.d[i+1]-P.d[i]);
+  if(P.lin)return P.time[i]+(P.time[i+1]-P.time[i])*f; // a past run: exactly when you got there
   return P.time[i]+(lerp(P.pace[i],P.pace[i+1],f/2)*(d-P.d[i]))/1000; // trapezoid to d
 }
 export function paceAt(P,d){
@@ -96,6 +97,7 @@ export function paceAt(P,d){
 export function distAt(P,t){
   if(t<=0)return 0;if(t>=P.finish)return P.total;
   let lo=0,hi=P.time.length-1;while(hi-lo>1){const m=(lo+hi)>>1;if(P.time[m]<=t)lo=m;else hi=m}
+  if(P.lin){const dt=P.time[hi]-P.time[lo];return P.d[lo]+(dt>0?(t-P.time[lo])/dt:0)*(P.d[hi]-P.d[lo])}
   // within the step: pace changes linearly, solve the trapezoid for the distance
   const L=P.d[hi]-P.d[lo],p0=P.pace[lo],p1=P.pace[hi],dt=(t-P.time[lo])*1000,k=(p1-p0)/L;
   const x=Math.abs(k)<1e-9?dt/p0:(-p0+Math.sqrt(p0*p0+2*k*dt))/k;
@@ -149,4 +151,36 @@ export function roadMarks(P,step=50){
   const out=[];
   for(let d=step;d<P.total-step/2;d+=step)out.push({d,pace:paceAt(P,d)});
   return out;
+}
+
+// ---- Racing a past run ----
+// A pacer from one of your runs on this route (a "ghost"): it reaches every point exactly when you did
+// that day. Terrain (elevation, grade) comes from the route; times from the run. lin: true makes
+// timeAt/distAt interpolate those times; pace (for display and the coach) is your pace there, smoothed.
+// fixes: [[ts, t ms, lat, lon, acc, gpsD, rd m, pace], …]; elapsed: the run's time (s)
+export function ghostFromRun(pts,fixes,elapsed){
+  const F=[];let far=-1;
+  for(const f of fixes){const r=f[6];if(r==null||!(r>far+0.5))continue;far=r;F.push([r,f[1]/1000])}
+  const D=pts.at(-1).d,T=[];let j=0;
+  const tail=F.length>1?(F.at(-1)[1]-F[Math.max(0,F.findIndex(x=>x[0]>=F.at(-1)[0]-300))][1])/Math.max(1,F.at(-1)[0]-F[Math.max(0,F.findIndex(x=>x[0]>=F.at(-1)[0]-300))][0]):0.3;
+  for(const p of pts){
+    const d=p.d;
+    if(!F.length||d<=0){T.push(0);continue}
+    if(d<=F[0][0]){T.push(F[0][1]*d/Math.max(1,F[0][0]));continue}
+    if(d>=F.at(-1)[0]){T.push(F.at(-1)[1]+(d-F.at(-1)[0])*tail);continue}
+    while(j<F.length-2&&F[j+1][0]<d)j++;
+    const a=F[j],b=F[j+1];T.push(a[1]+(b[1]-a[1])*(d-a[0])/(b[0]-a[0]));
+  }
+  if(F.length&&F.at(-1)[0]>=D-30)T[T.length-1]=Math.max(T.at(-2)??0,elapsed); // finished: exactly your time
+  return ghostFromTimes(pts,T);
+}
+
+// The same, from times already worked out (saved with a run, so results can be rebuilt later)
+export function ghostFromTimes(pts,T){
+  const n=pts.length;
+  for(let i=1;i<n;i++)T[i]=Math.max(T[i],T[i-1]);
+  const base=buildPacer(pts,Math.max(60,T[n-1]),{climb:'average',descent:'average',strategy:'even'});
+  const raw=pts.map((p,i)=>{const a=Math.max(0,i-5),b=Math.min(n-1,i+5),dd=pts[b].d-pts[a].d;return dd>0?(T[b]-T[a])/(dd/1000):300});
+  const pace=smoothVals(raw,pts,150);
+  return {...base,time:T,pace,finish:T[n-1],target:T[n-1],lin:true,ghost:true};
 }

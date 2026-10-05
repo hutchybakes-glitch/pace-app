@@ -48,7 +48,8 @@ test('effort: descents help to the taper then fade; extremes and colours',()=>{
   assert.ok(effort(-30,0,DESCENT.average)<=1);
   const e=extremes(buildPacer(hilly,1500,prof('even')));
   assert.ok(e.slow.d>1000&&e.slow.d<2100&&e.fast.d>3000&&e.fast.d<4100);
-  assert.equal(gradeColor(0.5),'rgb(148,163,184)');assert.equal(gradeColor(9),'rgb(185,28,28)');assert.equal(gradeColor(-1),'rgb(134,239,172)');
+  assert.equal(gradeColor(0.2),'rgb(148,163,184)');assert.equal(gradeColor(10),'rgb(153,27,27)');assert.equal(gradeColor(-12),'rgb(20,83,45)');
+  const r=x=>+gradeColor(x).match(/\d+/g)[1];assert.ok(r(0.5)>r(2)&&r(2)>r(5)&&r(5)>r(9),'steeper climbs are darker');
 });
 
 test('real route: Ribble Valley pacer is smooth and on time',()=>{

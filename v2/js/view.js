@@ -38,7 +38,7 @@ export function createView(canvas){
     const X=pts.map(p=>(p.lon-lon0)*k),Y=pts.map(p=>(p.lat-lat0)*111195);
     const TX=[],TY=[];
     for(let i=0;i<n;i++){const a=Math.max(0,i-2),b=Math.min(n-1,i+2),dx=X[b]-X[a],dy=Y[b]-Y[a],L=Math.hypot(dx,dy)||1;TX.push(dx/L);TY.push(dy/L)}
-    R={n,D:pts.map(p=>p.d),X,Y,Z:P.es,TX,TY,C:P.grade.map(gradeRGB),total:pts[n-1].d,turns:turns||[],marks:roadMarks(P),lat0,lon0,k};
+    R={n,D:pts.map(p=>p.d),X,Y,Z:P.es,TX,TY,C:P.grade.map(gradeRGB),total:pts[n-1].d,turns:turns||[],marks:roadMarks(P),G:P.grade,lat0,lon0,k};
     hd=null;cd=null;
   }
 
@@ -102,6 +102,9 @@ export function createView(canvas){
     // Road: casing then coloured by grade; the part already run dimmed
     const roadW=Math.max(16,10*sc),vis=[];
     for(let i=0;i<R.n-1;i++){if(Math.hypot(R.X[i]-me.x,R.Y[i]-me.y)<reach*0.8)vis.push(i)}
+    // A route that comes back along the same road (start and finish, out-and-back) overlaps itself:
+    // draw far-off parts of the race first so the stretch you're on, and coming up, is on top
+    vis.sort((a,b)=>Math.abs(R.D[b]-s.you)-Math.abs(R.D[a]-s.you));
     ctx.lineCap='round';ctx.lineJoin='round';
     ctx.strokeStyle='#020617';ctx.lineWidth=roadW+7;ctx.beginPath();
     for(const i of vis){ctx.moveTo(...T(R.X[i],R.Y[i]));ctx.lineTo(...T(R.X[i+1],R.Y[i+1]))}
@@ -214,6 +217,23 @@ export function createView(canvas){
 
     const across=(d,col,w)=>{const p=at(d),z=(p.z-z0)*ZE+0.05,a=P(p.x+p.ty*HALF*1.15,p.y-p.tx*HALF*1.15,z),b=P(p.x-p.ty*HALF*1.15,p.y+p.tx*HALF*1.15,z);if(!a||!b||hidden(a))return null;ctx.save();ctx.shadowColor=col;ctx.shadowBlur=14;ctx.strokeStyle=col;ctx.lineCap='round';ctx.lineWidth=Math.max(2,F*w/a[2]);ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();ctx.restore();return a};
     across(R.total,'#ffffff',0.35);across(0,'#22c55e',0.3);
+
+    // Gradient chevrons on the road ahead: ^ uphill, v downhill; 1 / 2 / 3 for 2–4 / 4–7 / 7 % +
+    // (halfway between the paces written every 50 m, so they never collide)
+    for(let d=Math.ceil((s.you+8-25)/50)*50+25;d<s.you+(rear?0:260);d+=50){
+      const g=R.G[idxOf(d)];if(Math.abs(g)<2)continue;
+      const c=onRoad(d,0.08),a=onRoad(d+3,0.08);if(!c||!a||hidden(c))continue;
+      let ux=a[0]-c[0],uy=a[1]-c[1];const L=Math.hypot(ux,uy)||1;ux/=L;uy/=L;
+      const up=g>0?1:-1,n=Math.abs(g)>=7?3:Math.abs(g)>=4?2:1,sz=Math.max(10,Math.min(44,F*2.4/c[2]));
+      ctx.save();ctx.globalAlpha=Math.max(0.5,1-c[2]/320);ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(2.5,sz*0.22);ctx.lineCap='round';ctx.lineJoin='round';
+      ctx.shadowColor='rgba(0,0,0,.6)';ctx.shadowBlur=4;
+      for(let k=0;k<n;k++){
+        const ox=c[0]+ux*sz*0.6*(k-(n-1)/2),oy=c[1]+uy*sz*0.6*(k-(n-1)/2); // stacked along the road
+        const tx=ox+ux*up*sz*0.35,ty=oy+uy*up*sz*0.35,bx=ox-ux*up*sz*0.25,by=oy-uy*up*sz*0.25,px=-uy*sz*0.5,py=ux*sz*0.5;
+        ctx.beginPath();ctx.moveTo(bx+px,by+py);ctx.lineTo(tx,ty);ctx.lineTo(bx-px,by-py);ctx.stroke();
+      }
+      ctx.restore();
+    }
 
     // Target pace painted on the road ahead (front view)
     if(!rear)for(const m of R.marks){

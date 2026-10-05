@@ -110,13 +110,14 @@ export function extremes(P){
   return {fast:{d:P.d[lo],pace:P.pace[lo],grade:P.grade[lo]},slow:{d:P.d[hi],pace:P.pace[hi],grade:P.grade[hi]}};
 }
 
-// Road colour for a grade: grey when flat, light → dark red as climbs steepen, light → dark green as
-// descents steepen. Returns an rgb() string.
+// Road colour for a grade: grey only when truly flat (under 0.3 %); from very light red for the slightest
+// incline to dark red at 10 % and steeper, and very light green to dark green for descents. The scale is
+// square-rooted so gentle grades (1–3 %) are clearly told apart. Returns [r,g,b].
 export function gradeRGB(g){
   const mix=(a,b,t)=>a.map((x,i)=>Math.round(x+(b[i]-x)*t));
-  if(Math.abs(g)<1)return [148,163,184];
-  const t=Math.min(1,(Math.abs(g)-1)/8);
-  return g>0?mix([252,165,165],[185,28,28],t):mix([134,239,172],[21,128,61],t);
+  if(Math.abs(g)<0.3)return [148,163,184];
+  const t=Math.sqrt(Math.min(1,Math.abs(g)/10));
+  return g>0?mix([254,226,226],[153,27,27],t):mix([220,252,231],[20,83,45],t);
 }
 export const gradeColor=g=>`rgb(${gradeRGB(g).join(',')})`;
 

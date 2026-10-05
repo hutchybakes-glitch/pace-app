@@ -10,7 +10,7 @@ import {buildPacer,timeAt,distAt,paceAt,avgBetween,extremes,gradeColor,projectFi
 import {createView,gapText} from './view.js';
 import {saveRoute,listRoutes,deleteRoute,saveRun,listRuns,deleteRun,opt,importV1Routes} from './store.js';
 import {SIM,SPEED,now,every,sim,simWatch} from './sim.js';
-import {createCoach,createSpeaker,gapPhrase} from './coach.js';
+import {createCoach,createSpeaker,gapPhrase,STYLES} from './coach.js';
 import {fetchWeather,at as wxAt,windStretches,compass16,mph,SHELTER} from './weather.js';
 
 const $=id=>document.getElementById(id);
@@ -29,7 +29,7 @@ let prof=opt.get('profile',{id:'even',climb:'average',descent:'average',strategy
 // speed: live pace from GPS (Doppler) speed, falling back to position; live: how quickly live pace reacts
 const o={speed:opt.get('speedSrc',true),live:opt.get('live','balanced'),band:opt.get('band',5),auto:opt.get('auto',true),zone:opt.get('zone',25),view:opt.get('view','map'),
   voice:opt.get('voice','full'),tones:opt.get('tones',true),rate:opt.get('rate','normal'),muted:opt.get('muted',false)};
-o.wxOn=opt.get('wxOn',true);o.wxMode=opt.get('wxMode','keep');o.shelter=opt.get('shelter','some');
+o.coachStyle=opt.get('coachStyle','moderate');o.wxOn=opt.get('wxOn',true);o.wxMode=opt.get('wxMode','keep');o.shelter=opt.get('shelter','some');
 const RATES={slow:0.9,normal:1,fast:1.12};
 const speaker=createSpeaker();speaker.setOpts({tones:o.tones,rate:RATES[o.rate]});speaker.setMuted(o.muted);
 const voiceOn=()=>o.voice!=='off'&&!o.muted;
@@ -202,8 +202,12 @@ function renderOptions(){
   $('o-tones').classList.toggle('on',o.tones);$('o-tones').setAttribute('aria-checked',o.tones);
   $('o-tones').onclick=()=>{o.tones=!o.tones;opt.set('tones',o.tones);speaker.setOpts({tones:o.tones});renderOptions()};
   $('o-rate').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===o.rate);b.onclick=()=>{o.rate=b.dataset.v;opt.set('rate',o.rate);speaker.setOpts({rate:RATES[o.rate]});renderOptions()}});
+  $('o-style').innerHTML=STYLES.map(x=>`<button class="stylec ${x.id===o.coachStyle?'on':''}" data-v="${x.id}"><b>${x.name}<em>${x.who}</em></b><small>${esc(x.desc)}</small><q>${esc(x.example)}</q></button>`).join('');
+  $('o-style').querySelectorAll('.stylec').forEach(b=>b.onclick=()=>{o.coachStyle=b.dataset.v;opt.set('coachStyle',o.coachStyle);renderOptions()});
+  $('o-style-row').hidden=o.voice==='off';
   $('o-test').onclick=()=>{speaker.unlock();speaker.setMuted(false);o.muted=false;opt.set('muted',false);
-    speaker.play([{text:'Climb ahead. Pacer eases to 5:20',pri:3,tone:'down'},{text:'Kilometre 3. 4:58. Pacer 5:01. 6 seconds ahead.',pri:2,tone:'split'}])};
+    const st=STYLES.find(x=>x.id===o.coachStyle)||STYLES[1];
+    speaker.play([{text:'Descent in 50 metres, gradually getting steeper. Pacer picking up to 4:44 at the steepest point.',pri:3,tone:'up'},{text:st.example,pri:2}])};
   $('o-zone').querySelector('b').textContent=`${o.zone} m`;
   $('o-zone').querySelectorAll('button').forEach(b=>b.onclick=()=>{o.zone=Math.max(10,Math.min(100,o.zone+ +b.dataset.d));opt.set('zone',o.zone);renderOptions()});
 }
@@ -229,10 +233,10 @@ const el=()=>acc+(phase==='running'?now()-t0:0); // pause-aware elapsed ms
 const AUTOSAVE=10000,RESUME_GAP=15*60000;
 
 let coach=null,armSaid=null,runCond=null;
-function enterRun(r=route,p=P,tr=turns,rc=cond()){
+function enterRun(r=route,p=P,tr=turns,rc=cond(),pf=prof){
   runCond=rc;
   runRoute=r;runP=p;runTurns=tr;
-  coach=createCoach({P:p,marks:paceMarks(p),level:o.voice==='key'?'key':'full'});armSaid=null;
+  coach=createCoach({P:p,prof:pf,level:o.voice==='key'?'key':'full',style:o.coachStyle,band:o.band});armSaid=null;
   setMuteUI();
   resetRun();
   view.setRoute(r.pts,p,tr);
@@ -577,7 +581,7 @@ $('rsgo').onclick=()=>{
   speaker.unlock();
   const r=pending;if(!r)return;$('resume').hidden=true;
   const Pr=buildPacer(r.route.pts,r.finish,r.prof,{cond:r.cond});
-  enterRun(r.route,Pr,turnsFor(r.route),r.cond||null);
+  enterRun(r.route,Pr,turnsFor(r.route),r.cond||null,r.prof);
   rec=r;rd=r.rd||0;rsplits=[...(r.rsplits||[])];track.dist=r.dist||0;matcher.seed(rd,track.dist);shownD=rd;
   sim.jump=rd;
   const gap=(Date.now()-r.saved)*SPEED,last=r.fixes.at(-1);

@@ -7,11 +7,25 @@ const M=1/111195;
 const route=hill=>{const pts=[];for(let d=0;d<=10000;d+=10)pts.push({d,lat:51+d*M,lon:0,ele:hill&&d>=4000&&d<=4800?(d-4000)*0.06:hill&&d>4800?48:0});return pts};
 const even=PROFILES[0];
 
-test('rpe: all-out 10 km builds steadily, ≤ 6 for the first 2.5 km, 10 at the line',()=>{
+test('rpe: all-out builds with the share of the race done and peaks at the line',()=>{
   const P=buildPacer(route(false),50*60,even),R=rpePlan(P,'allout');
-  for(let d=0;d<=2500;d+=100)assert.ok(rpeAt(R,d)<=6.05,`${d}: ${rpeAt(R,d)}`);
-  assert.ok(rpeAt(R,5000)>rpeAt(R,2500)&&rpeAt(R,7500)>rpeAt(R,5000));
+  assert.ok(rpeAt(R,300)>=4.5&&rpeAt(R,300)<=5.5,`start ${rpeAt(R,300)}`);
+  for(let d=1000;d<=9000;d+=1000)assert.ok(rpeAt(R,d)>rpeAt(R,d-1000),`${d}`);
+  assert.ok(rpeAt(R,9000)<=9.5,`no kilometres at 10: ${rpeAt(R,9000)}`);
   assert.ok(rpeAt(R,10000)>=9.6);
+  // a 5 km race starts nearer its finishing effort than a 10 km
+  const short=rpePlan(buildPacer(route(false).filter(p=>p.d<=5000),20*60,even),'allout');
+  assert.ok(rpeAt(short,300)>rpeAt(R,300)+1);
+});
+
+test('rpe: easy and comfortable runs hold the same effort; hills only lift them a little',()=>{
+  for(const [id,lo,hi] of [['easy',3,4],['steady',4,5]]){
+    const flat=rpePlan(buildPacer(route(false),60*60,even),id);
+    assert.ok(Math.max(...flat.rpe)-Math.min(...flat.rpe)<0.05,`${id} flat`);
+    const hilly=rpePlan(buildPacer(route(true),60*60,PROFILES.find(p=>p.id==='metronome')),id);
+    assert.ok(Math.max(...hilly.rpe)<=hi&&Math.min(...hilly.rpe)>=lo,`${id}: ${Math.min(...hilly.rpe)}–${Math.max(...hilly.rpe)}`);
+    assert.ok(rpeAt(hilly,4600)>rpeAt(hilly,3000),`${id} climb`);
+  }
 });
 
 test('rpe: a climb lifts it, recovery follows over the top',()=>{
@@ -21,11 +35,10 @@ test('rpe: a climb lifts it, recovery follows over the top',()=>{
   assert.ok(rpeAt(hilly,4950)<rpeAt(flat,4950),`recovery ${rpeAt(hilly,4950)} vs ${rpeAt(flat,4950)}`);
 });
 
-test('rpe: intensities stay within their bands',()=>{
-  const P=buildPacer(route(true),60*60,even);
-  const easy=rpePlan(P,'easy'),hard=rpePlan(P,'hard');
-  assert.ok(Math.max(...easy.rpe)<=4&&Math.min(...easy.rpe)>=2);
-  assert.ok(Math.max(...hard.rpe)<=8.5&&rpeAt(hard,10000)>=7.5);
+test('rpe: hard holds comfortably hard, building only a little',()=>{
+  const R=rpePlan(buildPacer(route(false),50*60,even),'hard');
+  assert.ok(rpeAt(R,300)>=5.8&&rpeAt(R,300)<=6.2,`${rpeAt(R,300)}`);assert.ok(rpeAt(R,10000)>=7.3&&rpeAt(R,10000)<=7.6);
+  assert.ok(Math.max(...R.rpe)<=8);
 });
 
 test('rpe: check-ins about every quarter, moved off the climb, none near the finish',()=>{
@@ -42,6 +55,7 @@ test('rpe: advice',()=>{
   assert.equal(advise({R,P,said:3,at:1500}).status,'low-early');
   assert.equal(advise({R,P,said:Math.round(tg),at}).status,'on');
   assert.equal(advise({R:rpePlan(P,'easy'),P,said:1.5,at}).status,'low-easy');
+  assert.equal(advise({R:rpePlan(P,'steady'),P,said:4.5,at:1000}).status,'on');
 });
 
 test('rpe: adjusting the plan keeps the time where you are',()=>{

@@ -237,10 +237,17 @@ function renderRpe(){
   $('rpeylab').innerHTML=[2,4,6,8,10].map(r=>`<span style="top:${pct(Y(r))}">${r}</span>`).join('');
   $('rpeaxis').innerHTML=`<span>0 km</span><span>${kmStr(D/2)}</span><span>${kmStr(D)} km</span>`;
   const at=d=>Math.round(rpeAt(Rplan,d)*2)/2,q=D>=4000?2500:D/4,peak=Rplan.rpe.reduce((m,v,i)=>v>m.v&&P.time[i]<P.finish*0.8?{v,d:P.d[i]}:m,{v:0,d:0});
-  const flat=INTENSITIES.find(x=>x.id===o.intensity).id==='easy';
-  $('rpeinsight').innerHTML=`Start around <b>${at(300)}</b> (${rpeName(at(300)).toLowerCase()}), <b>${at(q)}</b> by ${kmStr(q)} km, <b>${at(D/2)}</b> at halfway and <b>${at(D)}</b> at the finish.`+
-    (peak.v>at(D*0.6)+0.4&&!flat?` The toughest part before the finish is around ${kmStr(peak.d)} km (${Math.round(peak.v*2)/2}); let your breathing settle over the top.`:'')+
-    (flat?' On hills, slow down or walk to keep it easy.':'')+(o.rpeAsk?' <span class="dim">White dots: when it will ask how you feel.</span>':'');
+  const I=INTENSITIES.find(x=>x.id===o.intensity),dots=o.rpeAsk?' <span class="dim">White dots: when it will ask how you feel.</span>':'';
+  const hiR=Math.round(Math.max(...Rplan.rpe)*2)/2;
+  if(I.shape==='flat'){
+    $('rpeinsight').innerHTML=`Hold about <b>${Rplan.start}</b> (${I.id==='easy'?'easy, Zone 2':rpeName(Rplan.start).toLowerCase()}) the whole way. It shouldn't build as you go: if it starts to feel harder, slow down.`+
+      (hiR>Rplan.start?` A touch more on the climbs (up to ${hiR})${I.id==='easy'?'; walk the steep bits if you need to':''}.`:'')+dots;
+    return;
+  }
+  $('rpeinsight').innerHTML=(I.id==='allout'
+      ?`Start around <b>${at(300)}</b> (${rpeName(at(300)).toLowerCase()}), <b>${at(q)}</b> by ${kmStr(q)} km, <b>${at(D/2)}</b> at halfway and <b>${at(D)}</b> at the finish: building steadily, with nothing left at the line.`
+      :`Settle at about <b>${at(D/4)}</b> (${rpeName(at(D/4)).toLowerCase()}) and hold it, about <b>${at(D/2)}</b> at halfway, building only to <b>${at(D)}</b> by the finish. You should finish knowing you had more.`)+
+    (peak.v>at(D*0.6)+0.4?` The toughest part before the finish is around ${kmStr(peak.d)} km (${Math.round(peak.v*2)/2}); let your breathing settle over the top.`:'')+dots;
 }
 
 // Choose between a pacer profile and one of your past runs on this route (best first, 🏆)

@@ -1,15 +1,19 @@
 // Optimal RPE (rate of perceived exertion, 1–10) along the course, check-ins and pacing advice.
 //
-// What it's based on:
-// - In a well-paced race, RPE rises roughly linearly with the proportion of the race done and peaks at
-//   the finish (Tucker's anticipatory "template" RPE; Noakes et al.). Feeling fresh early is expected,
-//   not a sign to go faster: early RPE is a poor guide, so speed-up advice waits until 30 % in.
-// - Even pacing with a small reserve for the finish is how 5 km to marathon world records are run.
-// - On hills, letting effort rise a little on climbs and fall on descents beats holding a constant
-//   effort (variable-power studies, about 5 % over average on climbs), with recovery after the climb
-//   before pushing on. Too much on climbs risks early fatigue, so the rise is capped.
-// - On the CR-10 scale, running at the 2 mmol/L lactate boundary is about 4.3 and at 4 mmol/L about
-//   6.5, which anchors the Zone 2 (3–4) and threshold (6–7) bands below.
+// What it's based on, by the kind of run:
+// - Easy / Zone 2 and comfortable runs are run by constant effort: Zone 2 is about RPE 3–4, and when
+//   effort creeps up (hills, heat, cardiac drift) you slow down or walk rather than let it rise. So these
+//   plans are flat, rising only a little on climbs.
+// - Hard-but-controlled (tempo) runs hold "comfortably hard", RPE 6–7, building only slightly by the end
+//   and finishing with something in reserve.
+// - All-out races: RPE rises roughly linearly with the proportion of the race done and peaks at the
+//   finish (Tucker's anticipatory "template" RPE). Shorter races start nearer their finishing effort.
+//   Feeling fresh early is expected, not a sign to go faster, so speed-up advice waits until 30 % in.
+//   Even pacing with a finishing kick is how 5 km to marathon world records are run.
+// - On hills in a race, letting effort rise a little on climbs and fall on descents beats holding a
+//   constant effort (variable-power studies, about 5 % over average on climbs), with recovery over the
+//   top. Too much on climbs risks early fatigue, so the rise is capped.
+// - On the CR-10 scale, the 2 mmol/L lactate boundary is about 4.3 and 4 mmol/L about 6.5.
 import {timeAt,paceAt} from './pacer.js';
 
 export const RPE_SCALE=[
@@ -26,13 +30,21 @@ export const RPE_SCALE=[
 ];
 export const rpeName=r=>RPE_SCALE[Math.max(0,Math.min(9,Math.round(r)-1))].name;
 
-// What you intend the run to be. start/end: RPE at the start and finish of a typical 10 km; cap: the most
-// it should ever be; speedUp: whether it may suggest running faster
+// What you intend the run to be.
+//   shape   'race': builds from start to end over the run; 'flat': the same effort throughout
+//   start/end   RPE at the start and finish (an all-out race's start depends on its length, see rpePlan)
+//   hill    how much of the pacer's extra work on a climb shows as extra RPE (1 = all of it)
+//   up/down the most RPE may rise on a climb / fall on a descent; cap: never above this
+//   recover a short easing over the top of each climb; speedUp: may suggest running faster
 export const INTENSITIES=[
-  {id:'allout',name:'All-out race',desc:'A PB attempt. Controlled at first, building steadily, nothing left at the line.',end:10,cap:10,speedUp:true},
-  {id:'hard',name:'Hard, not all-out',desc:'A strong run, like a parkrun you push but don\'t empty yourself on. You finish with a bit in reserve.',end:8,cap:8.5,speedUp:true},
-  {id:'steady',name:'Comfortable',desc:'A steady run that stays under control throughout. Breathing settled, could talk in short sentences.',start:4,end:5.5,cap:6,speedUp:true},
-  {id:'easy',name:'Zone 2 easy',desc:'Conversational, for building your aerobic base. Slow right down, or walk, on hills to stay easy.',start:3,end:3.5,cap:4,speedUp:false},
+  {id:'allout',name:'All-out race',desc:'A PB attempt. Controlled at first, building steadily, nothing left at the line.',
+   shape:'race',end:10,hill:1,up:1.5,down:1.5,cap:10,recover:true,speedUp:true},
+  {id:'hard',name:'Hard, not all-out',desc:"Comfortably hard, like a tempo run or a parkrun you push but don't empty yourself on. Holds around 6 to 7, a little more by the end.",
+   shape:'race',start:6,end:7.5,hill:0.6,up:1,down:1,cap:8,recover:true,speedUp:true},
+  {id:'steady',name:'Comfortable',desc:'A steady run at the same effort all the way. Breathing settled, could talk in short sentences. A touch more on climbs.',
+   shape:'flat',start:4.5,end:4.5,hill:0.35,up:0.5,down:0.5,cap:5,recover:false,speedUp:true},
+  {id:'easy',name:'Zone 2 easy',desc:'Conversational, for building your aerobic base. The same easy effort throughout: slow right down, or walk, on hills to keep it there.',
+   shape:'flat',start:3.5,end:3.5,hill:0.3,up:0.5,down:0.5,cap:4,recover:false,speedUp:false},
 ];
 
 // Effort cost of running at grade g % compared with the flat (from metabolic cost studies: about 3.5 %
@@ -47,34 +59,30 @@ export function gradeCost(g){
 // Target RPE at every route point for this pacer and intensity. Returns {d, rpe, start, end, intensity}
 export function rpePlan(P,id='allout'){
   const I=INTENSITIES.find(x=>x.id===id)||INTENSITIES[0],n=P.d.length,mins=P.finish/60;
-  // Shorter races start nearer their finishing effort; longer ones start well below it
-  const s0=I.start??Math.max(3.5,Math.min(6.5,6.5-1.2*Math.log2(Math.max(1,mins)/20)))-(I.id==='hard'?0.5:0);
-  const s1=I.end;
+  // All-out: shorter races start nearer their finishing effort (about 6.5 for a 20-minute race, 5 for
+  // 50 minutes, 3.5 for 2 hours or more). Hard: lower for long runs too.
+  const race=Math.max(3.5,Math.min(6.5,6.5-1.2*Math.log2(Math.max(1,mins)/20)));
+  const s0=I.id==='allout'?race:I.id==='hard'?Math.min(I.start,race+1):I.start,s1=I.end;
+  const base=f=>I.shape==='flat'?s0:s0+(s1-s0)*(I.id==='allout'?Math.pow(f,1.2):f);
   // How hard the pacer is working here compared with its average: its speed times the grade cost
   const work=P.d.map((_,i)=>gradeCost(P.grade[i])/P.pace[i]);
   let wsum=0,tsum=0;
   for(let i=0;i<n-1;i++){const dt=P.time[i+1]-P.time[i];wsum+=work[i]*dt;tsum+=dt}
   const wavg=wsum/(tsum||1);
-  const out=[];
-  for(let i=0;i<n;i++){
-    const f=P.time[i]/P.finish;
-    const base=s0+(s1-s0)*Math.pow(f,1.2);
-    const hill=Math.max(-1.5,Math.min(1.5,(work[i]/wavg-1)*25)); // about 1 RPE for every 4 % harder
-    out.push(base+hill);
-  }
-  // Smooth over 150 m (effort lags the road), then give recovery over the top of each climb
-  let r=smooth(out,P.d,150);
-  const climbs=climbsOf(P);
-  for(const c of climbs){
+  const hillOf=i=>Math.max(-I.down,Math.min(I.up,(work[i]/wavg-1)*25*I.hill)); // about 1 RPE per 4 % harder
+  // Smooth over 150 m (effort lags the road)
+  let r=smooth(P.d.map((_,i)=>base(P.time[i]/P.finish)+hillOf(i)),P.d,150);
+  // Races: recovery over the top of each climb
+  if(I.recover)for(const c of climbsOf(P)){
     const size=Math.min(1,c.gain/25),len=Math.min(300,150+c.gain*5);
     for(let i=0;i<n;i++){const x=P.d[i]-c.d1;if(x>0&&x<len)r[i]-=0.6*size*(1-x/len)}
   }
-  // Before 40 % of the way, stay under the start band + 1 (+1.5 on a real hill) whatever the terrain;
-  // and keep half a point below the finishing effort until the last 7 % of the run
+  // Races: in the first 40 % stay within 1 of the build (1.5 on a real hill) whatever the terrain, and
+  // keep half a point below the finishing effort until the final push (the last 7 %)
   r=r.map((v,i)=>{
-    const f=P.time[i]/P.finish,early=f<0.4?s0+(s1-s0)*Math.pow(f,1.2)+(P.grade[i]>3?1.5:1):99;
-    const top=f<0.93?s1-0.5:I.cap; // the very top of the scale only in the final push, not for kilometres
-    return Math.max(1,Math.min(I.cap,top,early,v));
+    const f=P.time[i]/P.finish;let hi=I.cap;
+    if(I.shape==='race'){if(f<0.4)hi=Math.min(hi,base(f)+(P.grade[i]>3?1.5:1));if(f<0.93)hi=Math.min(hi,s1-0.5)}
+    return Math.max(1,Math.min(hi,I.shape==='flat'?Math.max(s0-I.down,v):v));
   });
   return {d:P.d,rpe:r,start:s0,end:s1,intensity:I};
 }
@@ -133,19 +141,20 @@ export function advise({R,P,said,at,t}){
   const left=P.total-at,restPace=left>50?(timeAt(P,P.total)-timeAt(P,at))/(left/1000):paceAt(P,at);
   const tgt=`about ${Math.round(target)}, ${rpeName(target).toLowerCase()}`;
   const offer=(k,why)=>{const ch=Math.round(restPace*(k-1));return Math.abs(ch)<2?null:{k,change:ch,text:why}};
-  if(diff>=1&&!(f>0.85&&diff<1.5&&I.id!=='easy')){
+  if(diff>=1&&!(f>0.85&&diff<1.5&&I.shape==='race')){
     const k=1+Math.min(0.045,0.015*diff);
     const o=offer(k,`That's above where you want to be. It should feel ${tgt} here.`);
     if(o)return {...o,status:'high',text:`${o.text} Ease off by ${o.change} seconds a kilometre?`};
   }
   if(diff<=-1.5&&I.speedUp){
-    if(f<0.3)return {k:null,change:0,status:'low-early',text:`Feeling good is normal this early. It should feel ${tgt}. Hold this and bank it for later.`};
+    if(f<0.3&&I.shape==='race')return {k:null,change:0,status:'low-early',text:`Feeling good is normal this early. It should feel ${tgt}. Hold this and bank it for later.`};
     const k=1-Math.min(0.036,0.012*-diff);
     const o=offer(k,`You've got more in the tank. It's fine to feel ${tgt} here.`);
     if(o)return {...o,status:'low',text:`${o.text} Pick it up by ${-o.change} seconds a kilometre?`};
   }
   if(diff<=-1.5)return {k:null,change:0,status:'low-easy',text:'Nice and easy, exactly right for this run.'};
-  if(diff>=1)return {k:null,change:0,status:'high-late',text:'It\'s meant to hurt now. Hang on, nearly there.'};
+  if(diff>=1&&I.shape==='race')return {k:null,change:0,status:'high-late',text:'It\'s meant to hurt now. Hang on, nearly there.'};
+  if(diff>=1)return {k:null,change:0,status:'high',text:`A bit above the ${tgt} this run is meant to be. Ease back a little.`};
   return {k:null,change:0,status:'on',text:`Right where you should be. ${Math.round(target)} is the target here.`};
 }
 

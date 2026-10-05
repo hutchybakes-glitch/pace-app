@@ -21,6 +21,11 @@
     <div class="brand"><img src="icons/icon-192.png" alt=""><div><h1>Pacer</h1><span>Race a pacer who knows every hill</span></div></div>
   </header>
 
+  <div id="simcard" class="card" hidden>
+    <div class="h">Sim scenario</div>
+    <div class="sub">How the pretend runner races the pacer, so you can see and hear how Pacer reacts.</div>
+    <div id="simsc" class="styles"></div>
+  </div>
   <div id="resume" class="card warn" hidden>
     <div class="h">Unfinished run</div>
     <div id="rsinfo"></div>
@@ -118,7 +123,6 @@
     </div>
     <div class="row2">
       <div id="gap" class="gap"></div>
-      <button id="pausebtn" class="round mute" aria-label="Pause" hidden>⏸</button>
       <button id="mute" class="round mute" aria-label="Mute voice coach">🔊</button>
       <div id="views" class="views" role="tablist"><button data-v="map">Map</button><button data-v="front">Front</button><button data-v="rear">Rear</button></div>
     </div>
@@ -144,9 +148,9 @@
     <div class="tiles" id="tiles">
       <div id="youtile" class="tile you"><span>You</span><b id="ypace">--:--</b><small id="ystate"></small></div>
       <div class="tile pc"><span>Pacer</span><b id="ppace">--:--</b></div>
-      <div id="gaptile" class="tile gapt"><span id="gaplab">Gap</span><b id="gapv">0.0</b></div>
+      <button id="pausebig" class="tile pausebig" aria-label="Pause the run"><i>⏸</i>Pause</button>
     </div>
-    <div id="ctrls"><button id="go" class="btn go">Start</button><button id="finbtn" class="btn">Finish</button></div>
+    <div id="ctrls"><button id="go" class="btn go">Start</button><button id="finbtn" class="btn save">Save</button><button id="discbtn" class="btn disc">Discard</button></div>
     <div id="gpsline"></div>
   </div>
 </section>

@@ -9,7 +9,7 @@ import {createStartGate,compass} from './start.js';
 import {buildPacer,timeAt,distAt,paceAt,avgBetween,extremes,gradeColor,projectFinish,paceMarks,PROFILES,TRAIT_NAMES} from './pacer.js';
 import {createView,gapText} from './view.js';
 import {saveRoute,listRoutes,deleteRoute,saveRun,listRuns,deleteRun,opt,importV1Routes} from './store.js';
-import {SIM,SPEED,now,every,sim,simWatch} from './sim.js';
+import {SIM,SPEED,now,every,sim,simWatch,SCENARIOS} from './sim.js';
 import {createCoach,createSpeaker,gapPhrase,STYLES} from './coach.js';
 import {fetchWeather,at as wxAt,windStretches,compass16,mph,SHELTER} from './weather.js';
 
@@ -35,7 +35,15 @@ const speaker=createSpeaker();speaker.setOpts({tones:o.tones,rate:RATES[o.rate]}
 const voiceOn=()=>o.voice!=='off'&&!o.muted;
 const finishFor=r=>opt.get('finish:'+r.id,Math.round(r.pts.at(-1).d/1000*300/15)*15); // default 5:00/km
 const msg=(t,err)=>{$('msg').textContent=t;$('msg').className=err?'err':''};
-if(SIM)document.querySelector('.brand h1').textContent='Pacer · SIM';
+if(SIM){
+  document.querySelector('.brand h1').textContent='Pacer · SIM';
+  sim.scenario=opt.get('simStory','race');$('simcard').hidden=false;
+  const renderSim=()=>{
+    $('simsc').innerHTML=SCENARIOS.map(x=>`<button class="stylec ${x.id===sim.scenario?'on':''}" data-v="${x.id}"><b>${x.name}</b><small>${x.desc}</small></button>`).join('');
+    $('simsc').querySelectorAll('.stylec').forEach(b=>b.onclick=()=>{sim.scenario=b.dataset.v;opt.set('simStory',sim.scenario);renderSim()});
+  };
+  renderSim();
+}
 
 async function initHome(){
   try{const n=await importV1Routes();if(n)msg(`Brought over ${n} route${n>1?'s':''} from Pace v1.`)}catch(e){}
@@ -265,12 +273,12 @@ $('views').querySelectorAll('button').forEach(b=>b.onclick=()=>setView(b.dataset
 
 function setPhaseUI(){
   const go=$('go');go.className='btn go';
-  go.textContent={idle:'Start',armed:'Cancel',running:'Pause',paused:'Resume',done:'Start'}[phase];
+  go.textContent={idle:'Start',armed:'Cancel',running:'Pause',paused:'Continue',done:'Start'}[phase];
   if(phase==='armed')go.classList.add('cancel');
-  $('finbtn').hidden=phase!=='paused';
-  $('ctrls').hidden=phase==='running';               // running: the bottom is all pace; pause is up top
-  $('pausebtn').hidden=phase!=='running';
-  $('tiles').hidden=$('lside').hidden=phase==='idle'||phase==='armed'; // nothing to show yet, and the start card needs the width
+  $('finbtn').hidden=$('discbtn').hidden=phase!=='paused';
+  $('ctrls').hidden=phase==='running';               // running: your pace, the pacer's, and a big Pause
+  $('tiles').hidden=phase!=='running';               // paused: Continue / Save / Discard instead
+  $('lside').hidden=phase==='idle'||phase==='armed'; // nothing to show yet, and the start card needs the width
   if(!$('run').hidden)requestAnimationFrame(layout);
   $('back').hidden=phase==='running'||phase==='armed';
 }
@@ -346,7 +354,7 @@ function start(at){
   ensureWatch();wake();setPhaseUI();
 }
 function pause(){acc=el();phase='paused';sim.moving=false;lock?.release();lock=null;setPhaseUI();save();if(voiceOn())speaker.say('Paused',2)}
-$('pausebtn').onclick=()=>{if(phase==='running')pause()};
+$('pausebig').onclick=()=>{if(phase==='running')pause()};
 $('go').onclick=()=>{
   speaker.unlock(); // iOS: audio must be started from a tap
   if(phase==='running')pause();
@@ -356,9 +364,13 @@ $('go').onclick=()=>{
 };
 $('finbtn').onclick=async()=>{
   if(phase!=='paused')return;
-  if(!worth(rec)){if(!confirm('Nothing much recorded yet. Discard this run?'))return;if(rec?.id)await deleteRun(rec.id);resetRun();return}
-  if(!confirm('Finish here and save this run?'))return;
+  if(!worth(rec)){alert('Nothing much recorded yet, so there is nothing to save.');return}
   finishRun(false);
+};
+$('discbtn').onclick=async()=>{
+  if(phase!=='paused'||!confirm("Discard this run? It won't be saved."))return;
+  await saving;if(rec?.id)await deleteRun(rec.id);
+  rec=null;resetRun();
 };
 $('back').onclick=async()=>{
   if(phase==='paused'&&rec){if(!confirm('Leave this run? It stays saved, and you can resume it from the home screen.'))return;await save()}
@@ -400,7 +412,7 @@ function loop(ts){
   }else shownD+=(rd-shownD)*0.3;
   const started=phase==='running'||phase==='paused'||phase==='done';
   const pd=started?distAt(runP,el()/1000):0;
-  view.draw({mode:o.view,you:started?shownD:0,pacer:pd,youCol:STATUS_COL[stat]||null,gps:(!started||offRoute)?lastLL:null});
+  view.draw({mode:o.view,you:started?shownD:0,pacer:pd,gap:started?gapNow:null,youCol:STATUS_COL[stat]||null,gps:(!started||offRoute)?lastLL:null});
 }
 
 // Are you physically within 25 m of this turn's point? (GPS, not just route distance)
@@ -484,9 +496,7 @@ function hud(){
     $('ypace').textContent=fmtP(curPace);$('ystate').textContent=`target ${fmtP(target)}`;
     $('ppace').textContent=fmtP(paceAt(runP,distAt(runP,t)));
     setStatus(curPace?(curPace>target+o.band?'slow':curPace<target-o.band?'fast':'on'):null);
-    const lvl=Math.abs(gapNow)<0.05;
-    $('gapv').textContent=gapText(gapNow);$('gaplab').textContent=lvl?'Level':gapNow>0?'Ahead':'Behind';
-    $('gaptile').className='tile gapt '+(lvl?'':gapNow>0?'ahead':'behind');
+
     // Projected finish: how you're doing against the pacer's hill-aware plan, applied to what's left
     const proj=projectFinish(runP,rd,t,timeOneKmBack());
     if(proj){const dlt=proj-runP.finish;$('proj').textContent=fmt(proj);$('projd').textContent=Math.abs(dlt)<0.5?'on target':`${dlt<0?'−':'+'}${gapFmt(Math.abs(dlt))}`;$('projd').className=dlt<-0.5?'ahead':dlt>0.5?'behind':''}
@@ -494,7 +504,6 @@ function hud(){
   }else{
     gapNow=started?0:null;$('gap').hidden=false;
     $('ypace').textContent=$('ppace').textContent='--:--';$('ystate').textContent='';setStatus(null);
-    $('gapv').textContent='0.0';$('gaplab').textContent='Gap';$('gaptile').className='tile gapt';
     $('proj').textContent=fmt(runP.finish);$('projd').textContent='target';$('projd').className='';
     $('gap').className='gap';$('gap').textContent=phase==='armed'?'Pacer waiting at the start':started?'And you\'re off…':'Pacer ready at the start';
   }

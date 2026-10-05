@@ -52,7 +52,7 @@ export function createView(canvas){
   const idxOf=d=>Math.max(0,Math.min(R.n-1,Math.round(d/10)));
 
   // s: {mode, you (route m), pacer (route m or null), gap (s, + = you ahead, or null),
-  //     youCol (your line's colour: red/green/gold against the pacer, or null), gps {lat,lon} or null}
+  //     gap (s, + = you ahead, or null), youCol (your line's colour: red/green/gold, or null), gps {lat,lon} or null}
   function draw(s){
     if(!R)return;
     ctx.clearRect(0,0,W,H);
@@ -65,6 +65,12 @@ export function createView(canvas){
     ctx.save();ctx.globalAlpha=alpha;ctx.font=`800 ${size}px ${FONT}`;const w=ctx.measureText(text).width+size*1.1,h=size*1.65;
     ctx.fillStyle=bg;ctx.beginPath();ctx.roundRect?ctx.roundRect(x-w/2,y-h/2,w,h,h/2):ctx.rect(x-w/2,y-h/2,w,h);ctx.fill();
     ctx.fillStyle=fg;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,x,y+0.5);ctx.restore();
+  }
+  // Your time gap above your line, F1-style: green when you're ahead, orange when the pacer is
+  function gapLabel(g,x,y,size=16){
+    if(g==null)return;
+    const level=Math.abs(g)<0.05,ahead=g>0;
+    pill(gapText(g)+(level?'':ahead?'  ahead':'  behind'),x,y,level?'#e2e8f0':ahead?GOOD:ORANGE,level?'#0f172a':ahead?'#052e16':'#1c1003',size);
   }
   // Pace painted on the road: white with a dark outline so it reads on any colour
   function paceText(text,x,y,size,alpha=1){
@@ -140,6 +146,7 @@ export function createView(canvas){
     const clampX=(x,w)=>Math.max(lft+w/2+2,Math.min(lft+vw-w/2-2,x));
     if(pq){dot(pq.c[0],pq.c[1],8,ORANGE);pill('PACER',clampX(pq.right[0]+34,58),pq.right[1],ORANGE,'#1c1003',12)}
     pill(metres(s.you),clampX(yq.left[0]-42,76),yq.left[1],'rgba(2,6,23,.88)','#f1f5f9',14);
+    gapLabel(s.gap,ax,ay-36,17);
     const hdDeg=(Math.atan2(hd.x,hd.y)*180/Math.PI+360)%360;heads={view:hdDeg,travel:hdDeg};
   }
 
@@ -228,7 +235,7 @@ export function createView(canvas){
       const lift=Math.max(16,F*0.55/head[2]);
       const side=Math.max(44,F*1.1/head[2]);
       const inView=(x,w)=>Math.max(lft+w/2+2,Math.min(lft+vw-w/2-2,x)); // keep tags clear of the side columns
-      if(o.me)pill(metres(s.you),inView(head[0]-side-10,76),head[1]+lift*0.4,'rgba(2,6,23,.88)','#f1f5f9',13);
+      if(o.me){pill(metres(s.you),inView(head[0]-side-10,76),head[1]+lift*0.4,'rgba(2,6,23,.88)','#f1f5f9',13);gapLabel(s.gap,inView(head[0],110),head[1]-lift-6,16)}
       else pill('PACER',inView(head[0]+side,58),head[1],ORANGE,'#1c1003',12,ghost?0.6:1);
     }
     const camDeg=(Math.atan2(f[0],f[1])*180/Math.PI+360)%360,runDeg=(Math.atan2(cd.x,cd.y)*180/Math.PI+360)%360;

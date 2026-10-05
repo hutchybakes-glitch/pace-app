@@ -4,9 +4,10 @@
 //   &speed=10   clock multiplier (default 10)
 //   &pace=4:30  constant pace instead of following the pacer
 //   &detour=3   at this km, a 300 m detour up to 70 m off the route
+// The Home screen's Sim scenario (sim.scenario) shapes the race: see SCENARIOS.
 import {paceAt} from './pacer.js';
 
-const q=new URLSearchParams(location.search);
+const q=new URLSearchParams(typeof location!=='undefined'?location.search:'');
 export const SIM=q.has('sim');
 export const SPEED=SIM?Math.max(1,+q.get('speed')||10):1;
 const PACE=(()=>{const m=(q.get('pace')||'').match(/^(\d+):(\d\d)$/);return m?+m[1]*60+ +m[2]:null})();
@@ -18,7 +19,27 @@ export const every=(ms,fn)=>setInterval(fn,ms/SPEED);
 
 // Set by the app: moving, restart (back to the start), jump (put the runner at this route distance;
 // negative = behind the start line)
-export const sim={moving:false,restart:false,jump:null};
+export const sim={moving:false,restart:false,jump:null,scenario:'steady'};
+
+// Sim scenarios: the runner's pace as a multiple of the pacer's pace at the same spot (so terrain still
+// counts), by fraction of the route: [[from, multiplier], …] (< 1 = quicker). Phases blend over ±4 %
+// of the route. 'steady' instead follows the pacer with short surges and fades.
+export const SCENARIOS=[
+  {id:'steady',name:'Steady with surges',desc:'Stays with the pacer, with short surges and fades'},
+  {id:'race',name:'Fast start, fade, comeback',desc:'Goes off quick and builds a lead, fades so the pacer overtakes and gets away, then comes back to retake the lead near the end',
+   phases:[[0,0.94],[0.15,1],[0.3,1.06],[0.5,1.04],[0.65,0.95],[0.85,0.99]]},
+  {id:'negative',name:'Slow start, strong finish',desc:'Starts easy and lets the pacer go, then reels it in over the last third',
+   phases:[[0,1.04],[0.4,1],[0.7,0.95]]},
+  {id:'blowup',name:'Blow-up',desc:'Flies off quick, then fades badly over the second half while the pacer drops you',
+   phases:[[0,0.95],[0.3,1],[0.6,1.08]]},
+];
+// Multiplier at fraction f of the route for a scenario with phases (null for 'steady')
+export function scenarioMult(id,f){
+  const ph=SCENARIOS.find(x=>x.id===id)?.phases;if(!ph)return null;
+  const val=x=>{let m=ph[0][1];for(const [a,v] of ph)if(x>=a)m=v;return m};
+  let sum=0;for(let k=-4;k<=4;k++)sum+=val(f+k*0.01);  // blend phases over ±4 % of the route
+  return sum/9;
+}
 
 // Stand-in for gps.watch. getRun() → {route, P} or null. One fix per simulated second.
 export function simWatch(getRun,onPos,onErr){
@@ -33,9 +54,11 @@ export function simWatch(getRun,onPos,onErr){
     const total=pts.at(-1).d;
     let v=0;
     if(sim.moving&&d<total){
-      // surge 4 % for 40 s every 3 min, fade 4 % for 40 s at the half-way point of each cycle
-      const ph=mt%180,mult=d<0?1:(ph<40?0.96:ph>=90&&ph<130?1.04:1);
-      wob=0.95*wob+0.05*gauss()*0.06;
+      // steady: surge 4 % for 40 s every 3 min, fade 4 % for 40 s half-way through each cycle;
+      // other scenarios: their phase multiplier, with only a small wobble
+      const ph=mt%180,story=d<0?null:scenarioMult(sim.scenario,d/total);
+      const mult=d<0?1:story??(ph<40?0.96:ph>=90&&ph<130?1.04:1);
+      wob=0.95*wob+0.05*gauss()*(story?0.03:0.06);
       const base=PACE||paceAt(r.P,Math.max(0,d));
       v=1000/(base*mult*(1+wob));d=Math.min(total,d+dt*v);if(d>=0)mt+=dt;
     }

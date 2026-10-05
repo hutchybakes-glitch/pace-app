@@ -79,6 +79,8 @@
 
     <div class="card">
       <div class="h">Options</div>
+      <div class="set col"><span><b>Pace colours</b><small>Your pace tile and line turn green within this of the pacer's pace where you are, red when slower, gold when faster</small></span>
+        <div class="seg" id="o-band"><button data-v="3">±3 s/km</button><button data-v="5">±5 s/km</button><button data-v="10">±10 s/km</button></div></div>
       <div class="set col"><span><b>Live pace</b><small>How quickly your live pace reacts. Quicker shows changes sooner but wobbles more.</small></span>
         <div class="seg" id="o-live"><button data-v="responsive">Responsive</button><button data-v="balanced">Balanced</button><button data-v="smooth">Smooth</button></div></div>
       <div class="set col"><span><b>Live pace from</b><small>GPS speed is measured by the satellites directly and is far steadier second to second. Position is used automatically if the phone gives no speed.</small></span>
@@ -114,6 +116,7 @@
     </div>
     <div class="row2">
       <div id="gap" class="gap"></div>
+      <button id="pausebtn" class="round mute" aria-label="Pause" hidden>⏸</button>
       <button id="mute" class="round mute" aria-label="Mute voice coach">🔊</button>
       <div id="views" class="views" role="tablist"><button data-v="map">Map</button><button data-v="front">Front</button><button data-v="rear">Rear</button></div>
     </div>
@@ -129,17 +132,21 @@
     <div class="lh"><span>Km</span><span class="y">You</span><span class="p">Pacer</span></div>
     <div class="splw"><table id="spl"></table></div>
   </aside>
-  <aside id="side">
-    <div class="sb"><span>Time</span><b id="tm">0:00</b></div>
-    <div class="sb"><span>Km</span><b id="km">0.00</b><small><i id="togo">–</i> to go</small></div>
-    <div class="sb"><span>Finish est.</span><b id="proj">–</b><small id="projd"></small></div>
-    <div class="sb pr"><span>Average</span><b id="ay" class="y">--:--</b><b id="ap" class="p">--:--</b></div>
-    <div class="sb wxb" id="wxb" hidden><span>Wind</span><b><svg id="wxarr" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l7 18-7-4.5L5 20z" fill="currentColor"/></svg><i id="wxspd"></i></b><small id="wxkind"></small></div>
-    <div class="sb wxb" id="wxt" hidden><span>Weather</span><b id="wxtemp"></b><small id="wxmore"></small></div>
-    <div class="leg"><i class="y"></i>You <i class="p"></i>Pacer</div>
+  <div id="bottom">
+    <div class="strip">
+      <span><b id="tm">0:00</b></span>
+      <span><b id="km">0.00</b> km <i>(<em id="togo">–</em> left)</i></span>
+      <span>Est <b id="proj">–</b> <i id="projd"></i></span>
+      <span id="wxs" hidden><svg id="wxarr" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l7 18-7-4.5L5 20z" fill="currentColor"/></svg><b id="wxspd"></b><i id="wxkind"></i></span>
+    </div>
+    <div class="tiles" id="tiles">
+      <div id="youtile" class="tile you"><span>You</span><b id="ypace">--:--</b><small id="ystate"></small></div>
+      <div class="tile pc"><span>Pacer</span><b id="ppace">--:--</b></div>
+      <div id="gaptile" class="tile gapt"><span id="gaplab">Gap</span><b id="gapv">0.0</b></div>
+    </div>
+    <div id="ctrls"><button id="go" class="btn go">Start</button><button id="finbtn" class="btn">Finish</button></div>
     <div id="gpsline"></div>
-  </aside>
-  <div id="ctrls"><button id="go" class="btn go">Start</button><button id="finbtn" class="btn">Finish</button></div>
+  </div>
 </section>
 
 <!-- ============ Result ============ -->

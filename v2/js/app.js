@@ -27,7 +27,7 @@ const show=id=>{for(const s of ['home','run','result'])$(s).hidden=s!==id;if(id!
 let routes=[],route=null,P=null,turns=[];
 let prof=opt.get('profile',{id:'even',climb:'average',descent:'average',strategy:'even'});
 // speed: live pace from GPS (Doppler) speed, falling back to position; live: how quickly live pace reacts
-const o={speed:opt.get('speedSrc',true),live:opt.get('live','balanced'),auto:opt.get('auto',true),zone:opt.get('zone',25),view:opt.get('view','map'),
+const o={speed:opt.get('speedSrc',true),live:opt.get('live','balanced'),band:opt.get('band',5),auto:opt.get('auto',true),zone:opt.get('zone',25),view:opt.get('view','map'),
   voice:opt.get('voice','full'),tones:opt.get('tones',true),rate:opt.get('rate','normal'),muted:opt.get('muted',false)};
 o.wxOn=opt.get('wxOn',true);o.wxMode=opt.get('wxMode','keep');o.shelter=opt.get('shelter','some');
 const RATES={slow:0.9,normal:1,fast:1.12};
@@ -194,6 +194,7 @@ function setProf(p){prof=p;opt.set('profile',p);rebuild()}
 
 function renderOptions(){
   $('o-speed').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',(b.dataset.v==='1')===o.speed);b.onclick=()=>{o.speed=b.dataset.v==='1';opt.set('speedSrc',o.speed);renderOptions()}});
+  $('o-band').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',+b.dataset.v===o.band);b.onclick=()=>{o.band=+b.dataset.v;opt.set('band',o.band);renderOptions()}});
   $('o-live').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===o.live);b.onclick=()=>{o.live=b.dataset.v;opt.set('live',o.live);smoother=createSmoother(LIVE[o.live].tau);renderOptions()}});
   $('o-auto').classList.toggle('on',o.auto);$('o-auto').setAttribute('aria-checked',o.auto);
   $('o-auto').onclick=()=>{o.auto=!o.auto;opt.set('auto',o.auto);renderOptions()};
@@ -246,12 +247,13 @@ function resetRun(){
   setPhaseUI();hud();
 }
 // The map stops at the top of the control bar; the side panel runs from below the top cards to it
+// The view stops at the top of the bottom panel; the splits column runs down the left between them
 function layout(){
-  const bar=$('ctrls').getBoundingClientRect().height,top=document.querySelector('.ovtop .row2').getBoundingClientRect().bottom;
+  const bar=$('bottom').getBoundingClientRect().height,top=document.querySelector('.ovtop .row2').getBoundingClientRect().bottom;
   $('cv').style.height=`${Math.max(100,$('run').clientHeight-bar)}px`;
-  for(const id of ['side','lside']){$(id).style.top=`${top+8}px`;$(id).style.bottom=`${bar+8}px`}
+  $('lside').style.top=`${top+8}px`;$('lside').style.bottom=`${bar+8}px`;
   view.resize();
-  view.setInsets(top+6,8,$('side').getBoundingClientRect().width+12,$('lside').getBoundingClientRect().width+12);
+  view.setInsets(top+6,8,8,$('lside').hidden?0:$('lside').getBoundingClientRect().width+12);
 }
 addEventListener('resize',()=>{if(!$('run').hidden)layout()});
 function setView(m){o.view=m;opt.set('view',m);$('views').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===m))}
@@ -260,9 +262,11 @@ $('views').querySelectorAll('button').forEach(b=>b.onclick=()=>setView(b.dataset
 function setPhaseUI(){
   const go=$('go');go.className='btn go';
   go.textContent={idle:'Start',armed:'Cancel',running:'Pause',paused:'Resume',done:'Start'}[phase];
-  if(phase==='running')go.classList.add('pause');if(phase==='armed')go.classList.add('cancel');
+  if(phase==='armed')go.classList.add('cancel');
   $('finbtn').hidden=phase!=='paused';
-  $('side').hidden=$('lside').hidden=phase==='idle'||phase==='armed'; // nothing to show yet, and the start card needs the width
+  $('ctrls').hidden=phase==='running';               // running: the bottom is all pace; pause is up top
+  $('pausebtn').hidden=phase!=='running';
+  $('tiles').hidden=$('lside').hidden=phase==='idle'||phase==='armed'; // nothing to show yet, and the start card needs the width
   if(!$('run').hidden)requestAnimationFrame(layout);
   $('back').hidden=phase==='running'||phase==='armed';
 }
@@ -338,6 +342,7 @@ function start(at){
   ensureWatch();wake();setPhaseUI();
 }
 function pause(){acc=el();phase='paused';sim.moving=false;lock?.release();lock=null;setPhaseUI();save();if(voiceOn())speaker.say('Paused',2)}
+$('pausebtn').onclick=()=>{if(phase==='running')pause()};
 $('go').onclick=()=>{
   speaker.unlock(); // iOS: audio must be started from a tap
   if(phase==='running')pause();
@@ -391,7 +396,7 @@ function loop(ts){
   }else shownD+=(rd-shownD)*0.3;
   const started=phase==='running'||phase==='paused'||phase==='done';
   const pd=started?distAt(runP,el()/1000):0;
-  view.draw({mode:o.view,you:started?shownD:0,pacer:pd,gap:started?gapNow:null,youPace:started?curPace:undefined,pacerPace:paceAt(runP,pd),gps:(!started||offRoute)?lastLL:null});
+  view.draw({mode:o.view,you:started?shownD:0,pacer:pd,youCol:STATUS_COL[stat]||null,gps:(!started||offRoute)?lastLL:null});
 }
 
 // Are you physically within 25 m of this turn's point? (GPS, not just route distance)
@@ -418,18 +423,27 @@ function timeOneKmBack(){
   return (a[1]+(b[1]-a[1])*Math.max(0,Math.min(1,k)))/1000;
 }
 
-// Wind and weather in the side panel: the wind you feel (arrow shows where it blows, as you see the
-// screen), head/tail/cross for your direction of running, then temperature, dew point, humidity, rain
-function sideWeather(t){
-  $('wxb').hidden=$('wxt').hidden=!runCond;
+// Wind in the strip: the wind you feel (arrow shows where it blows, as you see the screen) and
+// head/tail/cross for your direction of running
+function stripWeather(t){
+  $('wxs').hidden=!runCond;
   if(!runCond)return;
   const c=wxAt(runCond.w,runCond.start+t*1000),felt=c.wind*(SHELTER[runCond.shelter]??0.55),h=view.headings();
   const rel=Math.cos((c.dir-h.travel)*Math.PI/180),kind=felt<0.4?'calm':rel>0.4?'head':rel<-0.4?'tail':'cross';
   $('wxarr').style.transform=`rotate(${(c.dir+180-h.view+360)%360}deg)`;$('wxarr').style.visibility=kind==='calm'?'hidden':'visible';
   $('wxspd').textContent=`${Math.round(mph(felt))} mph`;
-  $('wxkind').textContent={calm:'calm',head:'headwind',tail:'tailwind',cross:'crosswind'}[kind];$('wxkind').className=kind;
-  $('wxtemp').textContent=`${Math.round(c.temp)}°C`;
-  $('wxmore').textContent=`dew ${Math.round(c.dew)}° · ${Math.round(c.rh)}% humid · ${c.rain>=0.3?`rain ${c.rain.toFixed(1)} mm/h`:c.rad>400?'sunny':'dry'}`;
+  $('wxkind').textContent={calm:'calm',head:'head',tail:'tail',cross:'cross'}[kind];$('wxkind').className=kind;
+}
+
+// Your pace tile and line: red slower / green on / gold faster than the pacer's pace where you are,
+// by more than the band; a change has to hold for 1.2 s so it doesn't flicker
+const STATUS_COL={slow:'#ef4444',on:'#22c55e',fast:'#facc15'};
+let stat=null,statCand=null,statSince=0;
+function setStatus(s){
+  const n=Date.now();
+  if(s!==statCand){statCand=s;statSince=n}
+  if(statCand!==stat&&(stat==null||s==null||n-statSince>=1200))stat=statCand;
+  $('youtile').className='tile you '+(stat||'');
 }
 
 // Splits table: every completed km for you and the pacer, then the km in progress (live, faint)
@@ -457,19 +471,26 @@ function hud(){
   const t=el()/1000,D=runP.total,started=phase==='running'||phase==='paused';
   $('tm').textContent=fmt(t);$('km').textContent=kmStr(rd);$('togo').textContent=kmStr(Math.max(0,D-rd));
   splits(t);
-  const cls=(id,you,pc)=>{$(id).className='y '+(you&&pc?(you<pc-1?'faster':you>pc+1?'slower':''):'')};
   if(started&&rd>20){
-    const ay=t/(rd/1000),ap=timeAt(runP,rd)/(rd/1000);
-    $('ay').textContent=fmtP(ay);$('ap').textContent=fmtP(ap);cls('ay',ay,ap);
     gapNow=timeAt(runP,rd)-t;$('gap').hidden=true;
-    sideWeather(t);
+    stripWeather(t);
+    // The glance tiles: your live pace (coloured against the pacer's pace where you are), the pacer's
+    // live pace, and the gap (+ you're ahead)
+    const target=paceAt(runP,rd);
+    $('ypace').textContent=fmtP(curPace);$('ystate').textContent=`target ${fmtP(target)}`;
+    $('ppace').textContent=fmtP(paceAt(runP,distAt(runP,t)));
+    setStatus(curPace?(curPace>target+o.band?'slow':curPace<target-o.band?'fast':'on'):null);
+    const lvl=Math.abs(gapNow)<0.05;
+    $('gapv').textContent=gapText(gapNow);$('gaplab').textContent=lvl?'Level':gapNow>0?'Ahead':'Behind';
+    $('gaptile').className='tile gapt '+(lvl?'':gapNow>0?'ahead':'behind');
     // Projected finish: how you're doing against the pacer's hill-aware plan, applied to what's left
     const proj=projectFinish(runP,rd,t,timeOneKmBack());
-    if(proj){const dlt=proj-runP.finish;$('proj').textContent=fmt(proj);$('projd').textContent=Math.abs(dlt)<0.5?'on target':`${dlt<0?'−':'+'}${gapFmt(Math.abs(dlt))} vs target`;$('projd').className=dlt<-0.5?'ahead':dlt>0.5?'behind':''}
+    if(proj){const dlt=proj-runP.finish;$('proj').textContent=fmt(proj);$('projd').textContent=Math.abs(dlt)<0.5?'on target':`${dlt<0?'−':'+'}${gapFmt(Math.abs(dlt))}`;$('projd').className=dlt<-0.5?'ahead':dlt>0.5?'behind':''}
     $('cv').setAttribute('aria-label',`Gap to the pacer ${gapText(gapNow)} seconds`);
   }else{
     gapNow=started?0:null;$('gap').hidden=false;
-    for(const id of ['ay','ap'])$(id).textContent='--:--';
+    $('ypace').textContent=$('ppace').textContent='--:--';$('ystate').textContent='';setStatus(null);
+    $('gapv').textContent='0.0';$('gaplab').textContent='Gap';$('gaptile').className='tile gapt';
     $('proj').textContent=fmt(runP.finish);$('projd').textContent='target';$('projd').className='';
     $('gap').className='gap';$('gap').textContent=phase==='armed'?'Pacer waiting at the start':started?'And you\'re off…':'Pacer ready at the start';
   }

@@ -15,7 +15,6 @@ const FONT='-apple-system,system-ui,sans-serif';
 const rgb=a=>`rgb(${a[0]},${a[1]},${a[2]})`;
 const mix=(a,b,t)=>[0,1,2].map(i=>Math.round(a[i]+(b[i]-a[i])*t));
 const mmss=s=>{s=Math.round(s);return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`};
-const paceStr=p=>p&&p<1800?mmss(p):'--:--';
 // F1-style gap text, + = you're ahead
 export const gapText=g=>{const a=Math.abs(g),sign=a<0.05?'':g>0?'+':'−';return sign+(a<59.95?a.toFixed(1):mmss(a))};
 
@@ -53,7 +52,7 @@ export function createView(canvas){
   const idxOf=d=>Math.max(0,Math.min(R.n-1,Math.round(d/10)));
 
   // s: {mode, you (route m), pacer (route m or null), gap (s, + = you ahead, or null),
-  //     youPace, pacerPace (s/km or null), gps {lat,lon} or null}
+  //     youCol (your line's colour: red/green/gold against the pacer, or null), gps {lat,lon} or null}
   function draw(s){
     if(!R)return;
     ctx.clearRect(0,0,W,H);
@@ -66,12 +65,6 @@ export function createView(canvas){
     ctx.save();ctx.globalAlpha=alpha;ctx.font=`800 ${size}px ${FONT}`;const w=ctx.measureText(text).width+size*1.1,h=size*1.65;
     ctx.fillStyle=bg;ctx.beginPath();ctx.roundRect?ctx.roundRect(x-w/2,y-h/2,w,h,h/2):ctx.rect(x-w/2,y-h/2,w,h);ctx.fill();
     ctx.fillStyle=fg;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,x,y+0.5);ctx.restore();
-  }
-  // Your time gap above your line: green when you're ahead, orange when the pacer is
-  function gapLabel(g,x,y,size=15){
-    if(g==null)return;
-    const ahead=g>=0.05,level=Math.abs(g)<0.05;
-    pill(gapText(g),x,y,level?'#e2e8f0':ahead?GOOD:ORANGE,level?'#0f172a':ahead?'#052e16':'#1c1003',size);
   }
   // Pace painted on the road: white with a dark outline so it reads on any colour
   function paceText(text,x,y,size,alpha=1){
@@ -126,16 +119,16 @@ export function createView(canvas){
     const near=d=>Math.abs(d-s.you)<20||(s.pacer!=null&&Math.abs(d-s.pacer)<20)||R.turns.some(t=>Math.abs(t.d-d)<20);
     for(const m of R.marks){
       if(m.d<s.you+20||m.d>s.you+reach*0.75||near(m.d))continue;
-      const p=at(m.d),q=T(p.x,p.y);paceText(mmss(m.pace),q[0],q[1],Math.max(13,Math.min(17,roadW*0.8)));
+      const p=at(m.d),q=T(p.x,p.y);paceText(mmss(m.pace),q[0],q[1],Math.max(16,Math.min(22,roadW)));
     }
     // km markers beside the road, upcoming turns on it
-    for(let km=1000;km<R.total;km+=1000){if(Math.abs(km-s.you)>reach*0.8)continue;const p=at(km),o=roadW*1.1/sc,q=T(p.x+p.ty*o,p.y-p.tx*o);pill(`${km/1000} km`,q[0],q[1],'rgba(15,23,42,.85)','#cbd5e1')}
+    for(let km=1000;km<R.total;km+=1000){if(Math.abs(km-s.you)>reach*0.8)continue;const p=at(km),o=roadW*1.9/sc,q=T(p.x+p.ty*o,p.y-p.tx*o);pill(`${km/1000} km`,q[0],q[1],'rgba(15,23,42,.85)','#cbd5e1')}
     for(const t of R.turns){if(t.d<s.you||t.d>s.you+450)continue;const p=at(t.d),q=T(p.x,p.y);turnMarker(q[0],q[1],t,hd,p)}
 
     // Lines across the road: the pacer's (orange) and yours (blue)
     let pq=null;
     if(s.pacer!=null){pq=across(s.pacer,ORANGE,5,false,true)}
-    const yq=across(s.you,ME,4,false,true);
+    const yq=across(s.you,s.youCol||ME,6,false,true);
     // Off-route: where GPS actually puts you
     if(s.gps){const x=(s.gps.lon-R.lon0)*R.k,y=(s.gps.lat-R.lat0)*111195,q=T(x,y);dot(q[0],q[1],6,'#facc15')}
     // You: an arrow pointing up the screen (direction of travel)
@@ -145,10 +138,8 @@ export function createView(canvas){
     // Labels last so nothing covers them: PACER beside its line, your gap above you
     // Labels last so nothing covers them: live paces at the line ends, your gap above you
     const clampX=(x,w)=>Math.max(lft+w/2+2,Math.min(lft+vw-w/2-2,x));
-    if(pq){dot(pq.c[0],pq.c[1],8,ORANGE);pill(`PACER ${paceStr(s.pacerPace)}`,clampX(pq.right[0]+48,86),pq.right[1],ORANGE,'#1c1003',13)}
-    if(s.youPace!==undefined)pill(paceStr(s.youPace),clampX(yq.left[0]-32,56),yq.left[1],ME,'#06142e',14);
-    pill(metres(s.you),clampX(yq.right[0]+40,72),yq.right[1]+(pq&&Math.abs(pq.right[1]-yq.right[1])<22?24:0),'rgba(2,6,23,.85)','#e2e8f0',13);
-    gapLabel(s.gap,ax,ay-34,16);
+    if(pq){dot(pq.c[0],pq.c[1],8,ORANGE);pill('PACER',clampX(pq.right[0]+34,58),pq.right[1],ORANGE,'#1c1003',12)}
+    pill(metres(s.you),clampX(yq.left[0]-42,76),yq.left[1],'rgba(2,6,23,.88)','#f1f5f9',14);
     const hdDeg=(Math.atan2(hd.x,hd.y)*180/Math.PI+360)%360;heads={view:hdDeg,travel:hdDeg};
   }
 
@@ -221,7 +212,7 @@ export function createView(canvas){
     if(!rear)for(const m of R.marks){
       if(m.d<s.you+12||m.d>s.you+350||(s.pacer!=null&&Math.abs(m.d-s.pacer)<12))continue;
       const pt=onRoad(m.d,0.1);if(!pt||hidden(pt)||pt[2]>320)continue;
-      const size=Math.max(9,Math.min(28,F*2.2/pt[2]));paceText(mmss(m.pace),pt[0],pt[1],size,Math.max(0.3,1-pt[2]/340));
+      const size=Math.max(11,Math.min(36,F*2.8/pt[2]));paceText(mmss(m.pace),pt[0],pt[1],size,Math.max(0.35,1-pt[2]/340));
     }
 
     // Runners, farther one first; each with its line across the road
@@ -229,7 +220,7 @@ export function createView(canvas){
     figs.forEach(o=>{o.base=onRoad(o.d)});
     figs.sort((a,b)=>(b.base?.[2]??-1)-(a.base?.[2]??-1));
     for(const o of figs){
-      across(o.d,o.col,o.me?0.26:0.32);
+      across(o.d,o.me?(s.youCol||o.col):o.col,o.me?0.3:0.32);
       if(!o.base)continue;
       const head=onRoad(o.d,2.4);if(!head)continue;
       const ghost=!o.me&&hidden(o.base);           // pacer over a crest: shown faintly through the hill
@@ -237,9 +228,8 @@ export function createView(canvas){
       const lift=Math.max(16,F*0.55/head[2]);
       const side=Math.max(44,F*1.1/head[2]);
       const inView=(x,w)=>Math.max(lft+w/2+2,Math.min(lft+vw-w/2-2,x)); // keep tags clear of the side columns
-      if(o.me){gapLabel(s.gap,head[0],head[1]-lift-4,15);if(s.youPace!==undefined)pill(paceStr(s.youPace),inView(head[0]-side,52),head[1]+lift*0.4,ME,'#06142e',13);
-        pill(metres(s.you),inView(head[0]-side,72),head[1]+lift*0.4+24,'rgba(2,6,23,.85)','#e2e8f0',12)}
-      else pill(`PACER ${paceStr(s.pacerPace)}`,inView(head[0]+side+16,84),head[1],ORANGE,'#1c1003',12,ghost?0.6:1);
+      if(o.me)pill(metres(s.you),inView(head[0]-side-10,76),head[1]+lift*0.4,'rgba(2,6,23,.88)','#f1f5f9',13);
+      else pill('PACER',inView(head[0]+side,58),head[1],ORANGE,'#1c1003',12,ghost?0.6:1);
     }
     const camDeg=(Math.atan2(f[0],f[1])*180/Math.PI+360)%360,runDeg=(Math.atan2(cd.x,cd.y)*180/Math.PI+360)%360;
     heads={view:camDeg,travel:runDeg};

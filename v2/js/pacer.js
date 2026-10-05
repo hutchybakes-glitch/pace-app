@@ -184,3 +184,10 @@ export function ghostFromTimes(pts,T){
   const pace=smoothVals(raw,pts,150);
   return {...base,time:T,pace,finish:T[n-1],target:T[n-1],lin:true,ghost:true};
 }
+
+// Change the plan from where you are: the rest of the run takes k times as long (k < 1 faster). The time
+// at d stays the same, so the gap doesn't jump.
+export function adjustPacer(P,d,k){
+  const t0=timeAt(P,d),time=P.time.map((t,i)=>P.d[i]>d?t0+(t-t0)*k:t),pace=P.pace.map((p,i)=>P.d[i]>d?p*k:p);
+  return {...P,time,pace,finish:t0+(P.finish-t0)*k,adjusted:true};
+}

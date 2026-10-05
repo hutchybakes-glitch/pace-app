@@ -91,6 +91,24 @@
       <div id="pinsight" class="insight"></div>
     </div>
 
+    <div class="card" id="rpecard">
+      <div class="h">Effort (RPE)</div>
+      <div class="set"><span><b>Show optimal RPE</b><small>How hard each part of the course should feel, 1 to 10, for the run you intend</small></span><button id="o-rpe" class="switch" role="switch"></button></div>
+      <div id="rpe-body">
+        <div class="set col"><span><b>Intended intensity</b></span><div id="rpe-int" class="styles"></div></div>
+        <div class="pchart rpec"><svg id="rpechart" viewBox="0 0 1000 160" preserveAspectRatio="none" role="img" aria-label="Optimal RPE along the route"></svg><div id="rpeylab"></div></div>
+        <div id="rpeaxis" class="axis"></div>
+        <div id="rpeinsight" class="insight"></div>
+        <div class="set"><span><b>Check in on how I feel</b><small>Asks your RPE a few times (about every quarter and after big hills), then suggests whether to change the plan</small></span><button id="o-rpeask" class="switch" role="switch"></button></div>
+        <div class="set"><span><b>Answer by voice</b><small>Say a number after the question. Uses the microphone; you can always tap instead.</small></span><button id="o-rpemic" class="switch" role="switch"></button></div>
+        <details class="rpeguide"><summary>What each level feels like</summary>
+          <p>RPE is how hard the run feels to you: breathing, legs and how much you'd like to stop. Don't think about pace, just effort. The talk test is the easiest check.</p>
+          <ol id="rpe-scale"></ol>
+          <p>Why it builds: in a well-paced race, effort feels like it rises steadily all the way and peaks at the line, even at an even pace. Feeling fresh early is normal and isn't a reason to go faster: runners who chase that feeling usually slow down later. On hills, it's fine for effort to rise a little on the climb, then let your breathing settle over the top and use the descent to recover.</p>
+        </details>
+      </div>
+    </div>
+
     <div class="card">
       <div class="h">Options</div>
       <div class="set col"><span><b>Pace colours</b><small>Your pace tile and line turn green within this of the pacer's pace where you are, red when slower, gold when faster</small></span>
@@ -134,10 +152,20 @@
     </div>
     <div class="row2">
       <div id="gap" class="gap"></div>
+      <button id="rpechip" class="rpechip" aria-label="Optimal RPE here. Tap to say how you feel" hidden><span>RPE</span><b>–</b></button>
       <button id="mute" class="round mute" aria-label="Mute voice coach">🔊</button>
       <div id="views" class="views" role="tablist"><button data-v="map">Map</button><button data-v="front">Front</button><button data-v="rear">Rear</button></div>
     </div>
     <div id="off" hidden></div>
+    <div id="rpeask" class="rpeask" hidden>
+      <div class="rq"><b>How hard does it feel?</b><small id="rpehint"></small></div>
+      <div class="rpad" id="rpad"></div>
+      <div class="rbtns"><span id="rpemicst"></span><button id="rpeskip" class="btn ghost">Skip</button></div>
+    </div>
+    <div id="rpeadv" class="rpeask" hidden>
+      <div class="rq"><b id="advtitle"></b><small id="advtext"></small></div>
+      <div class="rbtns2"><button id="advyes" class="btn go"></button><button id="advno" class="btn ghost">Keep the plan</button></div>
+    </div>
     <div id="arm" hidden>
       <div id="armh"></div>
       <div class="arm-m"><svg id="armarrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l7.5 19L12 16.5 4.5 21z" fill="currentColor"/></svg><span id="armdist"></span></div>
@@ -175,6 +203,7 @@
     <div id="rsub" class="sub"></div>
     <div class="rbig"><div class="you"><b id="ryou"></b><span>You</span></div><div class="pc" id="rpcbox"><b id="rpacer"></b><span id="rpclab">Pacer</span></div></div>
     <div class="card"><table class="kt" id="rkm"></table></div>
+    <div class="card" id="rrpecard" hidden><div class="h">How it felt</div><table class="kt" id="rrpe"></table></div>
     <button id="rrace" class="btn go" hidden>Race this route</button>
     <div class="ctrl"><button id="rgpx" class="btn ghost">Export GPX</button><button id="rdone" class="btn go">Done</button></div>
   </div>

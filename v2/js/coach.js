@@ -230,7 +230,7 @@ export function createCoach({P,prof,level='full',style='moderate',band=5,who='pa
     }
     return lead+hold+tip;
   }
-  return {update,setLevel:l=>{level=l},setStyle:x=>{style=x},sections:S};
+  return {update,setLevel:l=>{level=l},setStyle:x=>{style=x},setP:x=>{P=x},sections:S};
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -286,7 +286,7 @@ export function createSpeaker(){
       clearTimeout(timer);timer=setTimeout(done,c.text.length*90/opts.rate+2500); // iOS sometimes skips onend
     },wait);
   }
-  function done(){clearTimeout(timer);cur=null;setTimeout(pump,250)}
+  function done(){const c=cur;clearTimeout(timer);cur=null;setTimeout(pump,250);c?.onend?.()}
   function play(list){
     for(const c of list){
       if(c.pri>=3&&cur&&cur.pri<3){synth()?.cancel();q=q.filter(x=>x.pri>=3);cur=null}
@@ -294,7 +294,23 @@ export function createSpeaker(){
     }
     q.sort((a,b)=>b.pri-a.pri);pump();
   }
-  const say=(text,pri=2,tn)=>play([{text,pri,tone:tn}]);
+  const say=(text,pri=2,tn,onend)=>play([{text,pri,tone:tn,onend}]);
   function setMuted(m){muted=m;if(m){synth()?.cancel();q=[];cur=null}}
   return {unlock,play,say,setMuted,setOpts:o=>{opts={...opts,...o}},get muted(){return muted}};
+}
+
+// Listening for a spoken answer (Safari's speech recognition, where the phone allows it). Calls
+// onText(best guess, all guesses) or onFail(reason). Returns a stop function.
+export function listen(onText,onFail,ms=7000){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){onFail?.('unsupported');return ()=>{}}
+  let r,over=false;const end=why=>{if(over)return;over=true;clearTimeout(tm);try{r.abort()}catch(e){}if(why)onFail?.(why)};
+  try{
+    r=new SR();r.lang='en-GB';r.interimResults=false;r.maxAlternatives=5;r.continuous=false;
+    r.onresult=e=>{const alts=[...e.results[0]].map(a=>a.transcript);over=true;clearTimeout(tm);onText(alts[0],alts)};
+    r.onerror=e=>end(e.error||'error');r.onend=()=>end('nothing heard');
+    r.start();
+  }catch(e){onFail?.('unavailable');return ()=>{}}
+  const tm=setTimeout(()=>end('nothing heard'),ms);
+  return ()=>end(null);
 }

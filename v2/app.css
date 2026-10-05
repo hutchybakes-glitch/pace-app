@@ -173,16 +173,16 @@ b{font-variant-numeric:tabular-nums}
 #wxs{display:flex;align-items:center;gap:3px}#wxs b{font-size:14px}
 #wxarr{width:16px;height:16px;color:#7dd3fc;flex:none;transition:transform .6s}
 #wxkind.head{color:var(--pacer)}#wxkind.tail{color:var(--good)}
-.tiles{display:grid;grid-template-columns:1.4fr 1fr;grid-template-rows:1fr 1fr;gap:6px;height:clamp(118px,17vh,168px)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 50px;gap:6px;height:clamp(150px,20vh,190px)}
 .tile{border-radius:16px;background:#1e293b;display:flex;flex-direction:column;justify-content:center;padding:6px 12px;min-width:0;transition:background .35s,color .35s}
 .tile span{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;opacity:.85}
 .tile b{font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-1px;line-height:1}
-.tile.you{grid-row:1/3;align-items:flex-start}
-.tile.you b{font-size:clamp(54px,9.5vh,84px);margin-top:2px}
-.tile.you small{font-size:14px;font-weight:700;opacity:.9;margin-top:4px}
+.tile.you,.tile.pc{align-items:flex-start}
+.tile.you b,.tile.pc b{font-size:clamp(46px,8vh,70px);margin-top:2px}
+.tile.you small,.tile.pc small{font-size:13px;font-weight:700;opacity:.9;margin-top:4px}
 .tile.you.slow{background:#b91c1c}.tile.you.on{background:#15803d}.tile.you.fast{background:#eab308;color:#1c1003}
-.tile.pc span{color:var(--pacer)}.tile.pc b{font-size:34px;color:#fdba74}
-.tile.pausebig{border:0;color:#fff;background:#334155;font:inherit;font-size:20px;font-weight:800;flex-direction:row;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+.tile.pc{background:#1c1208;box-shadow:inset 0 0 0 2px var(--pacer)}.tile.pc span{color:var(--pacer)}.tile.pc b{color:#fdba74}
+.tile.pausebig{grid-column:1/3;border:0;color:#fff;background:#334155;font:inherit;font-size:20px;font-weight:800;flex-direction:row;align-items:center;justify-content:center;gap:8px;cursor:pointer}
 .tile.pausebig i{font-style:normal;font-size:24px}
 .tile.pausebig:active{background:#475569}
 #ctrls{display:flex;gap:10px;margin-top:6px}

@@ -514,7 +514,8 @@ function hud(){
     // live pace, and the gap (+ you're ahead)
     const target=paceAt(runP,rd);
     $('ypace').textContent=fmtP(curPace);$('ystate').textContent=`target ${fmtP(target)}`;
-    $('ppace').textContent=fmtP(paceAt(runP,distAt(runP,t)));
+    const pdNow=distAt(runP,t);$('ppace').textContent=fmtP(paceAt(runP,pdNow));
+    $('pstate').textContent=`${Math.round(Math.abs(pdNow-rd))} m ${pdNow>=rd?'ahead':'behind'}`;
     setStatus(curPace?(curPace>target+o.band?'slow':curPace<target-o.band?'fast':'on'):null);
 
     // Projected finish: how you're doing against the pacer's hill-aware plan, applied to what's left
@@ -523,7 +524,7 @@ function hud(){
     $('cv').setAttribute('aria-label',`Gap to the pacer ${gapText(gapNow)} seconds`);
   }else{
     gapNow=started?0:null;$('gap').hidden=false;
-    $('ypace').textContent=$('ppace').textContent='--:--';$('ystate').textContent='';setStatus(null);
+    $('ypace').textContent=$('ppace').textContent='--:--';$('ystate').textContent=$('pstate').textContent='';setStatus(null);
     $('proj').textContent=fmt(runP.finish);$('projd').textContent='target';$('projd').className='';
     $('gap').className='gap';$('gap').textContent=phase==='armed'?'Pacer waiting at the start':started?'And you\'re off…':'Pacer ready at the start';
   }

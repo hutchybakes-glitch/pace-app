@@ -170,3 +170,18 @@ export function parseRpe(s){
   return n>=1&&n<=10?n:null;
 }
 export const parseYesNo=s=>/\b(yes|yeah|yep|ok|okay|sure|do it|go on|please)\b/i.test(s)?true:/\b(no|nope|keep|stay|leave)\b/i.test(s)?false:null;
+
+// Colour for an RPE: green (easy) through yellow and orange to red (maximal)
+export const rpeCol=r=>r<2.5?'#86efac':r<4.5?'#a3e635':r<6.5?'#facc15':r<8?'#fb923c':r<9?'#f87171':'#ef4444';
+// RPE shown to the nearest half
+export const rpeRound=r=>Math.round(r*2)/2;
+// Where to write the target RPE beside the road: wherever it changes (to the nearest half), at least
+// 100 m apart, and every 400 m regardless so there's always one coming up
+export function rpeMarks(R){
+  const out=[],D=R.d.at(-1);let last=null,lastD=-1e9;
+  for(let d=0;d<D-30;d+=25){
+    const r=rpeRound(rpeAt(R,d));
+    if((r!==last&&d-lastD>=100)||d-lastD>=400){out.push({d,r});last=r;lastD=d}
+  }
+  return out;
+}

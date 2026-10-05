@@ -20,7 +20,7 @@ export const gapText=g=>{const a=Math.abs(g),sign=a<0.05?'':g>0?'+':'−';return
 
 export function createView(canvas){
   const ctx=canvas.getContext('2d');
-  let W=1,H=1,R=null,hd=null,cd=null; // R: prepared route; hd: smoothed map heading; cd: smoothed 3D camera direction
+  let W=1,H=1,R=null,hd=null,cd=null,RM=[],rcol=()=>'#facc15'; // RM: target RPE marks beside the road // R: prepared route; hd: smoothed map heading; cd: smoothed 3D camera direction
   let top=0,bot=0,rgt=0,lft=0; // screen covered by overlays at the top, bottom, right and left, px
   let heads={view:0,travel:0};  // last frame: ° the screen's up faces, ° you're running (for the wind arrow)
   const metres=m=>`${Math.round(m).toLocaleString('en-GB')} m`;
@@ -130,8 +130,10 @@ export function createView(canvas){
       if(m.d<s.you+20||m.d>s.you+reach*0.75||near(m.d))continue;
       const p=at(m.d),q=T(p.x,p.y);paceText(mmss(m.pace),q[0],q[1],Math.max(16,Math.min(22,roadW)));
     }
+    // Target RPE beside the road on the right (km markers on the left, away from the splits panel)
+    for(const m of RM){if(m.d<s.you-10||m.d>s.you+reach*0.75)continue;const p=at(m.d),o=roadW*2/sc,q=T(p.x+p.ty*o,p.y-p.tx*o);pill(`RPE ${m.r}`,q[0],q[1],rcol(m.r),'#0b1020',13)}
     // km markers beside the road, upcoming turns on it
-    for(let km=1000;km<R.total;km+=1000){if(Math.abs(km-s.you)>reach*0.8)continue;const p=at(km),o=roadW*1.9/sc,q=T(p.x+p.ty*o,p.y-p.tx*o);pill(`${km/1000} km`,q[0],q[1],'rgba(15,23,42,.85)','#cbd5e1')}
+    for(let km=1000;km<R.total;km+=1000){if(Math.abs(km-s.you)>reach*0.8)continue;const p=at(km),o=roadW*1.9/sc,q=T(p.x-p.ty*o,p.y+p.tx*o);pill(`${km/1000} km`,q[0],q[1],'rgba(15,23,42,.85)','#cbd5e1')}
     for(const t of R.turns){if(t.d<s.you||t.d>s.you+450)continue;const p=at(t.d),q=T(p.x,p.y);turnMarker(q[0],q[1],t,hd,p)}
 
     // Lines across the road: the pacer's (orange) and yours (blue)
@@ -280,6 +282,13 @@ export function createView(canvas){
       const size=Math.max(11,Math.min(36,F*2.8/pt[2]));paceText(mmss(m.pace),pt[0],pt[1],size,Math.max(0.35,1-pt[2]/340));
     }
 
+    // Target RPE on boards beside the road ahead, on the right
+    if(!rear)for(const m of RM){
+      if(m.d<s.you+12||m.d>s.you+320)continue;
+      const p=at(m.d),pt=P(p.x+p.ty*HALF*1.9,p.y-p.tx*HALF*1.9,(p.z-z0)*ZE+1.2);if(!pt||hidden(pt)||pt[2]>320)continue;
+      pill(`RPE ${m.r}`,pt[0],pt[1],rcol(m.r),'#0b1020',Math.max(12,Math.min(24,F*1.8/pt[2])),Math.max(0.45,1-pt[2]/340));
+    }
+
     // Runners, farther one first; each with its line across the road
     const figs=[{d:s.you,col:ME,me:true}];if(s.pacer!=null)figs.push({d:s.pacer,col:ORANGE});
     figs.forEach(o=>{o.base=onRoad(o.d)});
@@ -318,5 +327,5 @@ export function createView(canvas){
     ctx.restore();
   }
 
-  return {resize,setRoute,clearRoute,setInsets,draw,headings:()=>heads};
+  return {resize,setRoute,clearRoute,setInsets,draw,headings:()=>heads,setRpe:(m,col)=>{RM=m||[];if(col)rcol=col}};
 }

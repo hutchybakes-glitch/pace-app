@@ -7,7 +7,7 @@ import {createMatcher} from './match.js';
 import {turnsFor,nextTurn,turnText,inDist} from './nav.js';
 import {createStartGate,compass} from './start.js';
 import {buildPacer,timeAt,distAt,paceAt,avgBetween,extremes,gradeColor,projectFinish,paceMarks,ghostFromRun,ghostFromTimes,adjustPacer,PROFILES,TRAIT_NAMES} from './pacer.js';
-import {RPE_SCALE,INTENSITIES,rpePlan,rpeAt,rpeName,checkpoints,advise,parseRpe,parseYesNo} from './rpe.js';
+import {RPE_SCALE,INTENSITIES,rpePlan,rpeAt,rpeName,checkpoints,advise,parseRpe,parseYesNo,rpeCol,rpeRound,rpeMarks} from './rpe.js';
 import {createView,gapText} from './view.js';
 import {saveRoute,listRoutes,deleteRoute,saveRun,listRuns,deleteRun,opt,importV1Routes} from './store.js';
 import {SIM,SPEED,now,every,sim,simWatch,SCENARIOS} from './sim.js';
@@ -212,7 +212,6 @@ function setProf(p){prof=p;opt.set('profile',p);rebuild()}
 
 // ---- Effort (RPE): the plan for how hard each part should feel ----
 // Colour for an RPE: green (easy) through yellow and orange to red (maximal)
-const rpeCol=r=>r<2.5?'#86efac':r<4.5?'#a3e635':r<6.5?'#facc15':r<8?'#fb923c':r<9?'#f87171':'#ef4444';
 let Rplan=null;
 function renderRpe(){
   const sw=(id,v)=>{$(id).classList.toggle('on',v);$(id).setAttribute('aria-checked',v)};
@@ -305,7 +304,7 @@ const el=()=>acc+(phase==='running'?now()-t0:0); // pause-aware elapsed ms
 const AUTOSAVE=10000,RESUME_GAP=15*60000;
 
 let coach=null,armSaid=null,runCond=null,runGhost=null,mode='race',trail=[],spokenSplits=0;
-let runR=null,runChecks=[],checkI=0,asking=null; // RPE plan for this run, check-in points, the open question
+let runR=null,runChecks=[],checkI=0,asking=null,effSaid=null,effAt=-1e9; // RPE plan for this run, check-in points, the open question
 const who=()=>runGhost?'ghost':'pacer',Who=()=>runGhost?'Ghost':'Pacer';
 // Show the parts of the run screen that only make sense when racing a route
 function raceUI(on){
@@ -320,7 +319,7 @@ function enterRun(r=route,p=P,tr=turns,rc=cond(),pf=prof,ghost=null){
   coach=createCoach({P:p,prof:pf,level:o.voice==='key'?'key':'full',style:o.coachStyle,band:o.band,who:who()});armSaid=null;
   setMuteUI();
   resetRun();
-  view.setRoute(r.pts,p,tr);
+  view.setRoute(r.pts,p,tr);view.setRpe(runR?rpeMarks(runR):[],rpeCol);
   drawCourse(p);
   show('run');layout();setView(o.view);
   cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);
@@ -328,13 +327,13 @@ function enterRun(r=route,p=P,tr=turns,rc=cond(),pf=prof,ghost=null){
 // Recording a new route: no pacer, your trail on the map, and the route is built when you save
 function enterRecord(){
   mode='record';runCond=null;runRoute=null;runP=null;runTurns=[];runGhost=null;coach=null;runR=null;runChecks=[];raceUI(false);
-  setMuteUI();resetRun();view.clearRoute();
+  setMuteUI();resetRun();view.clearRoute();view.setRpe([]);
   show('run');layout();
   cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);
 }
 function resetRun(){
   phase='idle';acc=0;track.reset();smoother.reset();rd=0;rsplits=[];rpts=[];spts=[];curPace=null;vNow=0;shownD=0;offRoute=false;
-  rec=null;dirty=false;gate=null;sim.restart=true;sim.moving=false;trail=[];spokenSplits=0;checkI=0;closeAsk();
+  rec=null;dirty=false;gate=null;sim.restart=true;sim.moving=false;trail=[];spokenSplits=0;checkI=0;closeAsk();effSaid=null;effAt=-1e9;
   matcher=runRoute?createMatcher(runRoute.pts):null;
   $('off').hidden=true;$('arm').hidden=true;
   setPhaseUI();hud();
@@ -604,13 +603,36 @@ function courseMarks(you,pacer){
 
 // ---- RPE on the run: the chip shows how hard it should feel here; check-ins ask how it does feel ----
 function rpeHud(){
-  const on=!!runR&&phase!=='idle'&&phase!=='armed';$('rpechip').hidden=!on;if(!on)return;
+  if(!runR||phase==='idle'||phase==='armed')return;
   const r=Math.round(rpeAt(runR,rd)*2)/2;
-  $('rpechip').querySelector('b').textContent=r%1?r.toFixed(1):r;$('rpechip').style.background=rpeCol(r);
   while(checkI<runChecks.length&&runChecks[checkI]<rd-300)checkI++; // passed while paused or resumed
   if(phase==='running'&&!asking&&checkI<runChecks.length&&rd>=runChecks[checkI]){checkI++;askRpe(true)}
+  else if(phase==='running'&&!asking)effortCue();
 }
-$('rpechip').onclick=()=>{speaker.unlock();if(runR&&!asking)askRpe(false)};
+// Spoken effort: where to settle at the start, then whenever the target is about to change by a whole
+// point and stay changed (a climb, recovery over the top, or a race building), at most every 2 minutes
+function effortCue(){
+  if(!voiceOn())return;
+  const t=el()/1000,I=runR.intensity;
+  if(effSaid==null){
+    if(rd<15)return;
+    const r=rpeRound(rpeAt(runR,Math.max(rd,300)));effSaid=r;effAt=t;
+    speaker.say(I.shape==='flat'?`Effort: about ${r} out of 10, ${rpeName(r).toLowerCase()}, and keep it there the whole way.`
+      :`Effort: settle in around ${r} out of 10, ${rpeName(r).toLowerCase()}.${I.id==='allout'?' It will build as you go.':''}`,2);
+    return;
+  }
+  if(t-effAt<120)return;
+  // Only a change that lasts: a point or more away 50 m ahead, and still at least half a point the same
+  // way 200 m ahead
+  const ahead=rpeRound(rpeAt(runR,rd+50)),later=rpeRound(rpeAt(runR,rd+200));
+  if(Math.abs(ahead-effSaid)<1||Math.abs(later-effSaid)<0.5||(ahead>effSaid)!==(later>effSaid))return;
+  const up=ahead>effSaid,g=runP.grade,climb=[0,50,100,150].some(x=>g[Math.min(g.length-1,Math.round((rd+x)/10))]>2);
+  effSaid=ahead;effAt=t;
+  speaker.say(up?`Effort up to ${ahead}${climb?' for this climb':''}, ${rpeName(ahead).toLowerCase()}.`
+    :`Effort easing to ${ahead}. ${climb?'':'Let your breathing settle.'}`.trim(),2);
+}
+// Tap your pace tile at any time to say how hard it feels
+$('youtile').onclick=()=>{speaker.unlock();if(runR&&mode==='race'&&phase==='running'&&!asking)askRpe(false)};
 function closeAsk(){asking?.stop?.();clearTimeout(asking?.timer);asking=null;$('rpeask').hidden=$('rpeadv').hidden=true}
 function askRpe(spoken){
   closeAsk();
@@ -641,7 +663,7 @@ function answerRpe(n){
 }
 function applyAdjust(k){
   runP=adjustPacer(runP,rd,k);rec.adjust.push({rd:Math.round(rd),k});dirty=true;
-  coach?.setP(runP);view.setRoute(runRoute.pts,runP,runTurns);drawCourse(runP);
+  coach?.setP(runP);view.setRoute(runRoute.pts,runP,runTurns);view.setRpe(rpeMarks(runR),rpeCol);drawCourse(runP);
   if(voiceOn())speaker.say(`Done. The ${who()} is now on ${fmt(paceAt(runP,rd+50))} here, finishing in ${fmt(runP.finish)}.`,3,k<1?'up':'down');
 }
 
@@ -691,7 +713,7 @@ function hud(){
     // The glance tiles: your live pace (coloured against the pacer's pace where you are), the pacer's
     // live pace, and the gap (+ you're ahead)
     const target=paceAt(runP,rd);
-    $('ypace').textContent=fmtP(curPace);$('ystate').textContent=`target ${fmtP(target)}`;
+    $('ypace').textContent=fmtP(curPace);$('ystate').innerHTML=`target ${fmtP(target)}${runR?` · <i class="yrpe" style="background:${rpeCol(rpeAt(runR,rd))}">RPE ${rpeRound(rpeAt(runR,rd))}</i>`:''}`;
     const pdNow=distAt(runP,t);$('ppace').textContent=fmtP(paceAt(runP,pdNow));
     $('pstate').textContent=`${Math.round(Math.abs(pdNow-rd))} m ${pdNow>=rd?'ahead':'behind'}`;
     setStatus(curPace?(curPace>target+o.band?'slow':curPace<target-o.band?'fast':'on'):null);

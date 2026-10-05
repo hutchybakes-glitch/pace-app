@@ -9,8 +9,8 @@ const even=PROFILES[0];
 
 test('rpe: all-out builds with the share of the race done and peaks at the line',()=>{
   const P=buildPacer(route(false),50*60,even),R=rpePlan(P,'allout');
-  assert.ok(rpeAt(R,300)>=4.5&&rpeAt(R,300)<=5.5,`start ${rpeAt(R,300)}`);
-  for(let d=1000;d<=9000;d+=1000)assert.ok(rpeAt(R,d)>rpeAt(R,d-1000),`${d}`);
+  assert.ok(rpeAt(R,300)>=5&&rpeAt(R,300)<=5.6,`start ${rpeAt(R,300)}`);
+  for(let d=1000;d<=9000;d+=1000)assert.ok(rpeAt(R,d)>=rpeAt(R,d-1000)&&(d<2000||rpeAt(R,d)>rpeAt(R,d-1000)),`${d}`);
   assert.ok(rpeAt(R,9000)<=9.5,`no kilometres at 10: ${rpeAt(R,9000)}`);
   assert.ok(rpeAt(R,10000)>=9.6);
   // a 5 km race starts nearer its finishing effort than a 10 km
@@ -35,10 +35,13 @@ test('rpe: a climb lifts it, recovery follows over the top',()=>{
   assert.ok(rpeAt(hilly,4950)<rpeAt(flat,4950),`recovery ${rpeAt(hilly,4950)} vs ${rpeAt(flat,4950)}`);
 });
 
-test('rpe: hard holds comfortably hard, building only a little',()=>{
-  const R=rpePlan(buildPacer(route(false),50*60,even),'hard');
-  assert.ok(rpeAt(R,300)>=5.8&&rpeAt(R,300)<=6.2,`${rpeAt(R,300)}`);assert.ok(rpeAt(R,10000)>=7.3&&rpeAt(R,10000)<=7.6);
-  assert.ok(Math.max(...R.rpe)<=8);
+test('rpe: hard builds like a race but stays below all-out everywhere, 6–7 through the middle',()=>{
+  for(const hill of [false,true]){
+    const P=buildPacer(route(hill),50*60,even),H=rpePlan(P,'hard'),A=rpePlan(P,'allout');
+    const S=rpePlan(P,'steady'),E=rpePlan(P,'easy');
+    for(let i=0;i<H.rpe.length;i++)assert.ok(E.rpe[i]<S.rpe[i]&&S.rpe[i]<H.rpe[i]&&H.rpe[i]<A.rpe[i],`order at ${P.d[i]}`);
+    if(!hill){assert.ok(rpeAt(H,5000)>=5.8&&rpeAt(H,5000)<=7,`${rpeAt(H,5000)}`);assert.ok(rpeAt(H,10000)>=7.2&&rpeAt(H,10000)<=7.6)}
+  }
 });
 
 test('rpe: check-ins about every quarter, moved off the climb, none near the finish',()=>{

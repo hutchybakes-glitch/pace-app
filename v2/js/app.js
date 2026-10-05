@@ -634,31 +634,34 @@ function effortCue(){
 // Tap your pace tile at any time to say how hard it feels
 $('youtile').onclick=()=>{speaker.unlock();if(runR&&mode==='race'&&phase==='running'&&!asking)askRpe(false)};
 function closeAsk(){asking?.stop?.();clearTimeout(asking?.timer);asking=null;$('rpeask').hidden=$('rpeadv').hidden=true}
+// Can the phone listen for a spoken answer? (Then check-ins are voice only; the tap card is the fallback.)
+const canListen=()=>o.rpeMic&&voiceOn()&&!SIM&&!!(window.SpeechRecognition||window.webkitSpeechRecognition);
 function askRpe(spoken){
-  closeAsk();
+  closeAsk();const card=!spoken||!canListen();
   const tg=rpeAt(runR,rd);
   $('rpehint').textContent=`It should feel about ${Math.round(tg)} here: ${rpeName(tg).toLowerCase()}. Tap a number${o.rpeMic?' or say it':''}.`;
   $('rpad').innerHTML=RPE_SCALE.map(x=>`<button data-n="${x.n}" class="${x.n===Math.round(tg)?'tg':''}" style="background:${rpeCol(x.n)}"><b>${x.n}</b><small>${x.name.replace(', Zone 2','')}</small></button>`).join('');
   $('rpad').querySelectorAll('button').forEach(b=>b.onclick=()=>answerRpe(+b.dataset.n));
-  $('rpemicst').textContent='';$('rpeask').hidden=false;
-  const a=asking={kind:'rpe',timer:setTimeout(()=>{if(asking===a)closeAsk()},30000)};
+  $('rpemicst').textContent='';$('rpeask').hidden=!card;
+  const a=asking={kind:'rpe',voice:!card,timer:setTimeout(()=>{if(asking===a)closeAsk()},30000)};
+  const fallback=msg=>{if(asking!==a)return;$('rpemicst').textContent=msg;$('rpeask').hidden=false;a.voice=false};
   const ask=()=>{if(asking!==a||!o.rpeMic||SIM)return;$('rpemicst').textContent='🎤 Listening…';
-    a.stop=listen((t,alts)=>{const n=alts.map(parseRpe).find(x=>x!=null);if(asking!==a)return;if(n!=null)answerRpe(n);else $('rpemicst').textContent=`Heard "${t}". Tap a number.`},why=>{if(asking===a)$('rpemicst').textContent=why==='not-allowed'||why==='service-not-allowed'?'Microphone not allowed. Tap a number.':'Tap a number.'})};
+    a.stop=listen((t,alts)=>{const n=alts.map(parseRpe).find(x=>x!=null);if(asking!==a)return;if(n!=null)answerRpe(n);else fallback(`Heard "${t}". Tap a number.`)},why=>fallback(why==='not-allowed'||why==='service-not-allowed'?'Microphone not allowed. Tap a number.':'Tap a number.'))};
   if(voiceOn())speaker.say(spoken?'Quick check. How hard does it feel, one to ten?':'How hard does it feel, one to ten?',3,'split',ask);else ask();
 }
 function answerRpe(n){
-  if(!asking)return;closeAsk();
+  if(!asking)return;const byVoice=asking.voice&&canListen();closeAsk();
   const adv=advise({R:runR,P:runP,said:n,at:rd,t:el()/1000});
   rec?.rpe?.push({rd:Math.round(rd),t:Math.round(el()/1000),said:n,target:+rpeAt(runR,rd).toFixed(1),status:adv.status});dirty=true;
   if(!adv.k){if(voiceOn())speaker.say(`${n}. ${adv.text}`,3);return}
   const left=runP.total-rd,newPace=(timeAt(runP,runP.total)-timeAt(runP,rd))*adv.k/(left/1000);
   $('advtitle').textContent=adv.k>1?`Ease off to ${fmt(newPace)}/km?`:`Pick it up to ${fmt(newPace)}/km?`;
   $('advtext').textContent=`You said ${n}. ${adv.text.replace(/ (Ease off|Pick it up) by .*$/,'')} The ${who()} changes to ${adv.change>0?'+':'−'}${Math.abs(adv.change)} s/km for the rest of the run.`;
-  $('advyes').textContent=adv.k>1?'Ease off':'Speed up';$('rpeadv').hidden=false;
+  $('advyes').textContent=adv.k>1?'Ease off':'Speed up';$('rpeadv').hidden=byVoice;
   const a=asking={kind:'adv',timer:setTimeout(()=>{if(asking===a){closeAsk();if(voiceOn())speaker.say('Keeping the plan.',2)}},25000)};
   $('advyes').onclick=()=>{if(asking===a){closeAsk();applyAdjust(adv.k)}};
   $('advno').onclick=()=>{if(asking===a){closeAsk();if(voiceOn())speaker.say('Keeping the plan.',2)}};
-  const ask=()=>{if(asking!==a||!o.rpeMic||SIM)return;a.stop=listen((t,alts)=>{if(asking!==a)return;const y=alts.map(parseYesNo).find(x=>x!=null);if(y===true)$('advyes').onclick();else if(y===false)$('advno').onclick()},()=>{})};
+  const ask=()=>{if(asking!==a||!o.rpeMic||SIM)return;a.stop=listen((t,alts)=>{if(asking!==a)return;const y=alts.map(parseYesNo).find(x=>x!=null);if(y===true)$('advyes').onclick();else if(y===false)$('advno').onclick();else $('rpeadv').hidden=false},()=>{if(asking===a)$('rpeadv').hidden=false})};
   if(voiceOn())speaker.say(`${n}. ${adv.text} Say yes or no.`,3,null,ask);else ask();
 }
 function applyAdjust(k){
@@ -713,7 +716,7 @@ function hud(){
     // The glance tiles: your live pace (coloured against the pacer's pace where you are), the pacer's
     // live pace, and the gap (+ you're ahead)
     const target=paceAt(runP,rd);
-    $('ypace').textContent=fmtP(curPace);$('ystate').innerHTML=`target ${fmtP(target)}${runR?` · <i class="yrpe" style="background:${rpeCol(rpeAt(runR,rd))}">RPE ${rpeRound(rpeAt(runR,rd))}</i>`:''}`;
+    $('ypace').textContent=fmtP(curPace);$('ystate').textContent=`target ${fmtP(target)}`;
     const pdNow=distAt(runP,t);$('ppace').textContent=fmtP(paceAt(runP,pdNow));
     $('pstate').textContent=`${Math.round(Math.abs(pdNow-rd))} m ${pdNow>=rd?'ahead':'behind'}`;
     setStatus(curPace?(curPace>target+o.band?'slow':curPace<target-o.band?'fast':'on'):null);

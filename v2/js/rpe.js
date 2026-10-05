@@ -4,8 +4,8 @@
 // - Easy / Zone 2 and comfortable runs are run by constant effort: Zone 2 is about RPE 3–4, and when
 //   effort creeps up (hills, heat, cardiac drift) you slow down or walk rather than let it rise. So these
 //   plans are flat, rising only a little on climbs.
-// - Hard-but-controlled (tempo) runs hold "comfortably hard", RPE 6–7, building only slightly by the end
-//   and finishing with something in reserve.
+// - Hard-but-controlled (tempo) runs are "comfortably hard", RPE 6–7 through the middle. Effort builds
+//   in them too, so they start a little below an all-out race and finish with something in reserve.
 // - All-out races: RPE rises roughly linearly with the proportion of the race done and peaks at the
 //   finish (Tucker's anticipatory "template" RPE). Shorter races start nearer their finishing effort.
 //   Feeling fresh early is expected, not a sign to go faster, so speed-up advice waits until 30 % in.
@@ -39,8 +39,8 @@ export const rpeName=r=>RPE_SCALE[Math.max(0,Math.min(9,Math.round(r)-1))].name;
 export const INTENSITIES=[
   {id:'allout',name:'All-out race',desc:'A PB attempt. Controlled at first, building steadily, nothing left at the line.',
    shape:'race',end:10,hill:1,up:1.5,down:1.5,cap:10,recover:true,speedUp:true},
-  {id:'hard',name:'Hard, not all-out',desc:"Comfortably hard, like a tempo run or a parkrun you push but don't empty yourself on. Holds around 6 to 7, a little more by the end.",
-   shape:'race',start:6,end:7.5,hill:0.6,up:1,down:1,cap:8,recover:true,speedUp:true},
+  {id:'hard',name:'Hard, not all-out',desc:"Comfortably hard, like a tempo run or a parkrun you push but don't empty yourself on. Around 6 to 7 through the middle, a little more by the end.",
+   shape:'race',end:7.5,hill:0.6,up:1,down:1,cap:8,recover:true,speedUp:true},
   {id:'steady',name:'Comfortable',desc:'A steady run at the same effort all the way. Breathing settled, could talk in short sentences. A touch more on climbs.',
    shape:'flat',start:4.5,end:4.5,hill:0.35,up:0.5,down:0.5,cap:5,recover:false,speedUp:true},
   {id:'easy',name:'Zone 2 easy',desc:'Conversational, for building your aerobic base. The same easy effort throughout: slow right down, or walk, on hills to keep it there.',
@@ -60,9 +60,10 @@ export function gradeCost(g){
 export function rpePlan(P,id='allout'){
   const I=INTENSITIES.find(x=>x.id===id)||INTENSITIES[0],n=P.d.length,mins=P.finish/60;
   // All-out: shorter races start nearer their finishing effort (about 6.5 for a 20-minute race, 5 for
-  // 50 minutes, 3.5 for 2 hours or more). Hard: lower for long runs too.
+  // 50 minutes, 3.5 for 2 hours or more). Hard builds the same way (effort accumulates in a tempo run
+  // too) from half a point lower, to a lower finish.
   const race=Math.max(3.5,Math.min(6.5,6.5-1.2*Math.log2(Math.max(1,mins)/20)));
-  const s0=I.id==='allout'?race:I.id==='hard'?Math.min(I.start,race+1):I.start,s1=I.end;
+  const s0=I.id==='allout'?race:I.id==='hard'?race-0.5:I.start,s1=I.end;
   const base=f=>I.shape==='flat'?s0:s0+(s1-s0)*(I.id==='allout'?Math.pow(f,1.2):f);
   // How hard the pacer is working here compared with its average: its speed times the grade cost
   const work=P.d.map((_,i)=>gradeCost(P.grade[i])/P.pace[i]);
@@ -84,6 +85,12 @@ export function rpePlan(P,id='allout'){
     if(I.shape==='race'){if(f<0.4)hi=Math.min(hi,base(f)+(P.grade[i]>3?1.5:1));if(f<0.93)hi=Math.min(hi,s1-0.5)}
     return Math.max(1,Math.min(hi,I.shape==='flat'?Math.max(s0-I.down,v):v));
   });
+  // Faster runs never feel easier than slower ones at the same point: all-out at least a point above
+  // comfortable, hard at least half a point above comfortable and below all-out
+  if(I.shape==='race'){
+    const S=rpePlan(P,'steady').rpe,A=I.id==='hard'?rpePlan(P,'allout').rpe:null;
+    r=r.map((v,i)=>{v=Math.max(v,S[i]+(A?0.5:1));return A?Math.min(v,A[i]-0.3):Math.min(I.cap,v)});
+  }
   return {d:P.d,rpe:r,start:s0,end:s1,intensity:I};
 }
 export function rpeAt(R,d){

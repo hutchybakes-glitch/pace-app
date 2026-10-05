@@ -91,7 +91,7 @@ b{font-variant-numeric:tabular-nums}
 .card.note2{background:#0c2340;border-color:#1d4ed8}
 .tile.you.rec{background:#1e3a8a}
 .rpec{height:120px}
-.tile .yrpe{font-style:normal;color:#0b1020;border-radius:6px;padding:1px 6px;font-weight:900}.rpec svg{width:100%;height:100%;display:block}
+.rpec svg{width:100%;height:100%;display:block}
 .insight .dim{color:var(--mut2)}
 #rpe-body[hidden]{display:none}
 .rpeguide{margin-top:12px;color:var(--mut2);font-size:14px;line-height:1.45}

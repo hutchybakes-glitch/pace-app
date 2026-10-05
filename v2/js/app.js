@@ -248,6 +248,7 @@ function enterRun(r=route,p=P,tr=turns,rc=cond(),pf=prof){
   setMuteUI();
   resetRun();
   view.setRoute(r.pts,p,tr);
+  drawCourse(p);
   show('run');layout();setView(o.view);
   cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);
 }
@@ -412,6 +413,7 @@ function loop(ts){
   }else shownD+=(rd-shownD)*0.3;
   const started=phase==='running'||phase==='paused'||phase==='done';
   const pd=started?distAt(runP,el()/1000):0;
+  courseMarks(started?shownD:0,pd);
   view.draw({mode:o.view,you:started?shownD:0,pacer:pd,gap:started?gapNow:null,youCol:STATUS_COL[stat]||null,gps:(!started||offRoute)?lastLL:null});
 }
 
@@ -460,6 +462,24 @@ function setStatus(s){
   if(s!==statCand){statCand=s;statSince=n}
   if(statCand!==stat&&(stat==null||s==null||n-statSince>=1200))stat=statCand;
   $('youtile').className='tile you '+(stat||'');
+}
+
+// Course strip: the whole route's elevation coloured by gradient, the part run dimmed, you (white)
+// and the pacer (orange)
+function drawCourse(p){
+  const W=1000,D=p.total,lo=Math.min(...p.es),span=Math.max(Math.max(...p.es)-lo,15);
+  const X=d=>(d/D*W).toFixed(1),Y=e=>(39-(e-lo)/span*33).toFixed(1);
+  let s='';
+  for(let i=0;i<p.d.length-1;i++){const c=gradeColor(p.grade[i]);s+=`<polygon points="${X(p.d[i])},40 ${X(p.d[i])},${Y(p.es[i])} ${X(p.d[i+1])},${Y(p.es[i+1])} ${X(p.d[i+1])},40" fill="${c}" stroke="${c}" stroke-width="1" vector-effect="non-scaling-stroke"/>`}
+  s+=`<rect id="cdone" x="0" y="0" height="40" width="0" fill="#020617" fill-opacity=".6"/>`+
+    `<line id="cpacer" y1="0" y2="40" stroke="#fb923c" stroke-width="3" vector-effect="non-scaling-stroke"/>`+
+    `<line id="cyou" y1="0" y2="40" stroke="#fff" stroke-width="3" vector-effect="non-scaling-stroke"/>`;
+  $('course').innerHTML=s;
+}
+function courseMarks(you,pacer){
+  const x=d=>(Math.max(0,Math.min(runP.total,d))/runP.total*1000).toFixed(1);
+  $('cdone').setAttribute('width',x(you));
+  for(const [id,d] of [['cyou',you],['cpacer',pacer]]){$(id).setAttribute('x1',x(d));$(id).setAttribute('x2',x(d))}
 }
 
 // Splits table: every completed km for you and the pacer, then the km in progress (live, faint)

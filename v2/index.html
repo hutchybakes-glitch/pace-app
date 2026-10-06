@@ -157,6 +157,10 @@
       <span><em id="projl">Est</em> <b id="proj">–</b> <i id="projd"></i></span>
       <span id="wxs" hidden><svg id="wxarr" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l7 18-7-4.5L5 20z" fill="currentColor"/></svg><b id="wxspd"></b><i id="wxkind"></i></span>
     </div>
+    <div class="strip" id="mstrip" hidden>
+      <span>Cadence <b id="cad">--</b> spm</span>
+      <span>Stride <b id="strd">--</b> m</span>
+    </div>
     <div class="tiles" id="tiles">
       <div id="youtile" class="tile you"><span>You</span><b id="ypace">--:--</b><small id="ystate"></small></div>
       <div class="tile pc"><span id="plab">Pacer</span><b id="ppace">--:--</b><small id="pstate"></small></div>
@@ -175,8 +179,13 @@
     <div id="rsub" class="sub"></div>
     <div class="rbig"><div class="you"><b id="ryou"></b><span>You</span></div><div class="pc" id="rpcbox"><b id="rpacer"></b><span id="rpclab">Pacer</span></div></div>
     <div class="card"><table class="kt" id="rkm"></table></div>
+    <div class="card" id="rmcard" hidden>
+      <div class="h">Pace, cadence and stride</div>
+      <svg id="rchart" viewBox="0 0 1000 560" role="img" aria-label="Your pace, cadence and stride length along the run"></svg>
+      <div id="rmotion" class="insight"></div>
+    </div>
     <button id="rrace" class="btn go" hidden>Race this route</button>
-    <div class="ctrl"><button id="rgpx" class="btn ghost">Export GPX</button><button id="rdone" class="btn go">Done</button></div>
+    <div class="ctrl"><button id="rgpx" class="btn ghost">Export GPX</button><button id="rcsv" class="btn ghost">Export CSV</button><button id="rdone" class="btn go">Done</button></div>
   </div>
 </section>
 

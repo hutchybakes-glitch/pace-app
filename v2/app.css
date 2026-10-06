@@ -174,6 +174,10 @@ b{font-variant-numeric:tabular-nums}
 .strip{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12px;color:var(--mut);padding:2px 4px 6px;white-space:nowrap;overflow:hidden}
 .strip b{color:#fff;font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
 .strip i,.strip em{font-style:normal}
+#mstrip{justify-content:space-around;padding-top:0}
+#spl tr.mv td{font-size:11px;color:var(--mut);padding-top:0;text-align:right}
+#rchart{width:100%;height:auto;display:block;margin-top:6px}
+#rmotion p{margin:6px 0}
 #projd.ahead{color:var(--good)}#projd.behind{color:var(--pacer)}
 #wxs{display:flex;align-items:center;gap:3px}#wxs b{font-size:14px}
 #wxarr{width:16px;height:16px;color:#7dd3fc;flex:none;transition:transform .6s}

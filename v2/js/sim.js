@@ -19,7 +19,8 @@ export const every=(ms,fn)=>setInterval(fn,ms/SPEED);
 
 // Set by the app: moving, restart (back to the start), jump (put the runner at this route distance;
 // negative = behind the start line)
-export const sim={moving:false,restart:false,jump:null,scenario:'steady'};
+// v: the runner's current speed (m/s), for the synthetic accelerometer in motion.js
+export const sim={moving:false,restart:false,jump:null,scenario:'steady',v:0};
 
 // Sim scenarios: the runner's pace as a multiple of the pacer's pace at the same spot (so terrain still
 // counts), by fraction of the route: [[from, multiplier], …] (< 1 = quicker). Phases blend over ±4 %
@@ -62,6 +63,7 @@ export function simWatch(getRun,onPos,onErr){
       const base=PACE||paceAt(r.P,Math.max(0,d));
       v=1000/(base*mult*(1+wob));d=Math.min(total,d+dt*v);if(d>=0)mt+=dt;
     }
+    sim.v=v;
     let i=0,lo=0,hi=pts.length-2;while(lo<=hi){const m=(lo+hi)>>1;if(pts[m].d<=Math.max(0,d)){i=m;lo=m+1}else hi=m-1}
     const a=d<0?pts[0]:pts[i],b=d<0?pts.find(p=>p.d>=20)||pts.at(-1):pts[i+1]||pts[i],k=Math.cos(a.lat*Math.PI/180);
     const ex=(b.lon-a.lon)*k,ny0=b.lat-a.lat,L=Math.hypot(ex,ny0)||1;

@@ -151,3 +151,73 @@ function simAccel(push,step){
     }
   },50);
 }
+
+// ---- Cadence and stride guide ----
+// What the research says, and how it's used here:
+// - Experienced runners self-select a cadence within a few % of their metabolic optimum (novices run a
+//   little low, i.e. overstride), so the guide starts from YOUR flat-ground cadence, not a generic 180.
+// - Cadence rises only gently with speed (about 6 steps/min per m/s); speed changes come mostly from
+//   stride length. So the guide's stride is simply speed ÷ cadence at the pacer's pace there.
+// - Uphill at the same speed, cadence rises about 0.6 % per % of gradient (4 % at 7 %) and steps
+//   shorten; on a real climb you're slower too, so the stride shortens a lot more.
+// - Downhill, runners naturally drop cadence and lengthen their stride sharply, but the energetically
+//   optimal cadence barely changes with slope, and running a few % quicker than natural cuts braking,
+//   knee loading and quad damage. So on descents cadence holds (steep ones a little quicker) and the
+//   stride opens up.
+export const CAD_PER_MS=6, CAD_UP_K=0.006, CAD_UP_MAX=0.05, STEEP_DOWN=-5, STEEP_DOWN_K=0.03;
+export const TYPICAL_BASE=150;                // spm at 0 m/s by the typical-runner line: 170 at 5:00/km
+const gradeAt=(pts,d)=>{const i=Math.max(0,Math.min(pts.length-1,Math.round(d/10))),a=pts[Math.max(0,i-5)],b=pts[Math.min(pts.length-1,i+5)];return b.d>a.d?((b.ele??0)-(a.ele??0))/(b.d-a.d)*100:0};
+
+// Your baseline from past runs: cadence = base + 6 × speed (m/s), from points on flat ground (|grade| < 1.5 %)
+// at running speed. runs: saved runs with fixes [.., rd (6), pace (7), cadence (8), ..] and route.pts.
+// Returns {base, n (points used), personal}
+export function cadenceBaseline(runs){
+  const v=[];
+  for(const r of runs){
+    const pts=r.route?.pts;if(!pts)continue;
+    for(const f of r.fixes||[]){
+      const c=f[8],p=f[7];if(!c||!p||p<150||p>600||c<120||c>220)continue;
+      if(Math.abs(gradeAt(pts,f[6]))>=1.5)continue;
+      v.push(c-CAD_PER_MS*1000/p);
+    }
+  }
+  if(v.length<60)return {base:TYPICAL_BASE,n:v.length,personal:false};
+  v.sort((a,b)=>a-b);return {base:v[Math.floor(v.length/2)],n:v.length,personal:true};
+}
+
+// Gradient adjustment to cadence (fraction): up on climbs, held on descents, a little up on steep ones
+export const cadGrade=g=>g>0?Math.min(CAD_UP_MAX,CAD_UP_K*g):g<=STEEP_DOWN?STEEP_DOWN_K*Math.min(1,(STEEP_DOWN-g)/5+0.5):0;
+
+// The guide at every route point for pacer P: {d, cad, stride}. Smoothed over 100 m, so it eases into
+// and out of hills rather than stepping.
+export function cadencePlan(P,base=TYPICAL_BASE){
+  const raw=P.d.map((_,i)=>{const v=1000/P.pace[i];return (base+CAD_PER_MS*v)*(1+cadGrade(P.grade[i]))});
+  const cad=raw.map((_,i)=>{let s=0,n=0;for(let j=Math.max(0,i-5);j<=Math.min(raw.length-1,i+5);j++){s+=raw[j];n++}return s/n});
+  return {d:P.d,cad,stride:cad.map((c,i)=>1000/P.pace[i]/(c/60))};
+}
+export function planAt(C,d){
+  const i=Math.max(0,Math.min(C.d.length-1,Math.round(d/10)));return {cad:C.cad[i],stride:C.stride[i]};
+}
+
+// Signs along the road: at the start of every climb, descent and flat (at least 150 m long), with that
+// stretch's typical cadence and stride and a short tip. kind: 'up' | 'down' | 'flat'; steep: |grade| ≥ 5
+export function cadenceSigns(P,C){
+  const cls=g=>g>2?'up':g<-2?'down':'flat',seg=[];
+  for(let i=0;i<P.d.length;i++){const k=cls(P.grade[i]),s=seg.at(-1);if(s&&s.kind===k)s.i1=i;else seg.push({kind:k,i0:i,i1:i})}
+  // merge short stretches into the one before
+  for(let m=0;m<seg.length;)if(seg.length>1&&P.d[seg[m].i1]-P.d[seg[m].i0]<150){const s=seg.splice(m,1)[0];if(m>0)seg[m-1].i1=s.i1;else seg[0].i0=s.i0;
+    for(let k=1;k<seg.length;)if(seg[k].kind===seg[k-1].kind){seg[k-1].i1=seg[k].i1;seg.splice(k,1)}else k++;m=0}else m++;
+  return seg.map(s=>{
+    const idx=[];for(let i=s.i0;i<=s.i1;i++)idx.push(i);
+    const med=a=>{const v=idx.map(i=>a[i]).sort((x,y)=>x-y);return v[Math.floor(v.length/2)]};
+    const g=s.kind==='up'?Math.max(...idx.map(i=>P.grade[i])):s.kind==='down'?Math.min(...idx.map(i=>P.grade[i])):0;
+    return {d:P.d[s.i0],d1:P.d[s.i1],kind:s.kind,grade:+g.toFixed(1),steep:Math.abs(g)>=5,cad:Math.round(med(C.cad)),stride:+med(C.stride).toFixed(2)};
+  });
+}
+// first: the opening sign (said as you set off)
+export function cadenceTip(s,first=false){
+  if(first)return `Settle in at about ${s.cad} steps a minute, stride ${s.stride.toFixed(2)} metres.`;
+  if(s.kind==='up')return `${s.steep?'Steep climb':'Climb'}: keep your rhythm at about ${s.cad} and shorten your stride, to about ${s.stride.toFixed(2)} metres.`;
+  if(s.kind==='down')return s.steep?`Steep descent: quick, light steps, about ${s.cad}. Don't reach out in front.`:`Downhill: keep your cadence around ${s.cad} and let your stride open up.`;
+  return `Flat: settle back to about ${s.cad}, stride ${s.stride} metres.`;
+}

@@ -72,3 +72,31 @@ test('motion: insight tells a stride fade from a cadence drop',()=>{
   assert.equal(hilly[0].kind,'steady');
   assert.equal(simCadence(1000/300).toFixed(0),'172');
 });
+
+import {cadenceBaseline,cadencePlan,planAt,cadenceSigns,cadGrade,cadenceTip,TYPICAL_BASE} from '../../v2/js/motion.js';
+import {buildPacer,PROFILES} from '../../v2/js/pacer.js';
+const M2=1/111195;
+const hillRoute=()=>{const pts=[];for(let d=0;d<=4000;d+=10)pts.push({d,lat:51+d*M2,lon:0,ele:d<1000?0:d<1600?(d-1000)*0.07:d<2200?42-(d-1600)*0.07:0});return pts};
+
+test('cadence guide: typical runner 170 at 5:00/km on the flat, climbs quicker and shorter, descents hold cadence and lengthen',()=>{
+  const P=buildPacer(hillRoute(),20*60,PROFILES[0]),C=cadencePlan(P);
+  const flat=planAt(C,500),up=planAt(C,1300),down=planAt(C,1900);
+  assert.ok(Math.abs(flat.cad-(TYPICAL_BASE+6*1000/P.pace[50]))<1);
+  assert.ok(up.cad>flat.cad*1.01&&up.stride<flat.stride*0.9,`up ${up.cad} ${up.stride}`);
+  assert.ok(down.cad>=flat.cad*0.99&&down.stride>flat.stride*1.03,`down ${down.cad} ${down.stride}`);
+  assert.equal(cadGrade(-3),0);assert.ok(cadGrade(-8)>0.02);assert.equal(cadGrade(20),0.05);
+});
+
+test('cadence guide: signs at each climb, descent and flat',()=>{
+  const P=buildPacer(hillRoute(),20*60,PROFILES[0]),S=cadenceSigns(P,cadencePlan(P));
+  assert.deepEqual(S.map(s=>s.kind),['flat','up','down','flat']);
+  assert.ok(S[1].steep&&S[1].d>900&&S[1].d<1100);
+  assert.match(cadenceTip(S[1]),/shorten your stride/);assert.match(cadenceTip(S[0],true),/^Settle in/);assert.match(cadenceTip(S[2]),/light steps/);
+});
+
+test('cadence guide: your own baseline from flat running in past runs',()=>{
+  const pts=hillRoute(),fixes=[];for(let d=0;d<900;d+=10)fixes.push([0,0,0,0,5,d,d,300,176,1.14]);
+  const b=cadenceBaseline([{route:{pts},fixes}]);
+  assert.ok(b.personal&&Math.abs(b.base-(176-6*1000/300))<0.01);
+  assert.equal(cadenceBaseline([]).personal,false);
+});

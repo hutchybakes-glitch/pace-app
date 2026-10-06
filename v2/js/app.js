@@ -11,7 +11,7 @@ import {createView,gapText} from './view.js';
 import {saveRoute,listRoutes,deleteRoute,saveRun,listRuns,deleteRun,opt,importV1Routes} from './store.js';
 import {SIM,SPEED,now,every,sim,simWatch,SCENARIOS} from './sim.js';
 import {createCoach,createSpeaker,gapPhrase,STYLES} from './coach.js';
-import {createMotion,cadenceAt,strideOf,kmMotion,motionInsight,UPDATE_MS,STRIDE_MS} from './motion.js';
+import {createMotion,cadenceAt,strideOf,kmMotion,motionInsight,UPDATE_MS,STRIDE_MS,cadenceBaseline,cadencePlan,planAt,cadenceSigns,cadenceTip} from './motion.js';
 import {fetchWeather,at as wxAt,windStretches,compass16,mph,SHELTER} from './weather.js';
 
 const $=id=>document.getElementById(id);
@@ -34,7 +34,7 @@ let prof=opt.get('profile',{id:'even',climb:'average',descent:'average',strategy
 // speed: live pace from GPS (Doppler) speed, falling back to position; live: how quickly live pace reacts
 const o={speed:opt.get('speedSrc',true),live:opt.get('live','balanced'),band:opt.get('band',5),auto:opt.get('auto',true),zone:opt.get('zone',25),view:opt.get('view','map'),
   voice:opt.get('voice','full'),tones:opt.get('tones',true),rate:opt.get('rate','normal'),muted:opt.get('muted',false)};
-o.coachStyle=opt.get('coachStyle','moderate');o.wxOn=opt.get('wxOn',true);o.wxMode=opt.get('wxMode','keep');o.shelter=opt.get('shelter','some');
+o.coachStyle=opt.get('coachStyle','moderate');o.cad=opt.get('cadGuide',true);o.wxOn=opt.get('wxOn',true);o.wxMode=opt.get('wxMode','keep');o.shelter=opt.get('shelter','some');
 const RATES={slow:0.9,normal:1,fast:1.12};
 const speaker=createSpeaker();speaker.setOpts({tones:o.tones,rate:RATES[o.rate]});speaker.setMuted(o.muted);
 const voiceOn=()=>o.voice!=='off'&&!o.muted;
@@ -143,7 +143,7 @@ function rebuild(){
   $('rname').textContent=route.name;
   $('rchips').innerHTML=[`${kmStr(D)} km`,`${Math.round(up)} m climb`,`${turns.length} turns`,`elevation: ${route.src}`].map(t=>`<span>${esc(t)}</span>`).join('');
   $('v-finish').textContent=fmt(fin);$('v-pace').textContent=fmt(fin/(D/1000));
-  renderProfiles();drawPlanMap();drawPlanChart();
+  renderProfiles();drawPlanMap();drawPlanChart();renderCadPlan();
   const e=extremes(P),g=x=>`${x>0?'+':''}${x.toFixed(1)} %`;
   const pr=PROFILES.find(p=>p.id===prof.id);
   if(ghostRun){$('pinsight').innerHTML=`Racing your run from <b>${when(ghostRun.started)}</b>: <b>${fmt(P.finish)}</b> (${fmt(P.finish/(D/1000))}/km)${ghostRun===ghosts[0]?', your best here 🏆':''}. It was slowest at <b>${fmt(e.slow.pace)}</b>/km around ${kmStr(e.slow.d)} km and quickest at <b>${fmt(e.fast.pace)}</b>/km around ${kmStr(e.fast.d)} km.`;return}
@@ -181,6 +181,22 @@ function drawPlanChart(){
   const pct=y=>(y/220*100).toFixed(1)+'%';
   $('pylab').innerHTML=`<span style="top:${pct(Yp(pmin))}">${fmt(pmin)}</span><span style="top:${pct(Yp(avg))}">${fmt(avg)}</span><span style="top:${pct(Yp(pmax))}">${fmt(pmax)}</span>`;
   $('paxis').innerHTML=`<span>0 km</span><span>${kmStr(D/2)}</span><span>${kmStr(D)} km</span>`;
+}
+
+// Cadence and stride guide for this route and pacer: your flat baseline, then the targets on its biggest
+// climb and descent
+let cadBase=null;
+function renderCadPlan(){
+  $('cadplan').hidden=!o.cad;if(!o.cad)return;
+  cadBase=cadenceBaseline(allRuns.filter(r=>r.status==='done'));
+  const C=cadencePlan(P,cadBase.base),S=cadenceSigns(P,C);
+  const flatPace=P.finish/(P.total/1000),flat={cad:Math.round(cadBase.base+6*1000/flatPace),stride:(1000/flatPace)/((cadBase.base+6*1000/flatPace)/60)};
+  const up=S.filter(x=>x.kind==='up').sort((a,b)=>b.grade-a.grade)[0],dn=S.filter(x=>x.kind==='down').sort((a,b)=>a.grade-b.grade)[0]; // steepest of each
+  $('cadplan').innerHTML=`<b>Cadence and stride guide</b><div class="row"><span>→ Flat <b>${flat.cad}</b> spm · <b>${flat.stride.toFixed(2)}</b> m</span>`+
+    (up?`<span>↑ Steepest climb (${up.grade} %) at ${kmStr(up.d)} km <b>${up.cad}</b> · <b>${up.stride.toFixed(2)}</b> m</span>`:'')+
+    (dn?`<span>↓ Steepest descent (${dn.grade} %) at ${kmStr(dn.d)} km <b>${dn.cad}</b> · <b>${dn.stride.toFixed(2)}</b> m</span>`:'')+`</div>`+
+    `Climbs: keep your rhythm (a touch quicker if anything) and let the stride shorten. Descents: don't let your cadence drop; let the stride open up, with quick, light steps on steep ones. Back on the flat, the stride lengthens again. `+
+    (cadBase.personal?'<span class="dim">Based on your own cadence on flat ground in past runs.</span>':'<span class="dim">Typical-runner values until you\'ve done a run with cadence; then it uses yours.</span>');
 }
 
 // Target steppers: hold to repeat, speeding up
@@ -227,6 +243,8 @@ function renderOptions(){
   $('o-speed').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',(b.dataset.v==='1')===o.speed);b.onclick=()=>{o.speed=b.dataset.v==='1';opt.set('speedSrc',o.speed);renderOptions()}});
   $('o-band').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',+b.dataset.v===o.band);b.onclick=()=>{o.band=+b.dataset.v;opt.set('band',o.band);renderOptions()}});
   $('o-live').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===o.live);b.onclick=()=>{o.live=b.dataset.v;opt.set('live',o.live);smoother=createSmoother(LIVE[o.live].tau);renderOptions()}});
+  $('o-cad').classList.toggle('on',o.cad);$('o-cad').setAttribute('aria-checked',o.cad);
+  $('o-cad').onclick=()=>{o.cad=!o.cad;opt.set('cadGuide',o.cad);renderOptions();if(route)rebuild()};
   $('o-auto').classList.toggle('on',o.auto);$('o-auto').setAttribute('aria-checked',o.auto);
   $('o-auto').onclick=()=>{o.auto=!o.auto;opt.set('auto',o.auto);renderOptions()};
   $('o-voice').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===o.voice);b.onclick=()=>{o.voice=b.dataset.v;opt.set('voice',o.voice);renderOptions()}});
@@ -269,6 +287,8 @@ let coach=null,armSaid=null,runCond=null,runGhost=null,mode='race',trail=[],spok
 // [t, route distance] for the last minute, the shown values and when they were worked out
 const motion=createMotion();
 let steps=[],stepN=0,stepSplits=[],dhist=[],cadNow=null,strNow=null,motionT=-1e9,motionFrom=0;
+// The cadence/stride guide for this run, its signs, which sign was last spoken, and drift tracking
+let runCad=null,runSigns=[],signI=0,tipAt=-1e9,lowCount=0,driftAt=-1e9;
 const who=()=>runGhost?'ghost':'pacer',Who=()=>runGhost?'Ghost':'Pacer';
 // Show the parts of the run screen that only make sense when racing a route
 function raceUI(on){
@@ -284,6 +304,8 @@ function enterRun(r=route,p=P,tr=turns,rc=cond(),pf=prof,ghost=null){
   setMuteUI();
   resetRun();
   view.setRoute(r.pts,p,tr);
+  runCad=o.cad?cadencePlan(p,(cadBase||cadenceBaseline(allRuns.filter(x=>x.status==='done'))).base):null;
+  runSigns=runCad?cadenceSigns(p,runCad):[];view.setSigns(runSigns);
   drawCourse(p);
   show('run');layout();setView(o.view);
   cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);
@@ -291,6 +313,7 @@ function enterRun(r=route,p=P,tr=turns,rc=cond(),pf=prof,ghost=null){
 // Recording a new route: no pacer, your trail on the map, and the route is built when you save
 function enterRecord(){
   mode='record';runCond=null;runRoute=null;runP=null;runTurns=[];runGhost=null;coach=null;raceUI(false);
+  runCad=null;runSigns=[];view.setSigns([]);
   setMuteUI();resetRun();view.clearRoute();
   show('run');layout();
   cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);
@@ -298,7 +321,7 @@ function enterRecord(){
 function resetRun(){
   phase='idle';acc=0;track.reset();smoother.reset();rd=0;rsplits=[];rpts=[];spts=[];curPace=null;vNow=0;shownD=0;offRoute=false;
   rec=null;dirty=false;gate=null;sim.restart=true;sim.moving=false;trail=[];spokenSplits=0;
-  steps=[];stepN=0;stepSplits=[];dhist=[];cadNow=strNow=null;motionT=-1e9;motionFrom=0;
+  steps=[];stepN=0;stepSplits=[];dhist=[];cadNow=strNow=null;motionT=-1e9;motionFrom=0;signI=0;tipAt=-1e9;lowCount=0;driftAt=-1e9;
   matcher=runRoute?createMatcher(runRoute.pts):null;
   $('off').hidden=true;$('arm').hidden=true;
   setPhaseUI();hud();
@@ -626,6 +649,15 @@ function motionHud(){
   const w=STRIDE_MS/1000,from=e-w,n=steps.filter(x=>x>from&&x<=e).length;
   strNow=dhist.length&&dhist[0][0]<=from+2?strideOf(n,distBack(e)-distBack(from)):null;
   $('cad').textContent=cadNow?Math.round(cadNow):'--';$('strd').textContent=strNow?strNow.toFixed(2):'--';
+  // Against the guide here: your cadence low (amber) / high (blue); stride long when cadence is low
+  const tg=runCad&&rd>20?planAt(runCad,rd):null;
+  $('cadt').textContent=tg?` / ${Math.round(tg.cad)}`:'';$('strdt').textContent=tg?` / ${tg.stride.toFixed(2)}`:'';
+  const off=tg&&cadNow?cadNow/tg.cad-1:0;
+  $('cad').className=off<-0.03?'low':off>0.04?'high':'';$('strd').className=off<-0.03&&strNow&&strNow>tg.stride*1.03?'long':'';
+  // Cadence well below the guide for 15 s: a nudge, at most every 3 minutes
+  lowCount=off<-0.05?lowCount+1:0;
+  if(lowCount>=3&&t-driftAt>180&&voiceOn()){driftAt=t;lowCount=0;const sg=runSigns.filter(x=>x.d<=rd).at(-1);
+    speaker.say(`Cadence ${Math.round(cadNow)}. ${sg?.kind==='up'?'Shorter, quicker steps up here.':sg?.kind==='down'?'Quicker, lighter steps. Don\'t reach out in front.':'Quicken your steps a little, keep them light.'}`,1)}
 }
 // Route distance at run time ts (s), from the last minute of fixes
 function distBack(ts){
@@ -633,8 +665,19 @@ function distBack(ts){
   return a[1];
 }
 
+// Spoken technique tip as you reach each climb and descent, and the flat after a steep one (at most one a
+// minute); the opening one as you set off
+function cadTips(){
+  if(!runSigns.length||phase!=='running'||!voiceOn())return;
+  while(signI<runSigns.length&&runSigns[signI].d1<rd)signI++;
+  const sg=runSigns[signI];if(!sg||rd<Math.max(sg.d,40))return;
+  const first=signI===0,prev=runSigns[signI-1];signI++;
+  if(!first&&sg.kind==='flat'&&!prev?.steep)return;
+  const t=el()/1000;if(t-tipAt<60)return;tipAt=t;speaker.say(cadenceTip(sg,first),1);
+}
+
 function hud(){
-  motionHud();
+  motionHud();cadTips();
   if(mode==='record'&&!$('run').hidden)return hudRecord();
   if($('run').hidden||!runP)return;
   const t=el()/1000,D=runP.total,started=phase==='running'||phase==='paused';

@@ -89,6 +89,7 @@
       <div id="paxis" class="axis"></div>
       <div class="key"><span><i class="kpace"></i>Pacer's pace (higher = faster)</span></div>
       <div id="pinsight" class="insight"></div>
+      <div id="cadplan" class="insight cadplan"></div>
     </div>
 
     <div class="card">
@@ -108,6 +109,7 @@
         <div class="seg" id="o-rate"><button data-v="slow">Slower</button><button data-v="normal">Normal</button><button data-v="fast">Faster</button></div>
         <button id="o-test" class="btn ghost testv">🔊 Hear your coach</button></div>
       <div class="set"><span><b>Start at the start line</b><small>The clock starts as you cross it, like a chip mat</small></span><button id="o-auto" class="switch" role="switch"></button></div>
+      <div class="set"><span><b>Cadence and stride guide</b><small>Target cadence and stride for each climb, descent and flat: on signs beside the road, next to your live cadence, and as short spoken tips</small></span><button id="o-cad" class="switch" role="switch"></button></div>
       <div class="set"><span><b>Start zone</b><small>How close counts as "at the start"</small></span><div class="mini-step" id="o-zone"><button data-d="-5">−</button><b>25 m</b><button data-d="5">+</button></div></div>
       <div class="set col"><span><b>Your routes and runs</b><small id="st-status"></small></span>
         <div class="bt2"><button id="bk" class="btn ghost">Back up everything</button><label class="btn ghost">Restore a backup<input type="file" id="rsfile" accept=".json,application/json" hidden></label></div></div>
@@ -158,8 +160,8 @@
       <span id="wxs" hidden><svg id="wxarr" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l7 18-7-4.5L5 20z" fill="currentColor"/></svg><b id="wxspd"></b><i id="wxkind"></i></span>
     </div>
     <div class="strip" id="mstrip" hidden>
-      <span>Cadence <b id="cad">--</b> spm</span>
-      <span>Stride <b id="strd">--</b> m</span>
+      <span>Cadence <b id="cad">--</b><i id="cadt"></i> spm</span>
+      <span>Stride <b id="strd">--</b><i id="strdt"></i> m</span>
     </div>
     <div class="tiles" id="tiles">
       <div id="youtile" class="tile you"><span>You</span><b id="ypace">--:--</b><small id="ystate"></small></div>

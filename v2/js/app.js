@@ -7,11 +7,10 @@ import {createMatcher} from './match.js';
 import {turnsFor,nextTurn,turnText,inDist} from './nav.js';
 import {createStartGate,compass} from './start.js';
 import {buildPacer,timeAt,distAt,paceAt,avgBetween,extremes,gradeColor,projectFinish,paceMarks,ghostFromRun,ghostFromTimes,adjustPacer,PROFILES,TRAIT_NAMES} from './pacer.js';
-import {RPE_SCALE,INTENSITIES,rpePlan,rpeAt,rpeName,checkpoints,advise,parseRpe,parseYesNo,rpeCol,rpeRound,rpeMarks} from './rpe.js';
 import {createView,gapText} from './view.js';
 import {saveRoute,listRoutes,deleteRoute,saveRun,listRuns,deleteRun,opt,importV1Routes} from './store.js';
 import {SIM,SPEED,now,every,sim,simWatch,SCENARIOS} from './sim.js';
-import {createCoach,createSpeaker,gapPhrase,STYLES,listen} from './coach.js';
+import {createCoach,createSpeaker,gapPhrase,STYLES} from './coach.js';
 import {fetchWeather,at as wxAt,windStretches,compass16,mph,SHELTER} from './weather.js';
 
 const $=id=>document.getElementById(id);
@@ -34,7 +33,7 @@ let prof=opt.get('profile',{id:'even',climb:'average',descent:'average',strategy
 // speed: live pace from GPS (Doppler) speed, falling back to position; live: how quickly live pace reacts
 const o={speed:opt.get('speedSrc',true),live:opt.get('live','balanced'),band:opt.get('band',5),auto:opt.get('auto',true),zone:opt.get('zone',25),view:opt.get('view','map'),
   voice:opt.get('voice','full'),tones:opt.get('tones',true),rate:opt.get('rate','normal'),muted:opt.get('muted',false)};
-o.coachStyle=opt.get('coachStyle','moderate');o.rpe=opt.get('rpe',true);o.intensity=opt.get('intensity','allout');o.rpeAsk=opt.get('rpeAsk',true);o.rpeMic=opt.get('rpeMic',true);o.wxOn=opt.get('wxOn',true);o.wxMode=opt.get('wxMode','keep');o.shelter=opt.get('shelter','some');
+o.coachStyle=opt.get('coachStyle','moderate');o.wxOn=opt.get('wxOn',true);o.wxMode=opt.get('wxMode','keep');o.shelter=opt.get('shelter','some');
 const RATES={slow:0.9,normal:1,fast:1.12};
 const speaker=createSpeaker();speaker.setOpts({tones:o.tones,rate:RATES[o.rate]});speaker.setMuted(o.muted);
 const voiceOn=()=>o.voice!=='off'&&!o.muted;
@@ -136,7 +135,7 @@ function rebuild(){
   const fin=finishFor(route),ghosts=runsOn(route);
   ghostRun=opt.get('pcmode:'+route.id,'profile')==='ghost'&&ghosts.length?(ghosts.find(x=>x.id===opt.get('ghost:'+route.id,null))||ghosts[0]):null;
   P=ghostRun?ghostFromRun(route.pts,ghostRun.fixes,ghostRun.elapsed/1000):buildPacer(route.pts,fin,prof,{cond:cond()});
-  renderPcMode(ghosts);renderRpe();
+  renderPcMode(ghosts);
   $('tgtcard').hidden=$('wxcard').hidden=$('profiles').hidden=$('tune').hidden=!!ghostRun;
   renderWx();
   const D=P.total,up=P.es.reduce((a,e,i)=>a+(i&&e>P.es[i-1]?e-P.es[i-1]:0),0);
@@ -210,45 +209,6 @@ function renderProfiles(){
 }
 function setProf(p){prof=p;opt.set('profile',p);rebuild()}
 
-// ---- Effort (RPE): the plan for how hard each part should feel ----
-// Colour for an RPE: green (easy) through yellow and orange to red (maximal)
-let Rplan=null;
-function renderRpe(){
-  const sw=(id,v)=>{$(id).classList.toggle('on',v);$(id).setAttribute('aria-checked',v)};
-  sw('o-rpe',o.rpe);sw('o-rpeask',o.rpeAsk);sw('o-rpemic',o.rpeMic);
-  $('o-rpe').onclick=()=>{o.rpe=!o.rpe;opt.set('rpe',o.rpe);renderRpe()};
-  $('o-rpeask').onclick=()=>{o.rpeAsk=!o.rpeAsk;opt.set('rpeAsk',o.rpeAsk);renderRpe()};
-  $('o-rpemic').onclick=()=>{o.rpeMic=!o.rpeMic;opt.set('rpeMic',o.rpeMic);renderRpe()};
-  $('rpe-body').hidden=!o.rpe;
-  if(!$('rpe-scale').children.length)$('rpe-scale').innerHTML=RPE_SCALE.map(x=>`<li><i style="background:${rpeCol(x.n)}">${x.n}</i><span><b>${x.name}</b> ${esc(x.feel)}<em>Talk test: ${x.talk}</em></span></li>`).join('');
-  $('rpe-int').innerHTML=INTENSITIES.map(x=>`<button class="stylec ${x.id===o.intensity?'on':''}" data-v="${x.id}"><b>${x.name}</b><small>${esc(x.desc)}</small></button>`).join('');
-  $('rpe-int').querySelectorAll('.stylec').forEach(b=>b.onclick=()=>{o.intensity=b.dataset.v;opt.set('intensity',o.intensity);renderRpe()});
-  if(!P||!o.rpe)return;
-  Rplan=rpePlan(P,o.intensity);
-  const W=1000,D=P.total,X=d=>(d/D*W).toFixed(1),Y=r=>(150-(r-1)/9*140).toFixed(1);
-  const lo=Math.min(...P.es),span=Math.max(Math.max(...P.es)-lo,20);
-  let g=`<polygon points="0,160 ${P.d.map((d,i)=>X(d)+','+(160-(P.es[i]-lo)/span*45).toFixed(1)).join(' ')} ${W},160" fill="#1e293b"/>`;
-  for(const r of [2,4,6,8,10])g+=`<line x1="0" x2="${W}" y1="${Y(r)}" y2="${Y(r)}" stroke="#fff" stroke-opacity=".08" vector-effect="non-scaling-stroke"/>`;
-  for(let i=0;i<Rplan.d.length-1;i+=2){const j=Math.min(i+2,Rplan.d.length-1);g+=`<line x1="${X(Rplan.d[i])}" x2="${X(Rplan.d[j])}" y1="${Y(Rplan.rpe[i])}" y2="${Y(Rplan.rpe[j])}" stroke="${rpeCol(Rplan.rpe[i])}" stroke-width="3.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`}
-  if(o.rpeAsk)for(const d of checkpoints(P))g+=`<circle cx="${X(d)}" cy="12" r="5" fill="#fff" fill-opacity=".85" vector-effect="non-scaling-stroke"/>`;
-  $('rpechart').innerHTML=g;
-  const pct=y=>(y/160*100).toFixed(1)+'%';
-  $('rpeylab').innerHTML=[2,4,6,8,10].map(r=>`<span style="top:${pct(Y(r))}">${r}</span>`).join('');
-  $('rpeaxis').innerHTML=`<span>0 km</span><span>${kmStr(D/2)}</span><span>${kmStr(D)} km</span>`;
-  const at=d=>Math.round(rpeAt(Rplan,d)*2)/2,q=D>=4000?2500:D/4,peak=Rplan.rpe.reduce((m,v,i)=>v>m.v&&P.time[i]<P.finish*0.8?{v,d:P.d[i]}:m,{v:0,d:0});
-  const I=INTENSITIES.find(x=>x.id===o.intensity),dots=o.rpeAsk?' <span class="dim">White dots: when it will ask how you feel.</span>':'';
-  const hiR=Math.round(Math.max(...Rplan.rpe)*2)/2;
-  if(I.shape==='flat'){
-    $('rpeinsight').innerHTML=`Hold about <b>${Rplan.start}</b> (${I.id==='easy'?'easy, Zone 2':rpeName(Rplan.start).toLowerCase()}) the whole way. It shouldn't build as you go: if it starts to feel harder, slow down.`+
-      (hiR>Rplan.start?` A touch more on the climbs (up to ${hiR})${I.id==='easy'?'; walk the steep bits if you need to':''}.`:'')+dots;
-    return;
-  }
-  $('rpeinsight').innerHTML=(I.id==='allout'
-      ?`Start around <b>${at(300)}</b> (${rpeName(at(300)).toLowerCase()}), <b>${at(q)}</b> by ${kmStr(q)} km, <b>${at(D/2)}</b> at halfway and <b>${at(D)}</b> at the finish: building steadily, with nothing left at the line.`
-      :`Settle at about <b>${at(D/4)}</b> (${rpeName(at(D/4)).toLowerCase()}) and hold it, about <b>${at(D/2)}</b> at halfway, building only to <b>${at(D)}</b> by the finish. You should finish knowing you had more.`)+
-    (peak.v>at(D*0.6)+0.4?` The toughest part before the finish is around ${kmStr(peak.d)} km (${Math.round(peak.v*2)/2}); let your breathing settle over the top.`:'')+dots;
-}
-
 // Choose between a pacer profile and one of your past runs on this route (best first, 🏆)
 function renderPcMode(ghosts){
   $('pc-mode').querySelectorAll('button').forEach(b=>{
@@ -304,7 +264,6 @@ const el=()=>acc+(phase==='running'?now()-t0:0); // pause-aware elapsed ms
 const AUTOSAVE=10000,RESUME_GAP=15*60000;
 
 let coach=null,armSaid=null,runCond=null,runGhost=null,mode='race',trail=[],spokenSplits=0;
-let runR=null,runChecks=[],checkI=0,asking=null,effSaid=null,effAt=-1e9; // RPE plan for this run, check-in points, the open question
 const who=()=>runGhost?'ghost':'pacer',Who=()=>runGhost?'Ghost':'Pacer';
 // Show the parts of the run screen that only make sense when racing a route
 function raceUI(on){
@@ -315,25 +274,25 @@ function raceUI(on){
 }
 function enterRun(r=route,p=P,tr=turns,rc=cond(),pf=prof,ghost=null){
   mode='race';runCond=rc;runGhost=ghost?{runId:ghost.id,started:ghost.started}:null;raceUI(true);
-  runRoute=r;runP=p;runTurns=tr;runR=o.rpe?rpePlan(p,o.intensity):null;runChecks=runR&&o.rpeAsk?checkpoints(p):[];
+  runRoute=r;runP=p;runTurns=tr;
   coach=createCoach({P:p,prof:pf,level:o.voice==='key'?'key':'full',style:o.coachStyle,band:o.band,who:who()});armSaid=null;
   setMuteUI();
   resetRun();
-  view.setRoute(r.pts,p,tr);view.setRpe(runR?rpeMarks(runR):[],rpeCol);
+  view.setRoute(r.pts,p,tr);
   drawCourse(p);
   show('run');layout();setView(o.view);
   cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);
 }
 // Recording a new route: no pacer, your trail on the map, and the route is built when you save
 function enterRecord(){
-  mode='record';runCond=null;runRoute=null;runP=null;runTurns=[];runGhost=null;coach=null;runR=null;runChecks=[];raceUI(false);
-  setMuteUI();resetRun();view.clearRoute();view.setRpe([]);
+  mode='record';runCond=null;runRoute=null;runP=null;runTurns=[];runGhost=null;coach=null;raceUI(false);
+  setMuteUI();resetRun();view.clearRoute();
   show('run');layout();
   cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);
 }
 function resetRun(){
   phase='idle';acc=0;track.reset();smoother.reset();rd=0;rsplits=[];rpts=[];spts=[];curPace=null;vNow=0;shownD=0;offRoute=false;
-  rec=null;dirty=false;gate=null;sim.restart=true;sim.moving=false;trail=[];spokenSplits=0;checkI=0;closeAsk();effSaid=null;effAt=-1e9;
+  rec=null;dirty=false;gate=null;sim.restart=true;sim.moving=false;trail=[];spokenSplits=0;
   matcher=runRoute?createMatcher(runRoute.pts):null;
   $('off').hidden=true;$('arm').hidden=true;
   setPhaseUI();hud();
@@ -435,7 +394,7 @@ function start(at){
   if(!rec&&mode==='record')rec={started:Date.now(),status:'active',mode:'record',sim:SIM,route:null,speed:o.speed,fixes:[]};
   if(!rec)rec={started:Date.now(),status:'active',mode:'race',sim:SIM,route:{id:runRoute.id,name:runRoute.name,src:runRoute.src,pts:runRoute.pts,cues:runRoute.cues||[]},
     finish:runP.target??runP.finish,prof:{...prof},speed:o.speed,cond:runCond,fixes:[],
-    ghost:runGhost?{...runGhost,time:runP.time.map(x=>+x.toFixed(1))}:null,intensity:runR?o.intensity:null,rpe:[],adjust:[]};
+    ghost:runGhost?{...runGhost,time:runP.time.map(x=>+x.toFixed(1))}:null};
   phase='running';t0=at??now();track.last=null;rpts=[];spts=[];sim.moving=true;
   ensureWatch();wake();setPhaseUI();
 }
@@ -601,75 +560,6 @@ function courseMarks(you,pacer){
   for(const [id,d] of [['cyou',you],['cpacer',pacer]]){$(id).setAttribute('x1',x(d));$(id).setAttribute('x2',x(d))}
 }
 
-// ---- RPE on the run: the chip shows how hard it should feel here; check-ins ask how it does feel ----
-function rpeHud(){
-  if(!runR||phase==='idle'||phase==='armed')return;
-  const r=Math.round(rpeAt(runR,rd)*2)/2;
-  while(checkI<runChecks.length&&runChecks[checkI]<rd-300)checkI++; // passed while paused or resumed
-  if(phase==='running'&&!asking&&checkI<runChecks.length&&rd>=runChecks[checkI]){checkI++;askRpe(true)}
-  else if(phase==='running'&&!asking)effortCue();
-}
-// Spoken effort: where to settle at the start, then whenever the target is about to change by a whole
-// point and stay changed (a climb, recovery over the top, or a race building), at most every 2 minutes
-function effortCue(){
-  if(!voiceOn())return;
-  const t=el()/1000,I=runR.intensity;
-  if(effSaid==null){
-    if(rd<15)return;
-    const r=rpeRound(rpeAt(runR,Math.max(rd,300)));effSaid=r;effAt=t;
-    speaker.say(I.shape==='flat'?`Effort: about ${r} out of 10, ${rpeName(r).toLowerCase()}, and keep it there the whole way.`
-      :`Effort: settle in around ${r} out of 10, ${rpeName(r).toLowerCase()}.${I.id==='allout'?' It will build as you go.':''}`,2);
-    return;
-  }
-  if(t-effAt<120)return;
-  // Only a change that lasts: a point or more away 50 m ahead, and still at least half a point the same
-  // way 200 m ahead
-  const ahead=rpeRound(rpeAt(runR,rd+50)),later=rpeRound(rpeAt(runR,rd+200));
-  if(Math.abs(ahead-effSaid)<1||Math.abs(later-effSaid)<0.5||(ahead>effSaid)!==(later>effSaid))return;
-  const up=ahead>effSaid,g=runP.grade,climb=[0,50,100,150].some(x=>g[Math.min(g.length-1,Math.round((rd+x)/10))]>2);
-  effSaid=ahead;effAt=t;
-  speaker.say(up?`Effort up to ${ahead}${climb?' for this climb':''}, ${rpeName(ahead).toLowerCase()}.`
-    :`Effort easing to ${ahead}. ${climb?'':'Let your breathing settle.'}`.trim(),2);
-}
-// Tap your pace tile at any time to say how hard it feels
-$('youtile').onclick=()=>{speaker.unlock();if(runR&&mode==='race'&&phase==='running'&&!asking)askRpe(false)};
-function closeAsk(){asking?.stop?.();clearTimeout(asking?.timer);asking=null;$('rpeask').hidden=$('rpeadv').hidden=true}
-// Can the phone listen for a spoken answer? (Then check-ins are voice only; the tap card is the fallback.)
-const canListen=()=>o.rpeMic&&voiceOn()&&!SIM&&!!(window.SpeechRecognition||window.webkitSpeechRecognition);
-function askRpe(spoken){
-  closeAsk();const card=!spoken||!canListen();
-  const tg=rpeAt(runR,rd);
-  $('rpehint').textContent=`It should feel about ${Math.round(tg)} here: ${rpeName(tg).toLowerCase()}. Tap a number${o.rpeMic?' or say it':''}.`;
-  $('rpad').innerHTML=RPE_SCALE.map(x=>`<button data-n="${x.n}" class="${x.n===Math.round(tg)?'tg':''}" style="background:${rpeCol(x.n)}"><b>${x.n}</b><small>${x.name.replace(', Zone 2','')}</small></button>`).join('');
-  $('rpad').querySelectorAll('button').forEach(b=>b.onclick=()=>answerRpe(+b.dataset.n));
-  $('rpemicst').textContent='';$('rpeask').hidden=!card;
-  const a=asking={kind:'rpe',voice:!card,timer:setTimeout(()=>{if(asking===a)closeAsk()},30000)};
-  const fallback=msg=>{if(asking!==a)return;$('rpemicst').textContent=msg;$('rpeask').hidden=false;a.voice=false};
-  const ask=()=>{if(asking!==a||!o.rpeMic||SIM)return;$('rpemicst').textContent='🎤 Listening…';
-    a.stop=listen((t,alts)=>{const n=alts.map(parseRpe).find(x=>x!=null);if(asking!==a)return;if(n!=null)answerRpe(n);else fallback(`Heard "${t}". Tap a number.`)},why=>fallback(why==='not-allowed'||why==='service-not-allowed'?'Microphone not allowed. Tap a number.':'Tap a number.'))};
-  if(voiceOn())speaker.say(spoken?'Quick check. How hard does it feel, one to ten?':'How hard does it feel, one to ten?',3,'split',ask);else ask();
-}
-function answerRpe(n){
-  if(!asking)return;const byVoice=asking.voice&&canListen();closeAsk();
-  const adv=advise({R:runR,P:runP,said:n,at:rd,t:el()/1000});
-  rec?.rpe?.push({rd:Math.round(rd),t:Math.round(el()/1000),said:n,target:+rpeAt(runR,rd).toFixed(1),status:adv.status});dirty=true;
-  if(!adv.k){if(voiceOn())speaker.say(`${n}. ${adv.text}`,3);return}
-  const left=runP.total-rd,newPace=(timeAt(runP,runP.total)-timeAt(runP,rd))*adv.k/(left/1000);
-  $('advtitle').textContent=adv.k>1?`Ease off to ${fmt(newPace)}/km?`:`Pick it up to ${fmt(newPace)}/km?`;
-  $('advtext').textContent=`You said ${n}. ${adv.text.replace(/ (Ease off|Pick it up) by .*$/,'')} The ${who()} changes to ${adv.change>0?'+':'−'}${Math.abs(adv.change)} s/km for the rest of the run.`;
-  $('advyes').textContent=adv.k>1?'Ease off':'Speed up';$('rpeadv').hidden=byVoice;
-  const a=asking={kind:'adv',timer:setTimeout(()=>{if(asking===a){closeAsk();if(voiceOn())speaker.say('Keeping the plan.',2)}},25000)};
-  $('advyes').onclick=()=>{if(asking===a){closeAsk();applyAdjust(adv.k)}};
-  $('advno').onclick=()=>{if(asking===a){closeAsk();if(voiceOn())speaker.say('Keeping the plan.',2)}};
-  const ask=()=>{if(asking!==a||!o.rpeMic||SIM)return;a.stop=listen((t,alts)=>{if(asking!==a)return;const y=alts.map(parseYesNo).find(x=>x!=null);if(y===true)$('advyes').onclick();else if(y===false)$('advno').onclick();else $('rpeadv').hidden=false},()=>{if(asking===a)$('rpeadv').hidden=false})};
-  if(voiceOn())speaker.say(`${n}. ${adv.text} Say yes or no.`,3,null,ask);else ask();
-}
-function applyAdjust(k){
-  runP=adjustPacer(runP,rd,k);rec.adjust.push({rd:Math.round(rd),k});dirty=true;
-  coach?.setP(runP);view.setRoute(runRoute.pts,runP,runTurns);view.setRpe(rpeMarks(runR),rpeCol);drawCourse(runP);
-  if(voiceOn())speaker.say(`Done. The ${who()} is now on ${fmt(paceAt(runP,rd+50))} here, finishing in ${fmt(runP.finish)}.`,3,k<1?'up':'down');
-}
-
 // Recording: your time, distance, live and average pace, and splits; the voice reads each km
 function hudRecord(){
   const t=el()/1000,avg=rd>50?t/(rd/1000):null;
@@ -737,8 +627,7 @@ function hud(){
   let dist=inDist(Math.max(0,left));
   if(nt?.kind==='uturn'&&dist==='now'&&!uturnHere(nt))dist='in 20 m'; // "now" only when you're physically at the turnaround
   $('tdist').textContent=dist;$('turn').className=left<=60?'soon':'';
-  rpeHud();
-  if(phase==='running'&&voiceOn()&&coach&&rd>0&&!asking)speaker.play(coach.update({rd,t,gap:gapNow??0,cur:curPace,splits:rsplits.map(x=>x/1000),
+  if(phase==='running'&&voiceOn()&&coach&&rd>0)speaker.play(coach.update({rd,t,gap:gapNow??0,cur:curPace,splits:rsplits.map(x=>x/1000),
     proj:projectFinish(runP,rd,t,timeOneKmBack())}));
 }
 setInterval(hud,250);
@@ -756,6 +645,7 @@ function turnIcon(t){
 // =====================================================================================
 let shownRun=null;
 // The pacer a saved run raced: a profile pacer (with its conditions) or the ghost of a past run
+// (r.adjust: plan changes made during a run, from an earlier version)
 const pacerFor=r=>(r.adjust||[]).reduce((p,a)=>adjustPacer(p,a.rd,a.k),r.ghost?ghostFromTimes(r.route.pts,[...r.ghost.time]):buildPacer(r.route.pts,r.finish,r.prof,{cond:r.cond}));
 function compare(r){
   if(r.mode==='record')return {Pr:null,you:r.elapsed/1000,pacer:null,d:r.rd||r.dist||0,diff:0,record:true};
@@ -786,14 +676,9 @@ function showResult(r){
     rows+=`<tr><td>${k+1}${a1-a0<999?` <small>(${kmStr(a1-a0)})</small>`:''}</td><td>${fmt(you)}</td><td>${fmt(pc)}</td><td class="${dd<-0.5?'faster':dd>0.5?'slower':''}">${dd<-0.5?'−':dd>0.5?'+':''}${gapFmt(Math.abs(dd))}</td></tr>`;
   }
   $('rkm').innerHTML=rows;
-  const rp=r.rpe||[];$('rrpecard').hidden=!rp.length;
-  if(rp.length){const I=INTENSITIES.find(x=>x.id===r.intensity);
-    $('rrpe').innerHTML=`<tr><th>At</th><th>Felt</th><th>Plan</th><th></th></tr>`+rp.map(x=>{const ad=(r.adjust||[]).find(a=>Math.abs(a.rd-x.rd)<300);
-      return `<tr><td>${kmStr(x.rd)} km</td><td>${x.said}</td><td>${Math.round(x.target)}</td><td>${ad?(ad.k<1?'sped up':'eased off'):x.said>x.target+0.9?'above':x.said<x.target-1.4?'below':'on plan'}</td></tr>`}).join('')+(I?`<tr><td colspan="4"><small>${I.name}</small></td></tr>`:'')}
   show('result');
 }
 function showRecordResult(r){
-  $('rrpecard').hidden=true;
   const D=r.rd||0,t=r.elapsed/1000;
   $('rbadge').textContent='🗺️';$('rtitle').textContent='Route saved';
   $('rsub').textContent=`${r.route.name} · ${kmStr(D)} km · ${fmt(t)} · ${fmt(t/(D/1000))}/km${r.sim?' · simulated':''}. Race it any time, against a pacer or this run.`;
@@ -844,7 +729,6 @@ $('rsgo').onclick=()=>{
     enterRecord();
     trail=r.fixes.map(f=>({lat:f[2],lon:f[3],p:f[7]}));
   }else{
-    if(r.intensity){o.intensity=r.intensity;o.rpe=true}
     enterRun(r.route,pacerFor(r),turnsFor(r.route),r.cond||null,r.prof,r.ghost?{id:r.ghost.runId,started:r.ghost.started}:null);
   }
   rec=r;rd=r.rd||0;rsplits=[...(r.rsplits||[])];track.dist=r.dist||0;matcher?.seed(rd,track.dist);shownD=rd;spokenSplits=rsplits.length;

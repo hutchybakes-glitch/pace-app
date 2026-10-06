@@ -230,7 +230,7 @@ export function createCoach({P,prof,level='full',style='moderate',band=5,who='pa
     }
     return lead+hold+tip;
   }
-  return {update,setLevel:l=>{level=l},setStyle:x=>{style=x},setP:x=>{P=x},sections:S};
+  return {update,setLevel:l=>{level=l},setStyle:x=>{style=x},sections:S};
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -299,18 +299,3 @@ export function createSpeaker(){
   return {unlock,play,say,setMuted,setOpts:o=>{opts={...opts,...o}},get muted(){return muted}};
 }
 
-// Listening for a spoken answer (Safari's speech recognition, where the phone allows it). Calls
-// onText(best guess, all guesses) or onFail(reason). Returns a stop function.
-export function listen(onText,onFail,ms=7000){
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){onFail?.('unsupported');return ()=>{}}
-  let r,over=false;const end=why=>{if(over)return;over=true;clearTimeout(tm);try{r.abort()}catch(e){}if(why)onFail?.(why)};
-  try{
-    r=new SR();r.lang='en-GB';r.interimResults=false;r.maxAlternatives=5;r.continuous=false;
-    r.onresult=e=>{const alts=[...e.results[0]].map(a=>a.transcript);over=true;clearTimeout(tm);onText(alts[0],alts)};
-    r.onerror=e=>end(e.error||'error');r.onend=()=>end('nothing heard');
-    r.start();
-  }catch(e){onFail?.('unavailable');return ()=>{}}
-  const tm=setTimeout(()=>end('nothing heard'),ms);
-  return ()=>end(null);
-}

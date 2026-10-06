@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {buildPacer,timeAt,distAt,paceAt,avgBetween,effort,extremes,gradeColor,paceMarks,projectFinish,PROFILES,CLIMB,DESCENT} from '../../v2/js/pacer.js';
+import {buildPacer,timeAt,distAt,paceAt,avgBetween,effort,extremes,gradeColor,paceMarks,projectFinish,adjustPacer,PROFILES,CLIMB,DESCENT} from '../../v2/js/pacer.js';
 import {parseGPX,resample} from '../../v2/js/route.js';
 
 const M=1/111195;
@@ -78,3 +78,11 @@ test('projectFinish: on plan → target; 2 % slow → 2 % slower; follows a rece
   const t=timeAt(P,3000),back=t-(timeAt(P,3000)-timeAt(P,2000))*1.1;
   assert.ok(projectFinish(P,3000,t,back)>1500);
 });
+
+// A plan changed part-way through a run (runs saved by an earlier version)
+test('pacer: adjusting the plan keeps the time where you are',()=>{
+  const M=1/111195,pts=[];for(let d=0;d<=10000;d+=10)pts.push({d,lat:51+d*M,lon:0,ele:0});const P=buildPacer(pts,50*60,PROFILES[0]),A=adjustPacer(P,5000,1.02);
+  assert.ok(Math.abs(timeAt(A,5000)-timeAt(P,5000))<0.01);
+  assert.ok(Math.abs(A.finish-(1500+1500*1.02))<1);
+});
+

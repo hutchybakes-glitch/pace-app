@@ -28,11 +28,25 @@ const show=id=>{for(const s of ['home','run','result'])$(s).hidden=s!==id;if(id!
 // Home
 // =====================================================================================
 // base: the saved route you picked; route: the course to run on it (all of it, or the first part)
-let routes=[],base=null,route=null,P=null,turns=[],allRuns=[],ghostRun=null;
+let routes=[],base=null,route=null,P=null,turns=[],allRuns=[],ghostRun=null,rival=null,vsMode='profile'; // rival: a past run raced alongside the pacer
 const when=ms=>new Date(ms).toLocaleString(undefined,{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 const shortDate=ms=>new Date(ms).toLocaleDateString(undefined,{day:'numeric',month:'short'});
 // Your finished runs on a route that went (nearly) the whole way: these can be raced as a ghost, best first
 const cutShort=x=>(x.course?.skips||[]).reduce((s,k)=>s+k.to-k.from,0)>30; // missed part of the course (not a fair best or ghost, even if the distance was made up)
+// Your time (s) at route distance d in a run, from its fixes (null if it never got there)
+function timeAtD(run,d){
+  const f=run.fixes||[];let i=f.findIndex(x=>x[6]>=d);if(i<0)return null;if(i===0)return f[0][1]/1000;
+  const a=f[i-1],b=f[i];return (a[1]+(b[1]-a[1])*(d-a[6])/((b[6]-a[6])||1))/1000;
+}
+// Past runs you can race on this course, quickest first: [{run, time (s), part (true: the start of a longer run)}]
+function pastRuns(r){
+  const own=runsOn(r).map(x=>({run:x,time:x.elapsed/1000,part:false}));
+  if(!r.part)return own;
+  const L=r.part.len,more=allRuns.filter(x=>x.status==='done'&&x.mode!=='intervals'&&x.route?.id===r.part.of&&!cutShort(x)&&!x.freestyle&&(x.rd||0)>=L)
+    .map(x=>({run:x,time:timeAtD(x,L),part:true})).filter(x=>x.time);
+  return [...own,...more].sort((a,b)=>a.time-b.time);
+}
+const rivalLabel=run=>shortDate(run.started).toUpperCase();
 const runsOn=r=>allRuns.filter(x=>x.status==='done'&&x.mode!=='intervals'&&x.route?.id===r.id&&x.fixes?.length>10&&!cutShort(x)&&!x.freestyle&&(x.complete||(x.rd||0)>=r.pts.at(-1).d*0.97)).sort((a,b)=>a.elapsed-b.elapsed);
 let prof=opt.get('profile',{id:'even',climb:'average',descent:'average',strategy:'even'});
 // speed: live pace from GPS (Doppler) speed, falling back to position; live: how quickly live pace reacts
@@ -148,11 +162,16 @@ function renderWx(){
 // Rebuild the pacer after any change of route, target or profile
 function rebuild(){
   renderHow();
-  const fin=finishFor(route),ghosts=runsOn(route);
-  ghostRun=opt.get('pcmode:'+route.id,'profile')==='ghost'&&ghosts.length?(ghosts.find(x=>x.id===opt.get('ghost:'+route.id,null))||ghosts[0]):null;
-  P=ghostRun?ghostFromRun(route.pts,ghostRun.fixes,ghostRun.elapsed/1000):buildPacer(route.pts,fin,prof,{cond:cond()});
-  renderPcMode(ghosts);
-  $('tgtcard').hidden=$('wxcard').hidden=$('profiles').hidden=$('tune').hidden=!!ghostRun;
+  const fin=finishFor(route),ghosts=pastRuns(route);
+  // Race the pacer, one of your past runs (a ghost that runs exactly as you did), or both at once
+  vsMode=ghosts.length?opt.get('pcmode:'+route.id,'profile'):'profile';
+  const pick=vsMode!=='profile'?ghosts.find(x=>x.run.id===opt.get('ghost:'+route.id,null))||ghosts[0]:null;
+  const G=pick&&ghostFromRun(route.pts,pick.run.fixes,pick.time);
+  ghostRun=vsMode==='ghost'?pick.run:null;
+  rival=vsMode==='both'?{P:G,run:pick.run,time:pick.time,label:rivalLabel(pick.run)}:null;
+  P=vsMode==='ghost'?G:buildPacer(route.pts,fin,prof,{cond:cond()});
+  renderPcMode(ghosts,pick);
+  $('tgtcard').hidden=$('wxcard').hidden=$('profiles').hidden=$('tune').hidden=vsMode==='ghost';
   renderWx();
   const D=P.total,up=P.es.reduce((a,e,i)=>a+(i&&e>P.es[i-1]?e-P.es[i-1]:0),0);
   $('rname').textContent=route.name;
@@ -161,8 +180,10 @@ function rebuild(){
   renderProfiles();drawPlanMap();drawPlanChart();renderCadPlan();
   const e=extremes(P),g=x=>`${x>0?'+':''}${x.toFixed(1)} %`;
   const pr=PROFILES.find(p=>p.id===prof.id);
-  if(ghostRun){$('pinsight').innerHTML=`Racing your run from <b>${when(ghostRun.started)}</b>: <b>${fmt(P.finish)}</b> (${fmt(P.finish/(D/1000))}/km)${ghostRun===ghosts[0]?', your best here 🏆':''}. It was slowest at <b>${fmt(e.slow.pace)}</b>/km around ${kmStr(e.slow.d)} km and quickest at <b>${fmt(e.fast.pace)}</b>/km around ${kmStr(e.fast.d)} km.`;return}
-  $('pinsight').innerHTML=`${pr?esc(pr.desc)+'<br>':''}${P.wx?`Paced for the ${o.wxMode==='adjust'?'conditions':'conditions, same finish'}. `:''}Slowest <b>${fmt(e.slow.pace)}</b>/km on the ${g(e.slow.grade)} at ${kmStr(e.slow.d)} km · quickest <b>${fmt(e.fast.pace)}</b>/km on the ${g(e.fast.grade)} at ${kmStr(e.fast.d)} km. Finishes in <b>${fmt(P.finish)}</b>.`;
+  if(ghostRun){$('pinsight').innerHTML=`Racing your run from <b>${when(ghostRun.started)}</b>: <b>${fmt(P.finish)}</b> (${fmt(P.finish/(D/1000))}/km)${ghostRun===ghosts[0].run?', your best here 🏆':''}. It was slowest at <b>${fmt(e.slow.pace)}</b>/km around ${kmStr(e.slow.d)} km and quickest at <b>${fmt(e.fast.pace)}</b>/km around ${kmStr(e.fast.d)} km.`;return}
+  if(rival)$('pinsight').innerHTML=`Racing the pacer <b>(${fmt(P.finish)})</b> and your run from <b>${when(rival.run.started)}</b> <b>(${fmt(rival.time)})</b>${rival.run===ghosts[0].run?', your best here 🏆':''}. The pacer sets your target pace; your past run is the purple runner, running exactly as you did that day. `;
+  else $('pinsight').innerHTML='';
+  $('pinsight').innerHTML+=`${pr?esc(pr.desc)+'<br>':''}${P.wx?`Paced for the ${o.wxMode==='adjust'?'conditions':'conditions, same finish'}. `:''}Slowest <b>${fmt(e.slow.pace)}</b>/km on the ${g(e.slow.grade)} at ${kmStr(e.slow.d)} km · quickest <b>${fmt(e.fast.pace)}</b>/km on the ${g(e.fast.grade)} at ${kmStr(e.fast.d)} km. Finishes in <b>${fmt(P.finish)}</b>.`;
 }
 
 function drawPlanMap(){
@@ -191,6 +212,7 @@ function drawPlanChart(){
   for(let i=0;i<P.d.length-1;i++)s+=`<polygon points="${X(P.d[i])},220 ${X(P.d[i])},${Ye(P.es[i])} ${X(P.d[i+1])},${Ye(P.es[i+1])} ${X(P.d[i+1])},220" fill="${gradeColor(P.grade[i])}" stroke="${gradeColor(P.grade[i])}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
   const avg=P.finish/(D/1000);
   s+=`<line x1="0" x2="${W}" y1="${Yp(avg)}" y2="${Yp(avg)}" stroke="#fff" stroke-opacity=".35" stroke-dasharray="6 6" vector-effect="non-scaling-stroke"/>`;
+  if(rival)s+=`<polyline points="${rival.P.d.map((d,i)=>X(d)+','+Yp(Math.max(pmin,Math.min(pmax,rival.P.pace[i])))).join(' ')}" fill="none" stroke="#c084fc" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
   s+=`<polyline points="${P.d.map((d,i)=>X(d)+','+Yp(P.pace[i])).join(' ')}" fill="none" stroke="#fb923c" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
   $('pchart').innerHTML=s;
   const pct=y=>(y/220*100).toFixed(1)+'%';
@@ -253,6 +275,16 @@ const restWords=s=>s<60?`${s} seconds`:`${Math.floor(s/60)} minute${s>=120?'s':'
 const restTxt=s=>s<60?`${s} s`:s%60?`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`:`${s/60} min`;
 const restStep=(v,d)=>{const L=[15,30,45,60,75,90,120,150,180,240,300,360,480,600,720,900];let i=L.findIndex(x=>x>=v);if(i<0)i=L.length-1;return L[Math.max(0,Math.min(L.length-1,i+d))]};
 const intReps=c=>session(base.pts,{...c,len:c.kind==='split'?c.slen:c.len});
+// Finished sessions on this route with the same set-up (same stretch or split, reps and direction)
+const sameSession=(a,b)=>a.kind===b.kind&&(a.kind==='split'?a.slen===b.slen:a.from===b.from&&a.len===b.len&&a.dir===b.dir);
+const pastSessions=c=>allRuns.filter(x=>x.mode==='intervals'&&x.status==='done'&&x.route?.id===base.id&&x.session&&sameSession(x.session,c)&&(x.reps||[]).length).sort((a,b)=>b.started-a.started);
+let intRival=null;
+// Rep i of a past session as a ghost on this rep's course
+function repRival(i,pts){
+  const run=sess?.rival,rep=run?.reps?.[i];if(!rep||!rep.done)return null;
+  const fx=run.fixes.filter(f=>f[11]===i);if(fx.length<5)return null;
+  return {P:ghostFromRun(pts,fx,rep.time),run,label:'LAST TIME',time:rep.time};
+}
 function renderInt(){
   const c=intCfg(),D=base.pts.at(-1).d;
   $('i-kind').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===c.kind);b.onclick=()=>setInt({kind:b.dataset.v})});
@@ -266,6 +298,15 @@ function renderInt(){
   $('i-dir').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===c.dir);b.onclick=()=>setInt({dir:b.dataset.v})});
   $('i-dirnote').textContent=c.dir==='same'?'Get back to the start during the rest; each rep starts as you cross the line':'Every other rep runs the stretch back the other way, from where the last one finished';
   $('i-step').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',+b.dataset.v===c.step);b.onclick=()=>setInt({step:+b.dataset.v})});
+  // A past session with the same set-up to race, rep by rep (alongside each rep's pacer)
+  const same=pastSessions(c),rvOn=same.length&&opt.get('introv:'+base.id,null)!==false,rv=rvOn?same.find(x=>x.id===opt.get('introv:'+base.id,null))||same[0]:null;
+  $('i-rvrow').hidden=!same.length;
+  if(same.length){
+    $('i-rv').classList.toggle('on',!!rv);$('i-rv').setAttribute('aria-checked',!!rv);
+    $('i-rvnote').textContent=rv?`Your session from ${when(rv.started)}: every rep against how you ran it then`:`You've done this session ${same.length} time${same.length>1?'s':''}`;
+    $('i-rv').onclick=()=>{opt.set('introv:'+base.id,rv?false:same[0].id);renderInt()};
+  }
+  intRival=rv;
   const R=intReps(c);
   $('i-splitnote').textContent=`${R.length} reps along the ${kmStr(D)} km route`;
   for(const r of R)r.time=repTime(r);
@@ -301,17 +342,18 @@ function renderProfiles(){
   }
 }
 function setProf(p){prof=p;opt.set('profile',p);rebuild()}
+const setProfQuiet=p=>{prof={...p};opt.set('profile',prof)};
 
 // Choose between a pacer profile and one of your past runs on this route (best first, 🏆)
-function renderPcMode(ghosts){
+function renderPcMode(ghosts,pick){
   $('pc-mode').querySelectorAll('button').forEach(b=>{
-    b.classList.toggle('on',b.dataset.v===(ghostRun?'ghost':'profile'));b.disabled=b.dataset.v==='ghost'&&!ghosts.length;
+    b.classList.toggle('on',b.dataset.v===vsMode);b.disabled=b.dataset.v!=='profile'&&!ghosts.length;
     b.onclick=()=>{opt.set('pcmode:'+route.id,b.dataset.v);rebuild()};
   });
-  $('pcnote').textContent=ghosts.length?'':'Run this route once and you can race yourself on it.';
-  $('ghosts').hidden=!ghostRun;
+  $('pcnote').textContent=ghosts.length?'':'Run this course once and you can race yourself on it, on its own or alongside the pacer.';
+  $('ghosts').hidden=vsMode==='profile';
   const D=route.pts.at(-1).d/1000;
-  $('ghosts').innerHTML=ghosts.map((r,i)=>`<button class="stylec ${r===ghostRun?'on':''}" data-id="${r.id}"><b>${i===0?'🏆 ':''}${when(r.started)}<em>${fmt(r.elapsed/1000)} · ${fmt(r.elapsed/1000/D)}/km</em></b><small>${r.mode==='record'?'When you recorded this route':r.ghost?'Racing a past run':'Racing a pacer'}${i===0?' · your best here':''}${r.sim?' · simulated':''}</small></button>`).join('');
+  $('ghosts').innerHTML=ghosts.map((g,i)=>`<button class="stylec ${g===pick?'on':''}" data-id="${g.run.id}"><b>${i===0?'🏆 ':''}${when(g.run.started)}<em>${fmt(g.time)} · ${fmt(g.time/D)}/km</em></b><small>${g.part?`The first ${kmStr(D*1000)} km of your ${kmStr(g.run.rd)} km run`:g.run.mode==='record'?'When you recorded this route':g.run.ghost?'Racing a past run':'Racing a pacer'}${i===0?' · your best here':''}${g.run.sim?' · simulated':''}</small></button>`).join('');
   $('ghosts').querySelectorAll('.stylec').forEach(b=>b.onclick=()=>{opt.set('ghost:'+route.id,+b.dataset.id);rebuild()});
 }
 
@@ -338,7 +380,7 @@ function renderOptions(){
 }
 renderOptions();
 
-$('race').onclick=()=>{if(howOf()==='int')return enterSession();if(route&&P)enterRun(route,P,turns,ghostRun?null:cond(),prof,ghostRun)};
+$('race').onclick=()=>{if(howOf()==='int')return enterSession();if(route&&P)enterRun(route,P,turns,ghostRun?null:cond(),prof,ghostRun,rival)};
 $('recbtn').onclick=()=>enterRecord();
 
 // =====================================================================================
@@ -370,7 +412,9 @@ let runCad=null,runSigns=[],signI=0,tipAt=-1e9,lowCount=0,driftAt=-1e9;
 // freestyle (no route: from where you chose it)
 let course=null,yd=0,offWarned=false,lineAt=null,fullAt=null,freeYd0=0,freeG0=0,offNote=0,line=null;
 // An interval session in progress: {cfg, base, reps, i (current rep), results, restEnd, said}
-let sess=null; // line: {yd, g} at the finish line
+let sess=null;
+// A past run raced alongside the pacer: {P, run, label}; its course as you're running it; who leads it
+let runRival=null,rivalCourse=null,rvLead=null,rvLeadAt=-1e9,rvCand=null,rvCandAt=0,rvSplits=0; // line: {yd, g} at the finish line
 const who=()=>runGhost?'ghost':'pacer',Who=()=>runGhost?'Ghost':'Pacer';
 // Show the parts of the run screen that only make sense when racing a route
 function raceUI(on){
@@ -391,15 +435,16 @@ function repCourse(r){
 // Put rep i on the run screen (keeping the session's record)
 function loadRep(i){
   const keep=rec,c=repCourse(sess.reps[i]);sess.i=i;
-  enterRun(c.route,c.P,turnsFor(c.route),null,{...prof,strategy:'even'});
+  enterRun(c.route,c.P,turnsFor(c.route),null,{...prof,strategy:'even'},null,repRival(i,c.route.pts));
   rec=keep;
 }
 function enterSession(){
   const c=intCfg();
-  sess={cfg:c,base,reps:intReps(c),i:0,results:[],restEnd:0,said:new Set()};
+  sess={cfg:c,base,reps:intReps(c),i:0,results:[],restEnd:0,said:new Set(),rival:intRival};
   rec=null;loadRep(0);
 }
-function enterRun(r=route,p=P,tr=turns,rc=cond(),pf=prof,ghost=null){
+function enterRun(r=route,p=P,tr=turns,rc=cond(),pf=prof,ghost=null,rv=null){
+  runRival=rv;
   mode='race';runCond=rc;runGhost=ghost?{runId:ghost.id,started:ghost.started}:null;raceUI(true);
   runRoute=r;runP=p;runTurns=tr;
   coach=createCoach({P:p,prof:pf,level:o.voice==='key'?'key':'full',style:o.coachStyle,band:o.band,who:who()});armSaid=null;
@@ -414,7 +459,7 @@ function enterRun(r=route,p=P,tr=turns,rc=cond(),pf=prof,ghost=null){
 }
 // Recording a new route: no pacer, your trail on the map, and the route is built when you save
 function enterRecord(){
-  mode='record';runCond=null;runRoute=null;runP=null;runTurns=[];runGhost=null;coach=null;raceUI(false);
+  mode='record';runRival=null;runCond=null;runRoute=null;runP=null;runTurns=[];runGhost=null;coach=null;raceUI(false);
   runCad=null;runSigns=[];view.setSigns([]);
   setMuteUI();resetRun();view.clearRoute();
   show('run');layout();
@@ -424,7 +469,7 @@ function resetRun(){
   phase='idle';acc=0;track.reset();smoother.reset();rd=0;rsplits=[];rpts=[];spts=[];curPace=null;vNow=0;shownD=0;offRoute=false;
   rec=null;dirty=false;gate=null;sim.restart=true;sim.moving=false;trail=[];spokenSplits=0;
   steps=[];stepN=0;stepSplits=[];dhist=[];cadNow=strNow=null;motionT=-1e9;motionFrom=0;signI=0;tipAt=-1e9;lowCount=0;driftAt=-1e9;
-  course=runP?createCourse(runP):null;yd=0;offWarned=false;lineAt=fullAt=null;line=null;$('offcard').hidden=true;
+  course=runP?createCourse(runP):null;rivalCourse=runRival?createCourse(runRival.P):null;rvLead=null;rvLeadAt=-1e9;rvCand=null;rvSplits=0;yd=0;offWarned=false;lineAt=fullAt=null;line=null;$('offcard').hidden=true;
   matcher=runRoute?createMatcher(runRoute.pts):null;
   $('off').hidden=true;$('arm').hidden=true;
   setPhaseUI();hud();
@@ -472,7 +517,7 @@ function onPos(p){
     else if(matcher){
       const m=matcher.update(c.latitude,c.longitude,track.dist);
       // A cut or extra of 60 m or more (less is GPS cutting a corner or a turnaround tip); nothing after the finish line
-      if(m.event&&m.event.len>=MIN_EVENT&&lineAt==null){course.add(m.event);rec.course=course.toJSON();courseEvent(m.event)}
+      if(m.event&&m.event.len>=MIN_EVENT&&lineAt==null){course.add(m.event);rivalCourse?.add(m.event);rec.course=course.toJSON();courseEvent(m.event)}
       rd=m.d;offRoute=m.off;
       yd=line?line.yd+(track.dist-line.g):m.matched?course.ran(rd,m.offDist):track.dist; // past the finish line: GPS distance from there
       offUI(m);
@@ -489,14 +534,33 @@ function onPos(p){
   if(mode==='race'&&runP)finishLine(t);
 }
 
+// ---- The past run alongside the pacer: its gap in the pacer tile; calls when the lead changes and at
+// each km ----
+function rivalHud(t){
+  $('rstate').hidden=!runRival||mode!=='race';if(!runRival||mode!=='race')return;
+  const D=runP.total,g=fullAt!=null?runRival.P.finish-fullAt/1000:lineAt!=null?rivalCourse.pacerT(D)-lineAt/1000:rivalCourse.pacerT(rd)-t;
+  $('rstate').textContent=`${runRival.label}: ${Math.abs(g)<0.5?'level':`${gapText(g)} s`}`;
+  if(phase!=='running'||lineAt!=null)return;
+  // lead changes (held 3 s, at most one a minute)
+  const lead=g>0.5?'you':g<-0.5?'them':rvLead,n=Date.now();
+  if(lead!==rvCand){rvCand=lead;rvCandAt=n}
+  if(lead&&lead!==rvLead&&n-rvCandAt>3000&&t-rvLeadAt>60){
+    const first=rvLead==null;rvLead=lead;rvLeadAt=t;
+    if(!first&&voiceOn())speaker.say(lead==='you'?`You've passed your ${shortDate(runRival.run.started)} run.`:`Your ${shortDate(runRival.run.started)} run has gone ahead.`,2,lead==='you'?'pass':'passed');
+  }
+  // after each km: where you are against it
+  if(rsplits.length>rvSplits){rvSplits=rsplits.length;if(voiceOn()&&Math.abs(g)>=1){const w=`your ${shortDate(runRival.run.started)} run`,by=gapPhrase(g).replace(/ (ahead|behind)$/,'');speaker.say(g>0?`You're ${by} up on ${w}.`:`${w[0].toUpperCase()+w.slice(1)} is ${by} ahead.`,1)}}
+}
+
 // ---- Interval sessions: end of a rep, the rest, the next rep ----
 async function endRep(complete){
   const t=el()/1000,r=sess.reps[sess.i],D=runP.total,done=complete||rd>=D-8;
   const res={i:sess.i,from:r.from,to:r.to,reverse:r.reverse,len:r.len,pace:r.pace,grade:r.grade,time:+t.toFixed(1),dist:Math.round(yd),done,
-    pacer:+course.pacerT(Math.min(rd,D)).toFixed(1),cad:cadNow&&Math.round(cadNow)};
+    pacer:+course.pacerT(Math.min(rd,D)).toFixed(1),cad:cadNow&&Math.round(cadNow),last:runRival?.time??null};
   sess.results.push(res);rec.reps=sess.results;
   const last=sess.i>=sess.reps.length-1,g=res.pacer-t;
-  if(voiceOn()&&done)speaker.say(`Rep ${sess.i+1} done in ${fmt(t)}. ${Math.abs(g)<1?'Spot on.':g>0?`${gapPhrase(g).replace(' ahead','')} under target.`:`${gapPhrase(g).replace(' behind','')} over target.`}`,3,'pass');
+  const lt=res.last!=null?res.last-t:null;
+  if(voiceOn()&&done)speaker.say(`Rep ${sess.i+1} done in ${fmt(t)}. ${Math.abs(g)<1?'Spot on.':g>0?`${gapPhrase(g).replace(' ahead','')} under target.`:`${gapPhrase(g).replace(' behind','')} over target.`}${lt==null?'':Math.abs(lt)<1?' Same as last time.':lt>0?` ${gapPhrase(lt).replace(' ahead','')} quicker than last time.`:` ${gapPhrase(lt).replace(' behind','')} slower than last time.`}`,3,'pass');
   if(!done||last)return finishSession();
   startRest();
 }
@@ -504,7 +568,7 @@ function startRest(){
   const nx=sess.i+1,prev=sess.results.at(-1);
   sess.restEnd=now()+sess.cfg.rest*1000;sess.said=new Set();
   loadRep(nx);phase='rest';sim.moving=false;wake();setPhaseUI();save();
-  $('rlast').textContent=`Rep ${prev.i+1}: ${fmt(prev.time)} (target ${fmt(prev.pacer)}) · ${fmt(prev.time/(prev.dist/1000||1))}/km`;
+  $('rlast').textContent=`Rep ${prev.i+1}: ${fmt(prev.time)} (target ${fmt(prev.pacer)}${prev.last!=null?`, last time ${fmt(prev.last)}`:''}) · ${fmt(prev.time/(prev.dist/1000||1))}/km`;
   renderNext();
   const r=sess.reps[nx];
   if(voiceOn())speaker.say(`Rest, ${restWords(sess.cfg.rest)}. Next, rep ${nx+1}: ${r.len<1000?`${r.len} metres`:`${kmStr(r.len)} kilometres`}, ${r.grade>1?'uphill':r.grade<-1?'downhill':'flat'}, target ${fmt(runP.finish)}.`,2);
@@ -639,12 +703,13 @@ document.addEventListener('visibilitychange',()=>{if((phase==='running'||phase==
 function start(at){
   if(sess&&voiceOn()){speaker.say(`Rep ${sess.i+1}${sess.i?'':` of ${sess.reps.length}`}. Go! Target ${fmt(runP.finish)}.`,3,'start')}
   else if(voiceOn())speaker.say(rec?'Resumed':mode==='record'?'Recording. Off you go.':`Go! Your ${who()}'s away.`,3,'start');
-  if(!rec&&sess)rec={started:Date.now(),status:'active',mode:'intervals',sim:SIM,route:{id:sess.base.id,name:sess.base.name,src:sess.base.src},
+  if(!rec&&sess)rec={rival:sess.rival?{runId:sess.rival.id,started:sess.rival.started}:null,started:Date.now(),status:'active',mode:'intervals',sim:SIM,route:{id:sess.base.id,name:sess.base.name,src:sess.base.src},
     session:{...sess.cfg,n:sess.reps.length},reps:[],prof:{...prof},speed:o.speed,fixes:[]};
   if(!rec&&mode==='record')rec={started:Date.now(),status:'active',mode:'record',sim:SIM,route:null,speed:o.speed,fixes:[]};
   if(!rec)rec={started:Date.now(),status:'active',mode:'race',sim:SIM,route:{id:runRoute.id,name:runRoute.name,src:runRoute.src,pts:runRoute.pts,cues:runRoute.cues||[]},
     finish:runP.target??runP.finish,prof:{...prof},speed:o.speed,cond:runCond,fixes:[],
-    ghost:runGhost?{...runGhost,time:runP.time.map(x=>+x.toFixed(1))}:null};
+    ghost:runGhost?{...runGhost,time:runP.time.map(x=>+x.toFixed(1))}:null,
+    rival:runRival?{runId:runRival.run.id,started:runRival.run.started,label:runRival.label,time:runRival.P.time.map(x=>+x.toFixed(1))}:null};
   phase='running';t0=at??now();track.last=null;rpts=[];spts=[];sim.moving=true;
   ensureWatch();wake();setPhaseUI();
 }
@@ -743,9 +808,9 @@ function loop(ts){
     shownD=Math.min(runP.total,Math.max(0,shownD));
   }else shownD+=(rd-shownD)*0.3;
   const started=phase==='running'||phase==='paused'||phase==='done';
-  const pd=started?course.pacerD(el()/1000):0;
-  courseMarks(started?shownD:0,pd);
-  view.draw({mode:o.view,label:runGhost?'GHOST':'PACER',you:started?shownD:0,pacer:pd,gap:started?gapNow:null,youCol:STATUS_COL[stat]||null,gps:(!started||offRoute)?lastLL:null});
+  const pd=started?course.pacerD(el()/1000):0,rvd=runRival?(started?rivalCourse.pacerD(el()/1000):0):null;
+  courseMarks(started?shownD:0,pd,rvd);
+  view.draw({mode:o.view,label:runGhost?'GHOST':'PACER',you:started?shownD:0,pacer:pd,gap:started?gapNow:null,youCol:STATUS_COL[stat]||null,gps:(!started||offRoute)?lastLL:null,rival:runRival&&mode==='race'?{d:rvd,label:runRival.label}:null});
 }
 
 // Are you physically within 25 m of this turn's point? (GPS, not just route distance)
@@ -806,13 +871,14 @@ function drawCourse(p){
   for(let i=0;i<p.d.length-1;i++){const c=gradeColor(p.grade[i]);s+=`<polygon points="${X(p.d[i])},40 ${X(p.d[i])},${Y(p.es[i])} ${X(p.d[i+1])},${Y(p.es[i+1])} ${X(p.d[i+1])},40" fill="${c}" stroke="${c}" stroke-width="1" vector-effect="non-scaling-stroke"/>`}
   s+=`<rect id="cdone" x="0" y="0" height="40" width="0" fill="#020617" fill-opacity=".6"/>`+
     `<line id="cpacer" y1="0" y2="40" stroke="#fb923c" stroke-width="3" vector-effect="non-scaling-stroke"/>`+
+    `<line id="crival" y1="0" y2="40" stroke="#c084fc" stroke-width="3" vector-effect="non-scaling-stroke"/>`+
     `<line id="cyou" y1="0" y2="40" stroke="#fff" stroke-width="3" vector-effect="non-scaling-stroke"/>`;
   $('course').innerHTML=s;
 }
-function courseMarks(you,pacer){
+function courseMarks(you,pacer,rv=null){
   const x=d=>(Math.max(0,Math.min(runP.total,d))/runP.total*1000).toFixed(1);
-  $('cdone').setAttribute('width',x(you));
-  for(const [id,d] of [['cyou',you],['cpacer',pacer]]){$(id).setAttribute('x1',x(d));$(id).setAttribute('x2',x(d))}
+  $('cdone').setAttribute('width',x(you));$('crival').style.display=rv==null?'none':'';
+  for(const [id,d] of [['cyou',you],['cpacer',pacer],['crival',rv??0]]){$(id).setAttribute('x1',x(d));$(id).setAttribute('x2',x(d))}
 }
 
 // Recording: your time, distance, live and average pace, and splits; the voice reads each km
@@ -919,6 +985,7 @@ function hud(){
     $('ypace').textContent=fmtP(curPace);$('ystate').textContent=`target ${fmtP(target)}`;
     const pdNow=course.pacerD(t);$('ppace').textContent=fmtP(paceAt(runP,pdNow));
     $('pstate').textContent=`${Math.round(Math.abs(pdNow-rd))} m ${pdNow>=rd?'ahead':'behind'}`;
+    rivalHud(t);
     setStatus(curPace?(curPace>target+o.band?'slow':curPace<target-o.band?'fast':'on'):null);
 
     // Projected finish: how you're doing against the pacer's hill-aware plan, applied to what's left
@@ -969,13 +1036,16 @@ function compare(r){
   else if(r.fullAt){kind='full';d=Pr.total;you=r.fullAt/1000;pacer=Pr.finish}
   else if(r.lineAt){kind='short';d=Pr.total;you=r.lineAt/1000;pacer=C.pacerT(d)}
   else{d=r.complete?Pr.total:r.rd;you=r.elapsed/1000;pacer=C.pacerT(d)}
-  return {Pr,C,you,pacer,d,diff:you-pacer,kind,ran:r.yd??C.ran(r.rd||0)};
+  // …and the past run raced alongside the pacer, over the same ground
+  let rv=null;
+  if(r.rival){const Rp=ghostFromTimes(r.route.pts,[...r.rival.time]),C2=createCourse(Rp,r.course||{});rv=kind==='full'?Rp.finish:C2.pacerT(d)}
+  return {Pr,C,you,pacer,d,diff:you-pacer,kind,ran:r.yd??C.ran(r.rd||0),rv};
 }
 // Was this your quickest complete run on its route?
 const raceTime=x=>x.fullAt?x.fullAt:x.lineAt??x.elapsed;
 const isBest=r=>r.complete&&r.route&&r.mode!=='intervals'&&!cutShort(r)&&!r.freestyle&&!allRuns.some(x=>x!==r&&x.id!==r.id&&x.status==='done'&&x.mode!=='intervals'&&x.complete&&!cutShort(x)&&!x.freestyle&&x.route?.id===r.route.id&&raceTime(x)<=raceTime(r));
 function showResult(r){
-  shownRun=r;if(r.mode==='intervals')return showIntervalResult(r);$('rrace').hidden=r.mode!=='record';$('rpcbox').hidden=r.mode==='record';
+  shownRun=r;$('ragain').hidden=false;$('rrvbox').hidden=true;if(r.mode==='intervals')return showIntervalResult(r);$('rrace').hidden=r.mode!=='record';$('rpcbox').hidden=r.mode==='record';
   if(r.mode==='record')return showRecordResult(r);
   const c=compare(r),pr=PROFILES.find(p=>p.id===r.prof?.id),w=r.ghost?`your ${shortDate(r.ghost.started)} run`:'the pacer',W=w[0].toUpperCase()+w.slice(1);
   $('rpclab').textContent=r.ghost?'Past run':'Pacer';
@@ -994,6 +1064,9 @@ function showResult(r){
   if(isBest(r))$('rsub').textContent=`New best on this route!${$('rsub').textContent?' · '+$('rsub').textContent:''}`;
   $('rsub').textContent+=`${$('rsub').textContent?' · ':''}${r.route.name} · ${r.ghost?'raced a past run':`${pr?pr.name:'Custom'} pacer`}${r.sim?' · simulated':''}`;
   $('ryou').textContent=fmt(c.you);$('rpacer').textContent=fmt(c.pacer);
+  $('rrvbox').hidden=c.rv==null;
+  if(c.rv!=null){const g=c.you-c.rv;$('rrival').textContent=fmt(c.rv);$('rrvlab').textContent=`Your ${shortDate(r.rival.started)} run`;
+    $('rsub').textContent=`${Math.abs(g)<0.5?`Level with your ${shortDate(r.rival.started)} run`:g<0?`${gapFmt(-g)} quicker than your ${shortDate(r.rival.started)} run`:`${gapFmt(g)} slower than your ${shortDate(r.rival.started)} run`} · `+$('rsub').textContent}
   // Km by km: your split vs the pacer's for the same km
   // Km by km of what you ran; the pacer's time for the same stretch of course, while there is one
   const last=c.ran||c.d,km=kmMotionOf(r,last),mv=km.some(k=>k.cad);
@@ -1016,11 +1089,14 @@ function showIntervalResult(r){
   $('rtitle').textContent=r.complete?`${R.length} × ${S.kind==='split'?kmStr(S.slen):kmStr(S.len)} km done`:`${R.length} of ${S.n} reps`;
   $('rsub').textContent=`${a<1?'On target':c.diff<0?`${gapFmt(a)} under target`:`${gapFmt(a)} over target`} over all the reps · ${restTxt(S.rest||0)} rest · ${r.route.name}${r.sim?' · simulated':''}`;
   $('ryou').textContent=fmt(c.you);$('rpacer').textContent=fmt(c.pacer);
-  $('rkm').innerHTML='<tr><th>Rep</th><th></th><th>Time</th><th>Target</th><th>±</th><th>Pace</th></tr>'+R.map(x=>{const dd=x.time-x.pacer;
-    return `<tr><td>${x.i+1}</td><td><small>${x.grade>0.4?'↑':x.grade<-0.4?'↓':'→'}${x.grade>0?'+':''}${x.grade}%</small></td><td>${fmt(x.time)}${x.done?'':' <small>(stopped)</small>'}</td><td>${fmt(x.pacer)}</td><td class="${dd<-0.5?'faster':dd>0.5?'slower':''}">${dd<-0.5?'−':dd>0.5?'+':''}${gapFmt(Math.abs(dd))}</td><td>${fmt(x.time/(x.dist/1000||1))}</td></tr>`}).join('');
+  const hasLast=R.some(x=>x.last!=null);
+  if(r.rival)$('rsub').textContent+=` · raced your ${shortDate(r.rival.started)} session`;
+  $('rkm').innerHTML=`<tr><th>Rep</th><th></th><th>Time</th><th>Target</th><th>±</th>${hasLast?'<th>Last</th>':''}<th>Pace</th></tr>`+R.map(x=>{const dd=x.time-x.pacer;
+    return `<tr><td>${x.i+1}</td><td><small>${x.grade>0.4?'↑':x.grade<-0.4?'↓':'→'}${x.grade>0?'+':''}${x.grade}%</small></td><td>${fmt(x.time)}${x.done?'':' <small>(stopped)</small>'}</td><td>${fmt(x.pacer)}</td><td class="${dd<-0.5?'faster':dd>0.5?'slower':''}">${dd<-0.5?'−':dd>0.5?'+':''}${gapFmt(Math.abs(dd))}</td>${hasLast?`<td>${x.last!=null?fmt(x.last):'–'}</td>`:''}<td>${fmt(x.time/(x.dist/1000||1))}</td></tr>`}).join('');
   show('result');
 }
 function showRecordResult(r){
+  $('ragain').hidden=true;
   const D=r.rd||0,t=r.elapsed/1000;
   $('rbadge').textContent='🗺️';$('rtitle').textContent='Route saved';
   $('rsub').textContent=`${r.route.name} · ${kmStr(D)} km · ${fmt(t)} · ${fmt(t/(D/1000))}/km${r.sim?' · simulated':''}. Race it any time, against a pacer or this run.`;
@@ -1083,6 +1159,20 @@ $('rcsv').onclick=()=>{
   const csv='time,elapsed_s,lat,lon,accuracy_m,gps_distance_m,route_distance_m,pace_s_per_km,cadence_spm,stride_m,distance_run_m\n'+
     r.fixes.map(f=>[iso(f[0]),(f[1]/1000).toFixed(1),f[2].toFixed(7),f[3].toFixed(7),Math.round(f[4]),Math.round(f[5]),Math.round(f[6]),f[7]!=null?Math.round(f[7]):'',f[8]??'',f[9]??'',f[10]??Math.round(f[6])].join(',')).join('\n')+'\n';
   deliver(name,'text/csv',csv);
+};
+// Run this again: the same course (all of it, the same part, or the same interval session), with this run
+// as the past run to race, alongside the pacer you had (its target and profile)
+$('ragain').onclick=()=>{
+  const r=shownRun,id=String(r.route?.id??''),m=id.match(/^(\d+)(?::p(\d+))?$/),b=m&&routes.find(x=>x.id===+m[1]);
+  if(!b)return alert('That route is no longer saved.');
+  if(r.mode==='intervals'){opt.set('how:'+b.id,'int');opt.set('int:'+b.id,{...r.session});opt.set('introv:'+b.id,r.id)}
+  else{
+    const course=m[2]?`${b.id}:p${m[2]}`:String(b.id);
+    opt.set('how:'+b.id,m[2]?'part':'full');if(m[2])opt.set('part:'+b.id,+m[2]);
+    if(r.mode!=='record'&&!r.ghost&&r.finish){opt.set('finish:'+course,Math.round(r.finish));if(r.prof)setProfQuiet(r.prof)}
+    opt.set('pcmode:'+course,r.mode==='record'||r.ghost?'ghost':'both');opt.set('ghost:'+course,r.id);
+  }
+  show('home');selectRoute(b);$('plan').scrollIntoView({behavior:'smooth'});
 };
 $('rrace').onclick=()=>{const r=routes.find(x=>x.id===shownRun.route.id);show('home');if(r){selectRoute(r);$('plan').scrollIntoView({behavior:'smooth'})}refreshHistory()};
 $('rdone').onclick=()=>{show('home');refreshHistory()};

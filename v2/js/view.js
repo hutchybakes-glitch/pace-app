@@ -10,7 +10,7 @@ import {gradeRGB,roadMarks} from './pacer.js';
 const ZE=1.7;                     // 3D: vertical exaggeration of the terrain
 const HALF=4.5;
 const GRID=15,SAME=12;              // passes of the route closer than SAME m are the same road                   // 3D: half road width, m
-const ORANGE='#fb923c',ME='#60a5fa',GOOD='#4ade80';
+const ORANGE='#fb923c',ME='#60a5fa',GOOD='#4ade80',PURPLE='#c084fc';
 const SKY_TOP=[2,6,23],HORIZON=[30,41,59],GROUND=[12,18,32];
 const FONT='-apple-system,system-ui,sans-serif';
 const rgb=a=>`rgb(${a[0]},${a[1]},${a[2]})`;
@@ -169,7 +169,8 @@ export function createView(canvas){
     for(const t of R.turns){if(t.d<s.you||t.d>s.you+450)continue;const p=at(t.d),q=T(p.x,p.y);turnMarker(q[0],q[1],t,hd,p)}
 
     // Lines across the road: the pacer's (orange) and yours (blue)
-    let pq=null;
+    let pq=null,rq=null;
+    if(s.rival){rq=across(s.rival.d,PURPLE,5,false,true)}
     if(s.pacer!=null){pq=across(s.pacer,ORANGE,5,false,true)}
     const yq=across(s.you,s.youCol||ME,6,false,true);
     // Off-route: where GPS actually puts you
@@ -181,6 +182,7 @@ export function createView(canvas){
     // Labels last so nothing covers them: PACER beside its line, your gap above you
     // Labels last so nothing covers them: live paces at the line ends, your gap above you
     const clampX=(x,w)=>Math.max(lft+w/2+2,Math.min(lft+vw-w/2-2,x));
+    if(rq){dot(rq.c[0],rq.c[1],8,PURPLE);pill(s.rival.label,clampX(rq.left[0]-40,64),rq.left[1],PURPLE,'#1e0b2e',12)}
     if(pq){dot(pq.c[0],pq.c[1],8,ORANGE);pill(s.label||'PACER',clampX(pq.right[0]+34,58),pq.right[1],ORANGE,'#1c1003',12)}
     pill(metres(s.you),clampX(yq.left[0]-42,76),yq.left[1],'rgba(2,6,23,.88)','#f1f5f9',14);
     gapLabel(s.gap,ax,ay-36,17);
@@ -323,7 +325,7 @@ export function createView(canvas){
     }
 
     // Runners, farther one first; each with its line across the road
-    const figs=[{d:s.you,col:ME,me:true}];if(s.pacer!=null)figs.push({d:s.pacer,col:ORANGE});
+    const figs=[{d:s.you,col:ME,me:true}];if(s.pacer!=null)figs.push({d:s.pacer,col:ORANGE});if(s.rival)figs.push({d:s.rival.d,col:PURPLE,rival:true});
     figs.forEach(o=>{o.base=onRoad(o.d)});
     figs.sort((a,b)=>(b.base?.[2]??-1)-(a.base?.[2]??-1));
     for(const o of figs){
@@ -336,13 +338,14 @@ export function createView(canvas){
       const side=Math.max(44,F*1.1/head[2]);
       const inView=(x,w)=>Math.max(lft+w/2+2,Math.min(lft+vw-w/2-2,x)); // keep tags clear of the side columns
       if(o.me){pill(metres(s.you),inView(head[0]-side-10,76),head[1]+lift*0.4,'rgba(2,6,23,.88)','#f1f5f9',13);gapLabel(s.gap,inView(head[0],110),head[1]-lift-6,16)}
+      else if(o.rival)pill(s.rival.label,inView(head[0]-side,64),head[1],PURPLE,'#1e0b2e',12,ghost?0.6:1);
       else pill(s.label||'PACER',inView(head[0]+side,58),head[1],ORANGE,'#1c1003',12,ghost?0.6:1);
     }
     const camDeg=(Math.atan2(f[0],f[1])*180/Math.PI+360)%360,runDeg=(Math.atan2(cd.x,cd.y)*180/Math.PI+360)%360;
     heads={view:camDeg,travel:runDeg};
     // Pacer out of view: an edge hint
     if(s.pacer!=null){
-      const pc=figs.find(o=>!o.me),gap=s.pacer-s.you;
+      const pc=figs.find(o=>!o.me&&!o.rival),gap=s.pacer-s.you;
       if(!pc.base||Math.abs(gap)>700){
         const ahead=gap>0,toward=rear?!ahead:ahead;
         pill(`${s.label||'PACER'} ${Math.round(Math.abs(gap))} m ${ahead?'ahead':'behind'}`,lft+vw/2,toward?Math.max(top+14,hy+18):H-bot-18,ORANGE,'#1c1003');

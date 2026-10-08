@@ -75,6 +75,7 @@
       <div class="set"><span><b>Rest</b><small>Between reps; you can change the next rep's pace while you rest</small></span><div class="mini-step" id="i-rest"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
       <div class="set"><span><b>Rep pace</b><small>Average on the flat; each rep's pacer adjusts it for the hills, using your pacer profile below</small></span><div class="mini-step" id="i-pace"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
       <div class="set col"><span><b>Across the session</b></span><div class="seg" id="i-step"><button data-v="0">Same pace</button><button data-v="-2">2 s/km quicker each rep</button><button data-v="-4">4 s/km quicker each rep</button></div></div>
+      <div class="set" id="i-rvrow" hidden><span><b>Race your last session</b><small id="i-rvnote"></small></span><button id="i-rv" class="switch" role="switch"></button></div>
       <table class="kt" id="i-list"></table>
       <div id="i-sum" class="insight"></div>
     </div>
@@ -101,7 +102,8 @@
 
     <div class="card">
       <div class="h">Your pacer</div>
-      <div class="seg pcm" id="pc-mode"><button data-v="profile">A pacer profile</button><button data-v="ghost">One of your past runs</button></div>
+      <div class="h2s">Race against</div>
+      <div class="seg pcm" id="pc-mode"><button data-v="profile">The pacer</button><button data-v="ghost">A past run</button><button data-v="both">Both</button></div>
       <small id="pcnote" class="note"></small>
       <div id="ghosts" class="styles" hidden></div>
       <div id="profiles" class="profiles"></div>
@@ -207,7 +209,7 @@
     </div>
     <div class="tiles" id="tiles">
       <div id="youtile" class="tile you"><span>You</span><b id="ypace">--:--</b><small id="ystate"></small></div>
-      <div class="tile pc"><span id="plab">Pacer</span><b id="ppace">--:--</b><small id="pstate"></small></div>
+      <div class="tile pc"><span id="plab">Pacer</span><b id="ppace">--:--</b><small id="pstate"></small><small id="rstate" class="rstate" hidden></small></div>
       <button id="pausebig" class="tile pausebig" aria-label="Pause the run"><i>⏸</i>Pause</button>
     </div>
     <div id="ctrls"><button id="go" class="btn go">Start</button><button id="finbtn" class="btn save">Save</button><button id="discbtn" class="btn disc">Discard</button></div>
@@ -221,7 +223,7 @@
     <div id="rbadge"></div>
     <h1 id="rtitle"></h1>
     <div id="rsub" class="sub"></div>
-    <div class="rbig"><div class="you"><b id="ryou"></b><span>You</span></div><div class="pc" id="rpcbox"><b id="rpacer"></b><span id="rpclab">Pacer</span></div></div>
+    <div class="rbig"><div class="you"><b id="ryou"></b><span>You</span></div><div class="pc" id="rpcbox"><b id="rpacer"></b><span id="rpclab">Pacer</span></div><div class="rv" id="rrvbox" hidden><b id="rrival"></b><span id="rrvlab">Past run</span></div></div>
     <div class="card"><table class="kt" id="rkm"></table></div>
     <div class="card" id="rmcard" hidden>
       <div class="h">Pace, cadence and stride</div>
@@ -229,6 +231,7 @@
       <div id="rmotion" class="insight"></div>
     </div>
     <button id="rrace" class="btn go" hidden>Race this route</button>
+    <button id="ragain" class="btn go" hidden>Run this again</button>
     <div class="ctrl"><button id="rgpx" class="btn ghost">Export GPX</button><button id="rcsv" class="btn ghost">Export CSV</button><button id="rdone" class="btn go">Done</button></div>
   </div>
 </section>

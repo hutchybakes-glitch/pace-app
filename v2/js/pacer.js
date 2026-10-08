@@ -173,7 +173,7 @@ export function ghostFromRun(pts,fixes,elapsed){
     while(j<F.length-2&&F[j+1][0]<d)j++;
     const a=F[j],b=F[j+1];T.push(a[1]+(b[1]-a[1])*(d-a[0])/(b[0]-a[0]));
   }
-  if(F.length&&F.at(-1)[0]>=D-30)T[T.length-1]=Math.max(T.at(-2)??0,elapsed); // finished: exactly your time
+  if(F.length&&Math.abs(F.at(-1)[0]-D)<=30)T[T.length-1]=Math.max(T.at(-2)??0,elapsed); // finished here: exactly your time
   return ghostFromTimes(pts,T);
 }
 

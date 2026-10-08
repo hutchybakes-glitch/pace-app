@@ -51,6 +51,32 @@
       <div id="rchips" class="chips"></div>
       <svg id="pmap" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Route coloured by gradient"></svg>
       <div class="key"><span><i class="kup"></i>Uphill</span><span><i class="kflat"></i>Flat</span><span><i class="kdown"></i>Downhill</span><span class="kshade">darker = steeper</span></div>
+      <div class="h sp">How to run it</div>
+      <div class="seg how" id="how"><button data-v="full">Full route</button><button data-v="part">Part of it</button><button data-v="int">Intervals</button></div>
+      <div id="howpart" class="howbox" hidden>
+        <div class="set"><span><b>Distance</b><small id="partnote">From the start</small></span><div class="mini-step" id="partlen"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
+      </div>
+      <div id="howlaps" class="howbox" hidden>
+        <div class="set"><span><b>Run it as laps</b><small id="lapsnote">This route finishes where it starts, so it can be lapped</small></span><div class="mini-step" id="lapsn"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
+        <button id="lapsave" class="btn ghost">Save as a new route</button>
+      </div>
+    </div>
+
+    <div class="card" id="intcard" hidden>
+      <div class="h">Interval session</div>
+      <div class="seg" id="i-kind"><button data-v="repeat">Repeat a stretch</button><button data-v="split">Split the route into reps</button></div>
+      <div id="i-repeat">
+        <div class="set"><span><b>Starts at</b><small>How far along the route</small></span><div class="mini-step" id="i-from"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
+        <div class="set"><span><b>Rep length</b></span><div class="mini-step" id="i-len"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
+        <div class="set"><span><b>Reps</b></span><div class="mini-step" id="i-reps"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
+        <div class="set col"><span><b>Each rep</b></span><div class="seg" id="i-dir"><button data-v="same">From the same start</button><button data-v="alternate">There and back</button></div><small class="note" id="i-dirnote"></small></div>
+      </div>
+      <div id="i-split"><div class="set"><span><b>Rep length</b><small id="i-splitnote"></small></span><div class="mini-step" id="i-slen"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div></div>
+      <div class="set"><span><b>Rest</b><small>Between reps; you can change the next rep's pace while you rest</small></span><div class="mini-step" id="i-rest"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
+      <div class="set"><span><b>Rep pace</b><small>Average on the flat; each rep's pacer adjusts it for the hills, using your pacer profile below</small></span><div class="mini-step" id="i-pace"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
+      <div class="set col"><span><b>Across the session</b></span><div class="seg" id="i-step"><button data-v="0">Same pace</button><button data-v="-2">2 s/km quicker each rep</button><button data-v="-4">4 s/km quicker each rep</button></div></div>
+      <table class="kt" id="i-list"></table>
+      <div id="i-sum" class="insight"></div>
     </div>
 
     <div class="card" id="tgtcard">
@@ -82,14 +108,16 @@
       <div class="tune" id="tune">
         <div class="trow"><span>Climbing</span><div class="seg" id="t-climb"></div></div>
         <div class="trow"><span>Descending</span><div class="seg" id="t-descent"></div></div>
-        <div class="trow"><span>Strategy</span><div class="seg" id="t-strategy"></div></div>
+        <div class="trow strat"><span>Strategy</span><div class="seg" id="t-strategy"></div></div>
       </div>
+      <div id="prun">
       <div class="h sp">The pacer's run</div>
       <div class="pchart"><svg id="pchart" viewBox="0 0 1000 220" preserveAspectRatio="none" role="img" aria-label="Pacer's pace along the route over the elevation"></svg><div id="pylab"></div></div>
       <div id="paxis" class="axis"></div>
       <div class="key"><span><i class="kpace"></i>Pacer's pace (higher = faster)</span></div>
       <div id="pinsight" class="insight"></div>
       <div id="cadplan" class="insight cadplan"></div>
+      </div>
     </div>
 
     <div class="card">
@@ -140,6 +168,15 @@
       <div id="views" class="views" role="tablist"><button data-v="map">Map</button><button data-v="front">Front</button><button data-v="rear">Rear</button></div>
     </div>
     <div id="off" hidden></div>
+    <div id="restcard" class="restcard" hidden>
+      <div class="rh">Rest</div>
+      <div class="rclock" id="rclock">0:00</div>
+      <div id="rlast" class="rlast"></div>
+      <div class="rnext"><b id="rnext"></b><small id="rnextd"></small></div>
+      <div class="set"><span><b>Next rep pace</b><small id="rpacenote"></small></span><div class="mini-step" id="r-pace"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
+      <div id="rgo" class="rgo"></div>
+      <div class="obtns"><button id="rskip" class="btn go">Start now</button><button id="rend" class="btn ghost">End session</button></div>
+    </div>
     <div id="offcard" class="offcard" hidden>
       <b>You're off the course</b>
       <small id="offtext"></small>

@@ -296,6 +296,8 @@ export function createSpeaker(){
   }
   const say=(text,pri=2,tn,onend)=>play([{text,pri,tone:tn,onend}]);
   function setMuted(m){muted=m;if(m){synth()?.cancel();q=[];cur=null}}
-  return {unlock,play,say,setMuted,setOpts:o=>{opts={...opts,...o}},get muted(){return muted}};
+  // Drop queued (not yet spoken) lower-priority messages
+  const clear=()=>{q=q.filter(c=>c.pri>=3)};
+  return {unlock,play,say,setMuted,clear,setOpts:o=>{opts={...opts,...o}},get muted(){return muted}};
 }
 

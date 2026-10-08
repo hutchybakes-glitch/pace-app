@@ -193,3 +193,11 @@ export function adjustPacer(P,d,k){
   const t0=timeAt(P,d),time=P.time.map((t,i)=>P.d[i]>d?t0+(t-t0)*k:t),pace=P.pace.map((p,i)=>P.d[i]>d?p*k:p);
   return {...P,time,pace,finish:t0+(P.finish-t0)*k,adjusted:true};
 }
+
+// Time to run pts at a flat-equivalent pace (s/km): slower on climbs and quicker on descents by the
+// profile's hill handling (used for interval reps: the same effort on an uphill rep takes longer)
+export function effortTime(pts,pace,prof){
+  const P=buildPacer(pts,pace*pts.at(-1).d/1000,{...prof,strategy:'even'}),c=CLIMB[prof.climb],ds=DESCENT[prof.descent];
+  let t=0;for(let i=1;i<pts.length;i++){const e=(effort(P.grade[i-1],c,ds)+effort(P.grade[i],c,ds))/2;t+=e*pace*(pts[i].d-pts[i-1].d)/1000}
+  return t;
+}

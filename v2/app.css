@@ -177,6 +177,15 @@ b{font-variant-numeric:tabular-nums}
 
 .insight .dim{color:var(--mut)}
 #mstrip{justify-content:space-around;padding-top:0}
+.how{margin-top:8px}.howbox{margin-top:6px}
+#plan.int-mode #tgtcard,#plan.int-mode #wxcard,#plan.int-mode #prun,#plan.int-mode .pcm,#plan.int-mode #pcnote,#plan.int-mode #ghosts,#plan.int-mode .trow.strat{display:none!important}
+#i-list{margin-top:10px}#i-list td small{color:var(--mut)}
+.restcard{position:absolute;left:10px;right:10px;top:84px;z-index:6;background:rgba(2,6,23,.97);border:2px solid #38bdf8;border-radius:18px;padding:14px 16px;box-shadow:0 10px 40px #000a}
+.restcard .rh{font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#7dd3fc}
+.restcard .rclock{font-size:64px;font-weight:900;line-height:1.05;font-variant-numeric:tabular-nums}
+.restcard .rlast{color:var(--mut2);font-size:14px;margin-bottom:8px}
+.restcard .rnext b{display:block;font-size:18px}.restcard .rnext small{display:block;color:var(--mut2);font-size:14px}
+.restcard .rgo{margin-top:8px;font-size:15px;color:#fbbf24;font-weight:700}
 .offcard{position:absolute;left:10px;right:10px;top:150px;z-index:6;background:rgba(2,6,23,.96);border:2px solid #fb923c;border-radius:18px;padding:14px;box-shadow:0 10px 40px #000a}
 .offcard b{display:block;font-size:20px}.offcard small{display:block;color:var(--mut2);font-size:14px;margin-top:4px;line-height:1.4}
 .obtns{display:flex;gap:8px;margin-top:12px}.obtns .btn{margin:0;flex:1;font-size:16px;padding:14px 6px}

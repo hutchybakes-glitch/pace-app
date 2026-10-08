@@ -8,7 +8,8 @@
 import {gradeRGB,roadMarks} from './pacer.js';
 
 const ZE=1.7;                     // 3D: vertical exaggeration of the terrain
-const HALF=4.5;                   // 3D: half road width, m
+const HALF=4.5;
+const GRID=15,SAME=12;              // passes of the route closer than SAME m are the same road                   // 3D: half road width, m
 const ORANGE='#fb923c',ME='#60a5fa',GOOD='#4ade80';
 const SKY_TOP=[2,6,23],HORIZON=[30,41,59],GROUND=[12,18,32];
 const FONT='-apple-system,system-ui,sans-serif';
@@ -40,6 +41,10 @@ export function createView(canvas){
     for(let i=0;i<n;i++){const a=Math.max(0,i-2),b=Math.min(n-1,i+2),dx=X[b]-X[a],dy=Y[b]-Y[a],L=Math.hypot(dx,dy)||1;TX.push(dx/L);TY.push(dy/L)}
     R={n,D:pts.map(p=>p.d),X,Y,Z:P.es,TX,TY,C:P.grade.map(gradeRGB),total:pts[n-1].d,turns:turns||[],marks:roadMarks(P),G:P.grade,lat0,lon0,k};
     hd=null;cd=null;
+    // Where the route passes over the same ground twice (out-and-back, laps, start = finish): a grid of
+    // route points by position, to find the other passes near any point
+    const G=new Map();for(let i=0;i<n;i++){const key=`${Math.floor(X[i]/GRID)},${Math.floor(Y[i]/GRID)}`;(G.get(key)||G.set(key,[]).get(key)).push(i)}
+    R.grid=G;
   }
 
   // Interpolated point at route distance d: {x,y,z,tx,ty}
@@ -50,6 +55,19 @@ export function createView(canvas){
     return {x:L(R.X),y:L(R.Y),z:L(R.Z),tx:L(R.TX),ty:L(R.TY),i:lo};
   }
   const idxOf=d=>Math.max(0,Math.min(R.n-1,Math.round(d/10)));
+  // Which pass of a shared stretch of road matters now (lower = more): the one you're on or reaching
+  // next (by how far ahead), or what you've just run (the last 150 m); passes further behind count last
+  const pri=(D,you)=>D>=you?D-you:you-D<=150?(you-D)*2:1e6+(you-D);
+  // Is route point i covered by another pass that matters more? (within SAME m, and genuinely another
+  // pass: more than 60 m away along the route.) Covered points aren't drawn, so the road, paces, arrows
+  // and signs you see are always the ones for the pass you're about to run.
+  function covered(i,you){
+    const x=R.X[i],y=R.Y[i],cx=Math.floor(x/GRID),cy=Math.floor(y/GRID),p=pri(R.D[i],you);
+    for(let a=cx-1;a<=cx+1;a++)for(let b=cy-1;b<=cy+1;b++)for(const j of R.grid.get(`${a},${b}`)||[])
+      if(Math.abs(R.D[j]-R.D[i])>60&&pri(R.D[j],you)<p&&Math.hypot(R.X[j]-x,R.Y[j]-y)<SAME)return true;
+    return false;
+  }
+  const coveredD=(d,you)=>covered(idxOf(d),you);
 
   // s: {mode, you (route m), pacer (route m or null), gap (s, + = you ahead, or null),
   //     gap (s, + = you ahead, or null), youCol (your line's colour: red/green/gold, or null), gps {lat,lon} or null}
@@ -60,6 +78,15 @@ export function createView(canvas){
   }
 
   // ---------- shared bits ----------
+  // Ease a direction (unit vector) toward (tx,ty) by fraction k of the angle between them. Turning by
+  // angle (not by blending the vectors) means a full U-turn swings round instead of getting stuck, since
+  // halfway between two opposite directions is no direction at all.
+  function turnToward(v,tx,ty,k){
+    const want=Math.atan2(tx,ty);if(!v)return {x:Math.sin(want),y:Math.cos(want)};
+    const cur=Math.atan2(v.x,v.y);let d=want-cur;
+    while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;
+    const a=cur+d*k;return {x:Math.sin(a),y:Math.cos(a)};
+  }
   function dot(x,y,r,col){ctx.save();ctx.shadowColor=col;ctx.shadowBlur=14;ctx.fillStyle=col;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.shadowBlur=0;ctx.lineWidth=2.5;ctx.strokeStyle='#fff';ctx.stroke();ctx.restore()}
   function pill(text,x,y,bg,fg,size=11,alpha=1){
     ctx.save();ctx.globalAlpha=alpha;ctx.font=`800 ${size}px ${FONT}`;const w=ctx.measureText(text).width+size*1.1,h=size*1.65;
@@ -90,7 +117,7 @@ export function createView(canvas){
     let hx=ah.x-me.x,hy=ah.y-me.y,L=Math.hypot(hx,hy);
     if(L<1){hx=me.tx;hy=me.ty;L=1}
     hx/=L;hy/=L;
-    if(!hd)hd={x:hx,y:hy};else{hd.x+=(hx-hd.x)*0.15;hd.y+=(hy-hd.y)*0.15;const l=Math.hypot(hd.x,hd.y)||1;hd.x/=l;hd.y/=l}
+    hd=turnToward(hd,hx,hy,0.15);
     const vw=Math.max(140,W-rgt-lft),vh=Math.max(160,H-top-bot);
     const sc=Math.min(vw*1.6,vh)*0.78/220,ax=lft+vw/2,ay=top+vh*0.72; // px per m; you sit low in the visible area
     const T=(x,y)=>{const dx=x-me.x,dy=y-me.y;return [ax+(dx*hd.y-dy*hd.x)*sc,ay-(dx*hd.x+dy*hd.y)*sc]};
@@ -106,10 +133,10 @@ export function createView(canvas){
 
     // Road: casing then coloured by grade; the part already run dimmed
     const roadW=Math.max(16,10*sc),vis=[];
-    for(let i=0;i<R.n-1;i++){if(Math.hypot(R.X[i]-me.x,R.Y[i]-me.y)<reach*0.8)vis.push(i)}
+    for(let i=0;i<R.n-1;i++){if(Math.hypot(R.X[i]-me.x,R.Y[i]-me.y)<reach*0.8&&!covered(i,s.you))vis.push(i)}
     // A route that comes back along the same road (start and finish, out-and-back) overlaps itself:
     // draw far-off parts of the race first so the stretch you're on, and coming up, is on top
-    vis.sort((a,b)=>Math.abs(R.D[b]-s.you)-Math.abs(R.D[a]-s.you));
+    vis.sort((a,b)=>pri(R.D[b],s.you)-pri(R.D[a],s.you));
     ctx.lineCap='round';ctx.lineJoin='round';
     ctx.strokeStyle='#020617';ctx.lineWidth=roadW+7;ctx.beginPath();
     for(const i of vis){ctx.moveTo(...T(R.X[i],R.Y[i]));ctx.lineTo(...T(R.X[i+1],R.Y[i+1]))}
@@ -132,13 +159,13 @@ export function createView(canvas){
     // Target pace written on the road ahead, wherever it changes
     const near=d=>Math.abs(d-s.you)<20||(s.pacer!=null&&Math.abs(d-s.pacer)<20)||R.turns.some(t=>Math.abs(t.d-d)<20);
     for(const m of R.marks){
-      if(m.d<s.you+20||m.d>s.you+reach*0.75||near(m.d))continue;
+      if(m.d<s.you+20||m.d>s.you+reach*0.75||near(m.d)||coveredD(m.d,s.you))continue;
       const p=at(m.d),q=T(p.x,p.y);paceText(mmss(m.pace),q[0],q[1],Math.max(16,Math.min(22,roadW)));
     }
     // Cadence and stride signs beside the road on the right (km markers on the left)
-    for(const m of SG){if(m.d<s.you-10||m.d>s.you+reach*0.75)continue;const p=at(Math.max(m.d,1)),o=roadW*2.2/sc,q=T(p.x+p.ty*o,p.y-p.tx*o);sign(m,q[0],q[1],12,1)}
+    for(const m of SG){if(m.d<s.you-10||m.d>s.you+reach*0.75||coveredD(m.d+20,s.you))continue;const p=at(Math.max(m.d,1)),o=roadW*2.2/sc,q=T(p.x+p.ty*o,p.y-p.tx*o);sign(m,q[0],q[1],12,1)}
     // km markers beside the road, upcoming turns on it
-    for(let km=1000;km<R.total;km+=1000){if(Math.abs(km-s.you)>reach*0.8)continue;const p=at(km),o=roadW*1.9/sc,q=T(p.x-p.ty*o,p.y+p.tx*o);pill(`${km/1000} km`,q[0],q[1],'rgba(15,23,42,.85)','#cbd5e1')}
+    for(let km=1000;km<R.total;km+=1000){if(Math.abs(km-s.you)>reach*0.8||coveredD(km,s.you))continue;const p=at(km),o=roadW*1.9/sc,q=T(p.x-p.ty*o,p.y+p.tx*o);pill(`${km/1000} km`,q[0],q[1],'rgba(15,23,42,.85)','#cbd5e1')}
     for(const t of R.turns){if(t.d<s.you||t.d>s.you+450)continue;const p=at(t.d),q=T(p.x,p.y);turnMarker(q[0],q[1],t,hd,p)}
 
     // Lines across the road: the pacer's (orange) and yours (blue)
@@ -174,7 +201,7 @@ export function createView(canvas){
     const b=P(T[back]);let hx=me[0]-b[0],hy=me[1]-b[1],L=Math.hypot(hx,hy);
     if(L<3){hx=hd?.x??0;hy=hd?.y??1;L=1}
     hx/=L;hy/=L;
-    if(!hd)hd={x:hx,y:hy};else{hd.x+=(hx-hd.x)*0.15;hd.y+=(hy-hd.y)*0.15;const l=Math.hypot(hd.x,hd.y)||1;hd.x/=l;hd.y/=l}
+    hd=turnToward(hd,hx,hy,0.15);
     const Tf=q=>{const [x,y]=P(q),dx=x-me[0],dy=y-me[1];return [ax+(dx*hd.y-dy*hd.x)*sc,ay-(dx*hd.x+dy*hd.y)*sc]};
     const reach=Math.hypot(W,H)/sc,step=50;
     ctx.strokeStyle='rgba(148,163,184,.07)';ctx.lineWidth=1;ctx.beginPath();
@@ -216,7 +243,7 @@ export function createView(canvas){
     const a=at(s.you-15),b=at(s.you+25);let tx=b.x-a.x,ty=b.y-a.y,tl=Math.hypot(tx,ty);
     if(tl<1){tx=me.tx;ty=me.ty;tl=1}
     tx/=tl;ty/=tl;
-    if(!cd)cd={x:tx,y:ty};else{cd.x+=(tx-cd.x)*0.12;cd.y+=(ty-cd.y)*0.12;const l=Math.hypot(cd.x,cd.y)||1;cd.x/=l;cd.y/=l}
+    cd=turnToward(cd,tx,ty,0.12);
     const ahead=at(s.you+dir*45);
     const E=[me.x-cd.x*dir*34,me.y-cd.y*dir*34,12],Tg=[me.x+cd.x*dir*45,me.y+cd.y*dir*45,(ahead.z-z0)*ZE+1];
     let f=[Tg[0]-E[0],Tg[1]-E[1],Tg[2]-E[2]];const fl=Math.hypot(...f);f=f.map(v=>v/fl);
@@ -238,6 +265,7 @@ export function createView(canvas){
     // the bottom of the screen, so nearer hills hide the road behind them
     const lo=rear?s.you-700:s.you-40,hi=rear?s.you+40:s.you+700,segs=[];
     for(let i=Math.max(0,idxOf(lo)-1);i<Math.min(R.n-1,idxOf(hi)+1);i++){
+      if(covered(i,s.you))continue;
       const zA=(R.Z[i]-z0)*ZE,zB=(R.Z[i+1]-z0)*ZE;
       const nA=[R.TY[i],-R.TX[i]],nB=[R.TY[i+1],-R.TX[i+1]];
       const LA=P(R.X[i]+nA[0]*HALF,R.Y[i]+nA[1]*HALF,zA),RA=P(R.X[i]-nA[0]*HALF,R.Y[i]-nA[1]*HALF,zA);
@@ -266,7 +294,7 @@ export function createView(canvas){
     // Gradient chevrons on the road ahead: ^ uphill, v downhill; 1 / 2 / 3 for 2–4 / 4–7 / 7 % +
     // (halfway between the paces written every 50 m, so they never collide)
     for(let d=Math.ceil((s.you+8-25)/50)*50+25;d<s.you+(rear?0:260);d+=50){
-      const g=R.G[idxOf(d)];if(Math.abs(g)<2)continue;
+      const g=R.G[idxOf(d)];if(Math.abs(g)<2||coveredD(d,s.you))continue;
       const c=onRoad(d,0.08),a=onRoad(d+3,0.08);if(!c||!a||hidden(c))continue;
       let ux=a[0]-c[0],uy=a[1]-c[1];const L=Math.hypot(ux,uy)||1;ux/=L;uy/=L;
       const up=g>0?1:-1,n=Math.abs(g)>=7?3:Math.abs(g)>=4?2:1,sz=Math.max(10,Math.min(44,F*2.4/c[2]));
@@ -282,14 +310,14 @@ export function createView(canvas){
 
     // Target pace painted on the road ahead (front view)
     if(!rear)for(const m of R.marks){
-      if(m.d<s.you+12||m.d>s.you+350||(s.pacer!=null&&Math.abs(m.d-s.pacer)<12))continue;
+      if(m.d<s.you+12||m.d>s.you+350||(s.pacer!=null&&Math.abs(m.d-s.pacer)<12)||coveredD(m.d,s.you))continue;
       const pt=onRoad(m.d,0.1);if(!pt||hidden(pt)||pt[2]>320)continue;
       const size=Math.max(11,Math.min(36,F*2.8/pt[2]));paceText(mmss(m.pace),pt[0],pt[1],size,Math.max(0.35,1-pt[2]/340));
     }
 
     // Cadence and stride boards beside the road ahead, on the right
     if(!rear)for(const m of SG){
-      if(m.d<s.you+12||m.d>s.you+320)continue;
+      if(m.d<s.you+12||m.d>s.you+320||coveredD(m.d+20,s.you))continue;
       const p=at(m.d),pt=P(p.x+p.ty*HALF*2,p.y-p.tx*HALF*2,(p.z-z0)*ZE+1.2);if(!pt||hidden(pt)||pt[2]>320)continue;
       sign(m,pt[0],pt[1],Math.max(11,Math.min(22,F*1.6/pt[2])),Math.max(0.45,1-pt[2]/340));
     }

@@ -138,12 +138,14 @@ export function paceMarks(P,{minGap=100,maxGap=400,change=6,ahead=100}={}){
 // Projected finish time (s) for a runner at route distance d after t seconds, using how they're doing
 // against the pacer's plan (which already knows the hills ahead): half their whole run so far, half
 // their last km (tBack = their elapsed time 1 km back, if known). Null until 200 m in.
-export function projectFinish(P,d,t,tBack=null){
+// T: the pacer's time to route distance d (default the plan; the app passes the course as you're running it)
+// planBack: the pacer's time over the same last km you ran (default: the last km of route)
+export function projectFinish(P,d,t,tBack=null,T=x=>timeAt(P,x),planBack=null){
   if(d<200||t<=0)return null;
-  const overall=t/timeAt(P,d);
+  const overall=t/T(d);
   let r=overall;
-  if(tBack!=null&&d>=1200){const plan=timeAt(P,d)-timeAt(P,d-1000);if(plan>0)r=0.5*overall+0.5*(t-tBack)/plan}
-  return t+(P.finish-timeAt(P,d))*r;
+  if(tBack!=null&&d>=1200){const plan=planBack??T(d)-T(d-1000);if(plan>0)r=0.5*overall+0.5*(t-tBack)/plan}
+  return t+(T(P.total)-T(d))*r;
 }
 
 // Pace written on the road: the pacer's exact pace at that spot, every `step` m from `step` in

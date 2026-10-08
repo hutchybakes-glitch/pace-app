@@ -177,6 +177,9 @@ b{font-variant-numeric:tabular-nums}
 
 .insight .dim{color:var(--mut)}
 #mstrip{justify-content:space-around;padding-top:0}
+.offcard{position:absolute;left:10px;right:10px;top:150px;z-index:6;background:rgba(2,6,23,.96);border:2px solid #fb923c;border-radius:18px;padding:14px;box-shadow:0 10px 40px #000a}
+.offcard b{display:block;font-size:20px}.offcard small{display:block;color:var(--mut2);font-size:14px;margin-top:4px;line-height:1.4}
+.obtns{display:flex;gap:8px;margin-top:12px}.obtns .btn{margin:0;flex:1;font-size:16px;padding:14px 6px}
 #mstrip i{color:var(--mut);font-size:13px;margin-left:1px}
 #cad.low,#strd.long{color:#fbbf24}#cad.high{color:#93c5fd}
 .cadplan{margin-top:8px}.cadplan .row{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}

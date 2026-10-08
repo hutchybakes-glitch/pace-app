@@ -23,13 +23,18 @@ export function parseGPX(xml){
       if(!isFinite(lat)||!isFinite(lon))continue;
       const e=m[2]&&m[2].match(/<ele>\s*([^<\s]+)/);
       const tx=m[2]&&(m[2].match(/<cmt>([\s\S]*?)<\/cmt>/)||m[2].match(/<desc>([\s\S]*?)<\/desc>/)||m[2].match(/<name>([\s\S]*?)<\/name>/));
-      out.push({lat,lon,ele:e&&isFinite(+e[1])?+e[1]:null,text:tx?ent(tx[1].replace(/<!\[CDATA\[|\]\]>/g,'')).trim():''});
+      // time (a recorded run: gives the pace all the way round) and cadence (Garmin/Strava extensions,
+      // in strides a minute: ×2 for steps)
+      const tm=m[2]&&m[2].match(/<time>\s*([^<\s]+)/),cd=m[2]&&m[2].match(/<(?:\w+:)?cad>\s*(\d+)/);
+      const t=tm?Date.parse(tm[1]):NaN;
+      out.push({lat,lon,ele:e&&isFinite(+e[1])?+e[1]:null,t:isFinite(t)?t:null,cad:cd&&+cd[1]>0?+cd[1]*2:null,text:tx?ent(tx[1].replace(/<!\[CDATA\[|\]\]>/g,'')).trim():''});
     }
     return out;
   };
   let pts=read('trkpt');if(!pts.length)pts=read('rtept');
   const cues=[...read('wpt'),...pts].filter(p=>p.text).map(({lat,lon,text})=>({lat,lon,text}));
-  return {name:nm?ent(nm[1]).trim():'',pts:pts.map(({lat,lon,ele})=>({lat,lon,ele})),cues};
+  return {name:nm?ent(nm[1]).trim():'',pts:pts.map(({lat,lon,ele})=>({lat,lon,ele})),cues,
+    timed:pts.map(({lat,lon,ele,t,cad})=>({lat,lon,ele,t,cad}))}; // timed: with each point's time and cadence
 }
 
 // Points every `step` metres along the route, plus the finish: [{d,lat,lon,ele|null}]

@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pacer">
+<meta name="theme-color" content="#060b18">
+<title>Pacer</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- ============ App: four tabs ============ -->
+<section id="home">
+
+  <!-- ---------- Today ---------- -->
+  <div class="pane" id="tab-today">
+    <header class="hdr">
+      <div><small id="hello">Pacer</small><h1>Today</h1></div>
+      <button id="gear" class="iconbtn" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+    </header>
+
+    <div id="chin" class="card chal" hidden>
+      <div class="eyebrow">⚔️ Challenge</div>
+      <h3 id="chtitle"></h3>
+      <div id="chsub" class="sub"></div>
+      <div class="bt2"><button id="chgo" class="btn go">Accept</button><button id="chno" class="btn ghost">Not now</button></div>
+    </div>
+    <div id="resume" class="card warn" hidden>
+      <div class="h">Unfinished run</div>
+      <div id="rsinfo"></div>
+      <div class="bt3"><button id="rsgo" class="btn go">Resume</button><button id="rssave" class="btn">Save</button><button id="rsdel" class="btn">Discard</button></div>
+    </div>
+    <div id="bkbanner" class="card note2" hidden>
+      <div class="h">Back up your runs</div>
+      <div class="sub" id="bktext"></div>
+      <button id="bknow" class="btn ghost">Back up now</button>
+    </div>
+
+    <div id="welcome" class="card welcome" hidden>
+      <div class="wl-art" aria-hidden="true"><span class="dot y"></span><span class="dot p"></span><span class="dot r"></span></div>
+      <h2>Race a pacer who knows every hill</h2>
+      <p>Pacer runs your route with you, metre by metre: easing up the climbs and using the descents, so you always know exactly where you stand. Race your best, a friend, or the plan.</p>
+      <ol class="steps"><li><b>Add a route</b><span>Load a GPX from Strava, Garmin or a route planner, or record one as you run</span></li><li><b>Pick your rival</b><span>The pacer, your best run, a friend's run, or all at once</span></li><li><b>Run</b><span>Live gap, pace on the road, voice coach</span></li></ol>
+      <div class="bt2"><button class="btn go" data-act="gpx">Load a GPX</button><button class="btn rec" data-act="rec">● Record a route</button></div>
+    </div>
+
+    <div id="hero" class="card hero" hidden>
+      <div class="hero-top"><span class="eyebrow">Ready to race</span><button id="hchange" class="link">Change route</button></div>
+      <h2 id="hname"></h2>
+      <div id="hchips" class="chips"></div>
+      <div class="hmapw"><svg id="hmap" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg><svg id="hele" viewBox="0 0 300 40" preserveAspectRatio="none" aria-hidden="true"></svg></div>
+      <div id="hvs" class="vs"></div>
+      <div id="hwx" class="hwx"></div>
+      <button id="qgo" class="btn go big">Start</button>
+      <button id="hsetup" class="btn ghost">Race setup</button>
+    </div>
+
+    <div class="quick" id="quick">
+      <button data-act="best"><i>🏆</i><b>Race your best</b><small id="qbest">Your quickest run here</small></button>
+      <button data-act="int"><i>⏱️</i><b>Intervals</b><small>Reps on this route</small></button>
+      <button data-act="rec"><i class="recdot"></i><b>Record a route</b><small>Run it, then race it</small></button>
+      <button data-act="gpx"><i>📥</i><b>Import a run</b><small>GPX from Strava, Garmin…</small></button>
+    </div>
+
+    <div id="lastcard" class="card" hidden></div>
+    <div id="weekcard" class="card week" hidden></div>
+    <button id="dnateaser" class="card teaser" hidden></button>
+    <div id="simcard" class="card" hidden>
+      <div class="h">Sim scenario</div>
+      <div class="sub">How the pretend runner races, so you can see and hear how Pacer reacts.</div>
+      <div id="simsc" class="styles"></div>
+    </div>
+  </div>
+
+  <!-- ---------- Routes ---------- -->
+  <div class="pane" id="tab-routes" hidden>
+    <header class="hdr"><div><small>Your courses</small><h1>Routes</h1></div></header>
+    <div class="actions">
+      <label class="btn ghost act"><span>＋</span> Load GPX<input type="file" id="gpx" hidden></label>
+      <button id="recbtn" class="btn rec act"><span>●</span> Record</button>
+    </div>
+    <div id="msg"></div>
+    <ul id="routes" class="rcards"></ul>
+    <p id="noroutes" class="empty" hidden>No routes yet. Load a GPX file (from Strava, Garmin Connect, Komoot, a race website…) or record one on your next run.</p>
+  </div>
+
+  <!-- ---------- Insights ---------- -->
+  <div class="pane" id="tab-insights" hidden>
+    <header class="hdr"><div><small>Learned from your runs</small><h1>Insights</h1></div></header>
+    <div id="insights"></div>
+  </div>
+
+  <!-- ---------- Runs ---------- -->
+  <div class="pane" id="tab-runs" hidden>
+    <header class="hdr"><div><small id="runtotals"></small><h1>Runs</h1></div></header>
+    <div class="seg filt" id="rfilter"><button data-v="all" class="on">All</button><button data-v="race">Races</button><button data-v="int">Intervals</button><button data-v="imp">Imported</button></div>
+    <div id="noruns" class="empty">No runs yet. Your races, recordings and imported runs land here.</div>
+    <ul id="runs"></ul>
+  </div>
+
+  <nav id="tabbar">
+    <button data-tab="today" class="on"><svg viewBox="0 0 24 24"><path d="M13.5 3.5a1.8 1.8 0 1 1-3.6 0 1.8 1.8 0 0 1 3.6 0ZM9 22l1.6-6.6L13 18v4m-6.5-9.5L9 8l4 1.5 2 3 3 1M10.6 15.4 12 9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Today</button>
+    <button data-tab="routes"><svg viewBox="0 0 24 24"><path d="M6 19a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Zm12-9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM6 14V9a3 3 0 0 1 3-3h6M18 10v5a3 3 0 0 1-3 3H8.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Routes</button>
+    <button data-tab="insights"><svg viewBox="0 0 24 24"><path d="M12 3v3m6.4-.4-2.1 2.1M21 12h-3M5.6 5.6l2.1 2.1M3 12h3m3 7h6m-5 2.5h4M12 9a4.5 4.5 0 0 0-2.6 8.2V19h5.2v-1.8A4.5 4.5 0 0 0 12 9Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Insights</button>
+    <button data-tab="runs"><svg viewBox="0 0 24 24"><path d="M4 20V10m5.3 10V4m5.4 16v-8M20 20V7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>Runs</button>
+  </nav>
+</section>
+
+<!-- ============ Race setup (a sheet over the tabs) ============ -->
+<section id="setup" class="sheet" hidden>
+  <header class="sheethdr"><button id="setupback" class="round" aria-label="Back">‹</button><h2>Race setup</h2><span></span></header>
+  <div id="plan" class="sheetbody">
+    <div class="card routecard">
+      <h2 id="rname"></h2>
+      <div id="rchips" class="chips"></div>
+      <svg id="pmap" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Route coloured by gradient"></svg>
+      <div class="key"><span><i class="kup"></i>Uphill</span><span><i class="kflat"></i>Flat</span><span><i class="kdown"></i>Downhill</span><span class="kshade">darker = steeper</span></div>
+    </div>
+
+    <div class="card">
+      <div class="step"><span>1</span>How to run it</div>
+      <div class="seg how" id="how"><button data-v="full">Full route</button><button data-v="part">Part of it</button><button data-v="int">Intervals</button></div>
+      <div id="howpart" class="howbox" hidden>
+        <div class="set"><span><b>Distance</b><small id="partnote">From the start</small></span><div class="mini-step" id="partlen"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
+      </div>
+      <div id="howlaps" class="howbox" hidden>
+        <div class="set"><span><b>Run it as laps</b><small id="lapsnote">This route finishes where it starts, so it can be lapped</small></span><div class="mini-step" id="lapsn"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
+        <button id="lapsave" class="btn ghost">Save as a new route</button>
+      </div>
+    </div>
+
+    <div class="card" id="intcard" hidden>
+      <div class="step"><span>2</span>Interval session</div>
+      <div class="seg" id="i-kind"><button data-v="repeat">Repeat a stretch</button><button data-v="split">Split the route into reps</button></div>
+      <div id="i-repeat">
+        <div class="set"><span><b>Starts at</b><small>How far along the route</small></span><div class="mini-step" id="i-from"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
+        <div class="set"><span><b>Rep length</b></span><div class="mini-step" id="i-len"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
+        <div class="set"><span><b>Reps</b></span><div class="mini-step" id="i-reps"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
+        <div class="set col"><span><b>Each rep</b></span><div class="seg" id="i-dir"><button data-v="same">From the same start</button><button data-v="alternate">There and back</button></div><small class="note" id="i-dirnote"></small></div>
+      </div>
+      <div id="i-split"><div class="set"><span><b>Rep length</b><small id="i-splitnote"></small></span><div class="mini-step" id="i-slen"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div></div>
+      <div class="set"><span><b>Rest</b><small>Between reps; you can change the next rep's pace while you rest</small></span><div class="mini-step" id="i-rest"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
+      <div class="set"><span><b>Rep pace</b><small>Effort on the flat: each rep's pacer adjusts it for the hills</small></span><div class="mini-step" id="i-pace"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
+      <div class="set col"><span><b>Across the session</b></span><div class="seg" id="i-step"><button data-v="0">Same pace</button><button data-v="-2">2 s/km quicker each rep</button><button data-v="-4">4 s/km quicker</button></div></div>
+      <div class="set" id="i-rvrow" hidden><span><b>Race your last session</b><small id="i-rvnote"></small></span><button id="i-rv" class="switch" role="switch"></button></div>
+      <table class="kt" id="i-list"></table>
+      <div id="i-sum" class="insight"></div>
+    </div>
+
+    <div class="card" id="vscard">
+      <div class="step"><span>2</span>Race against</div>
+      <div class="seg pcm big3" id="pc-mode"><button data-v="profile"><i class="dot p"></i>The pacer</button><button data-v="ghost"><i class="dot r"></i>A past run</button><button data-v="both"><i class="dot p"></i><i class="dot r"></i>Both</button></div>
+      <small id="pcnote" class="note"></small>
+      <div id="ghosts" class="board" hidden></div>
+    </div>
+
+    <div class="card" id="tgtcard">
+      <div class="step"><span>3</span>Target</div>
+      <div class="stepper" id="st-finish"><button data-d="-1" aria-label="Decrease">−</button><div><b id="v-finish">–</b><span>finish time</span></div><button data-d="1" aria-label="Increase">+</button></div>
+      <div class="stepper" id="st-pace"><button data-d="-1" aria-label="Decrease">−</button><div><b id="v-pace">–</b><span>average pace /km</span></div><button data-d="1" aria-label="Increase">+</button></div>
+      <div id="tgthint" class="hint"></div>
+    </div>
+
+    <details class="card fold" id="dstyle">
+      <summary><span><b>Pacer style</b><small id="sum-style"></small></span><i class="chev"></i></summary>
+      <div id="profiles" class="profiles"></div>
+      <div class="tune" id="tune">
+        <div class="trow"><span>Climbing</span><div class="seg" id="t-climb"></div></div>
+        <div class="trow"><span>Descending</span><div class="seg" id="t-descent"></div></div>
+        <div class="trow strat"><span>Strategy</span><div class="seg" id="t-strategy"></div></div>
+      </div>
+    </details>
+
+    <details class="card fold" id="wxcard">
+      <summary><span><b>Conditions</b><small id="sum-wx"></small></span><i class="chev"></i></summary>
+      <div class="set"><span><b>Race start</b><small id="wx-when"></small></span><div class="wxstart"><input type="datetime-local" id="wx-start" step="900"><button id="wx-now" class="chip">Now</button></div></div>
+      <div id="wx-now-line" class="wxline"></div>
+      <div id="wx-impact" class="wximpact"></div>
+      <div class="set"><span><b>Pace for the conditions</b><small>Heat, humidity, sun, wind on each stretch of road, and rain</small></span><button id="wx-on" class="switch" role="switch"></button></div>
+      <div class="set col" id="wx-opts"><span><b>Target</b></span>
+        <div class="seg" id="wx-mode"><button data-v="keep">Keep my target</button><button data-v="adjust">Adjust for conditions</button></div>
+        <small id="wx-modenote" class="note"></small>
+        <span class="sp2"><b>Wind shelter</b><small>How exposed the course is: hedges, buildings and trees cut the wind</small></span>
+        <div class="seg" id="wx-shelter"><button data-v="open">Open</button><button data-v="some">Some shelter</button><button data-v="sheltered">Sheltered</button></div>
+      </div>
+    </details>
+
+    <details class="card fold" id="dplan" open>
+      <summary><span><b>The race plan</b><small id="sum-plan"></small></span><i class="chev"></i></summary>
+      <div id="prun">
+        <div class="pchart"><svg id="pchart" viewBox="0 0 1000 220" preserveAspectRatio="none" role="img" aria-label="Pacer's pace along the route over the elevation"></svg><div id="pylab"></div></div>
+        <div id="paxis" class="axis"></div>
+        <div class="key"><span><i class="kpace"></i>Pacer's pace (higher = faster)</span><span id="krival" hidden><i class="krv"></i>Past run</span></div>
+        <div id="pinsight" class="insight"></div>
+        <div id="cadplan" class="insight cadplan"></div>
+      </div>
+    </details>
+    <div class="dockpad"></div>
+  </div>
+  <div class="dock"><button id="race" class="btn go big" disabled>Start race</button></div>
+</section>
+
+<!-- ============ Settings (a sheet) ============ -->
+<section id="settings" class="sheet" hidden>
+  <header class="sheethdr"><button id="setback" class="round" aria-label="Back">‹</button><h2>Settings</h2><span></span></header>
+  <div class="sheetbody">
+    <div class="card">
+      <div class="h">You</div>
+      <div class="set"><span><b>Your name</b><small>Shown to friends when you send them a challenge</small></span><input id="o-name" class="txt" maxlength="24" placeholder="Name" autocomplete="given-name"></div>
+    </div>
+    <div class="card">
+      <div class="h">Voice coach</div>
+      <div class="set col"><span><b>Voice coach</b><small>Reads the road ahead from the pacer's plan, keeps you posted on the gap, and helps you get back on terms. Directions stay on screen.</small></span>
+        <div class="seg" id="o-voice"><button data-v="off">Off</button><button data-v="key">Key moments</button><button data-v="full">Full coach</button></div></div>
+      <div class="set col" id="o-style-row"><span><b>Coach style</b><small>Each one reads the road and calls your splits; they differ in how they talk about you and the pacer.</small></span>
+        <div id="o-style" class="styles"></div></div>
+      <div class="set"><span><b>Tones</b><small>A short chime before each cue: rising = pick up, falling = ease off</small></span><button id="o-tones" class="switch" role="switch"></button></div>
+      <div class="set col"><span><b>Voice speed</b></span>
+        <div class="seg" id="o-rate"><button data-v="slow">Slower</button><button data-v="normal">Normal</button><button data-v="fast">Faster</button></div>
+        <button id="o-test" class="btn ghost testv">🔊 Hear your coach</button></div>
+    </div>
+    <div class="card">
+      <div class="h">On the run</div>
+      <div class="set col"><span><b>Pace colours</b><small>Your pace tile turns green within this of the pacer's pace where you are, red when slower, gold when faster</small></span>
+        <div class="seg" id="o-band"><button data-v="3">±3 s/km</button><button data-v="5">±5 s/km</button><button data-v="10">±10 s/km</button></div></div>
+      <div class="set col"><span><b>Live pace</b><small>How quickly your live pace reacts. Quicker shows changes sooner but wobbles more.</small></span>
+        <div class="seg" id="o-live"><button data-v="responsive">Responsive</button><button data-v="balanced">Balanced</button><button data-v="smooth">Smooth</button></div></div>
+      <div class="set col"><span><b>Live pace from</b><small>GPS speed is far steadier second to second. Position is used automatically if the phone gives no speed.</small></span>
+        <div class="seg" id="o-speed"><button data-v="1">GPS speed</button><button data-v="0">Position</button></div></div>
+      <div class="set"><span><b>Start at the start line</b><small>The clock starts as you cross it, like a chip mat</small></span><button id="o-auto" class="switch" role="switch"></button></div>
+      <div class="set"><span><b>Start zone</b><small>How close counts as "at the start"</small></span><div class="mini-step" id="o-zone"><button data-d="-5">−</button><b>25 m</b><button data-d="5">+</button></div></div>
+      <div class="set"><span><b>Cadence and stride guide</b><small>Targets for each climb, descent and flat: on signs beside the road, next to your live cadence, and as short spoken tips</small></span><button id="o-cad" class="switch" role="switch"></button></div>
+    </div>
+    <div class="card">
+      <div class="h">Run screen</div>
+      <div class="sub">Keep the screen as calm as you like: the pace tiles, gap and directions are always there.</div>
+      <div class="set"><span><b>Splits</b><small>Your km splits against the pacer's, top left</small></span><button id="o-splits" class="switch" role="switch"></button></div>
+      <div class="set"><span><b>Cadence and stride</b><small>The live cadence and stride row (still recorded when hidden)</small></span><button id="o-cadrow" class="switch" role="switch"></button></div>
+      <div class="set"><span><b>Course profile</b><small>The whole course's hills along the bottom, with you and the pacer on it</small></span><button id="o-strip" class="switch" role="switch"></button></div>
+      <div class="set"><span><b>Wind</b><small>The wind you're running into, in the strip</small></span><button id="o-wind" class="switch" role="switch"></button></div>
+    </div>
+    <div class="card">
+      <div class="h">Your routes and runs</div>
+      <div class="sub" id="st-status"></div>
+      <div class="bt2"><button id="bk" class="btn ghost">Back up everything</button><label class="btn ghost">Restore a backup<input type="file" id="rsfile" accept=".json,application/json" hidden></label></div>
+    </div>
+    <p class="foot"><a href="../v2/">Pacer v2</a> · <a href="../">Classic Pace (v1)</a></p>
+  </div>
+</section>
+
+<!-- ============ Run ============ -->
+<section id="run" hidden>
+  <canvas id="cv"></canvas>
+  <div class="ovtop">
+    <div class="toprow">
+      <button id="back" class="round" aria-label="Back">‹</button>
+      <div id="turn"><svg id="ticon" viewBox="0 0 48 48" aria-hidden="true"></svg><div><b id="ttext"></b><span id="tdist"></span></div></div>
+    </div>
+    <div class="row2">
+      <div id="gap" class="gap"></div>
+      <button id="mute" class="round mute" aria-label="Mute voice coach">🔊</button>
+      <div id="views" class="views" role="tablist"><button data-v="map">Map</button><button data-v="front">Front</button><button data-v="rear">Rear</button></div>
+    </div>
+    <div id="off" hidden></div>
+    <div id="restcard" class="restcard" hidden>
+      <div class="rh">Rest</div>
+      <div class="rclock" id="rclock">0:00</div>
+      <div id="rlast" class="rlast"></div>
+      <div class="rnext"><b id="rnext"></b><small id="rnextd"></small></div>
+      <div class="set"><span><b>Next rep pace</b><small id="rpacenote"></small></span><div class="mini-step" id="r-pace"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
+      <div id="rgo" class="rgo"></div>
+      <div class="obtns"><button id="rskip" class="btn go">Start now</button><button id="rend" class="btn ghost">End session</button></div>
+    </div>
+    <div id="offcard" class="offcard" hidden>
+      <b>You're off the course</b>
+      <small id="offtext"></small>
+      <div class="obtns"><button id="offback" class="btn ghost">Back to the course</button><button id="offfree" class="btn go">Freestyle</button></div>
+    </div>
+    <div id="arm" hidden>
+      <div id="armh"></div>
+      <div class="arm-m"><svg id="armarrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l7.5 19L12 16.5 4.5 21z" fill="currentColor"/></svg><span id="armdist"></span></div>
+      <div id="arms"></div>
+      <button id="armgo" class="btn ghost">Start now</button>
+    </div>
+  </div>
+  <aside id="lside">
+    <div class="lh"><span>Km</span><span class="y">You</span><span class="p" id="lhp">Pacer</span></div>
+    <div class="splw"><table id="spl"></table></div>
+  </aside>
+  <div id="bottom">
+    <svg id="course" viewBox="0 0 1000 40" preserveAspectRatio="none" role="img" aria-label="Whole course by gradient, with you and the pacer"></svg>
+    <div class="strip">
+      <span><b id="tm">0:00</b></span>
+      <span><b id="km">0.00</b> km <i id="togow">(<em id="togo">–</em> left)</i></span>
+      <span><em id="projl">Est</em> <b id="proj">–</b> <i id="projd"></i></span>
+      <span id="wxs" hidden><svg id="wxarr" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l7 18-7-4.5L5 20z" fill="currentColor"/></svg><b id="wxspd"></b><i id="wxkind"></i></span>
+    </div>
+    <div class="strip" id="mstrip" hidden>
+      <span>Cadence <b id="cad">--</b><i id="cadt"></i> spm</span>
+      <span>Stride <b id="strd">--</b><i id="strdt"></i> m</span>
+    </div>
+    <div class="tiles" id="tiles">
+      <div id="youtile" class="tile you"><span>You</span><b id="ypace">--:--</b><small id="ystate"></small></div>
+      <div class="tile pc"><span id="plab">Pacer</span><b id="ppace">--:--</b><small id="pstate"></small><small id="rstate" class="rstate" hidden></small></div>
+      <button id="pausebig" class="tile pausebig" aria-label="Pause the run"><i>⏸</i>Pause</button>
+    </div>
+    <div id="ctrls"><button id="go" class="btn go">Start</button><button id="finbtn" class="btn save">Save</button><button id="discbtn" class="btn disc">Discard</button></div>
+    <div id="gpsline"></div>
+  </div>
+</section>
+
+<!-- ============ Result ============ -->
+<section id="result" hidden>
+  <div class="res">
+    <div id="rbadge"></div>
+    <h1 id="rtitle"></h1>
+    <div id="rsub" class="sub"></div>
+    <div class="rbig"><div class="you"><b id="ryou"></b><span>You</span></div><div class="pc" id="rpcbox"><b id="rpacer"></b><span id="rpclab">Pacer</span></div><div class="rv" id="rrvbox" hidden><b id="rrival"></b><span id="rrvlab">Past run</span></div></div>
+    <div class="bt2 shareb"><button id="rshare" class="btn ghost">📸 Share result</button><button id="rchal" class="btn ghost">⚔️ Challenge a friend</button></div>
+    <div id="rdna" class="card rdna" hidden></div>
+    <div class="card"><table class="kt" id="rkm"></table></div>
+    <div class="card" id="rmcard" hidden>
+      <div class="h">Pace, cadence and stride</div>
+      <svg id="rchart" viewBox="0 0 1000 560" role="img" aria-label="Your pace, cadence and stride length along the run"></svg>
+      <div id="rmotion" class="insight"></div>
+    </div>
+    <button id="rrace" class="btn go" hidden>Race this route</button>
+    <button id="ragain" class="btn go" hidden>Run this again</button>
+    <div class="ctrl"><button id="rgpx" class="btn ghost">Export GPX</button><button id="rcsv" class="btn ghost">Export CSV</button><button id="rdone" class="btn go">Done</button></div>
+  </div>
+</section>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

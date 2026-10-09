@@ -87,6 +87,15 @@ export function weekPlan({monday,runsPerWeek=4,weekKm=20,form=null,goal=null,rou
         why:`Comfortably hard${at(P?.tempo)}: right at your threshold, where racing gets easier. The tempo pacer takes the hills for you.`,...pick});
     }
   }
+  // no race coming up: every other week, a Saturday race against your own best on a 5K-ish course
+  // (Thursday's tempo becomes easy that week, so there are still only two hard days)
+  const tt=(phase==='keep'||phase==='base')&&n>=4&&Math.floor(monday/(7*DAY))%2===1&&routes.find(r=>r.D>=4000&&r.D<=6000);
+  if(tt&&days[5].kind==='rest'&&run.includes(5)){
+    const r=[...routes].filter(x=>x.D>=4000&&x.D<=6000).sort((a,b)=>Math.abs(a.D-5000)-Math.abs(b.D-5000))[0];
+    if(quality[1]!=null&&days[quality[1]].kind==='tempo')Object.assign(days[quality[1]],{kind:'rest',title:'Rest',why:''});
+    set(5,{kind:'race',vsBest:true,title:'Race your best',what:r.name,km:r.D/1000,pace:P?paceFor(form,r.D):null,purpose:'race',
+      why:`Time trial: race your best run on ${r.name}, metre by metre, with the pacer on what your form says you can do. Easy for the first kilometre, then hunt it down.`,route:r,how:'full',len:r.D});
+  }
   // the race itself
   if(phase==='race'&&goalR)set(gday,{kind:'race',title:'Race day',what:`${goalR.name}`,km:goalR.D/1000,pace:P?.race,purpose:'race',goalRace:true,
     why:`Race day: goal ${hms(goal.time)}. Trust the pacer: even effort, hills and all.${raceFade>1.5?' Hold back over the first third: in races you usually fade.':''}`,route:goalR,how:'full',len:goalR.D});

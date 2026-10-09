@@ -27,7 +27,7 @@ const fmt=s=>{s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60)
 const fmtP=p=>p&&p<1800?fmt(p):'--:--';
 const gapFmt=s=>s<59.5?`${Math.round(s)} s`:fmt(s);
 const kmStr=m=>(m/1000).toFixed(2);
-const show=id=>{for(const s of ['home','run','result'])$(s).hidden=s!==id;if(id!=='home')closeSheets();if(id!=='run')scrollTo(0,0)};
+const show=id=>{for(const s of ['home','run','result'])$(s).hidden=s!==id;if(id!=='home')closeSheets();if(id!=='run')scrollTo(0,0);syncNav()};
 
 // =====================================================================================
 // Home
@@ -127,7 +127,7 @@ async function importTimed(g,r,name,file){
     route:{id:r.id,name:r.name,src:r.src,pts:r.pts,cues:r.cues||[]},fixes:run.fixes,elapsed:run.elapsed,rd:run.rd,yd:run.dist,
     dist:run.dist,rsplits:run.rsplits,complete:run.complete,saved:Date.now()};
   rec.id=await saveRun(rec);allRuns=await listRuns();
-  selectRoute(r);showResult(rec);
+  selectRoute(r);showResult(rec);resultFresh=true;
   return true;
 }
 
@@ -678,7 +678,7 @@ async function finishSession(){
     rd:R.reduce((a,x)=>a+x.dist,0),saved:Date.now()});
   sess=null;
   await saving;rec.id=await saveRun(rec);allRuns=await listRuns();
-  cancelAnimationFrame(raf);showResult(rec);
+  cancelAnimationFrame(raf);showResult(rec);resultFresh=true;
 }
 
 // ---- When the course and what you run don't match ----
@@ -831,7 +831,7 @@ async function finishRun(complete){
   snapshot();Object.assign(rec,{status:'done',running:false,complete});
   if(complete&&!said&&mode==='race'&&voiceOn()){const g=timeAt(runP,runP.total)-acc/1000,w=runGhost?'your past run':'the pacer';speaker.say(`Finished in ${fmt(acc/1000)}. ${Math.abs(g)<0.5?`A dead heat with ${w}!`:g>0?`You beat ${w} by ${gapPhrase(g).replace(' ahead','')}!`:`${w[0].toUpperCase()+w.slice(1)} won by ${gapPhrase(g).replace(' behind','')}.`}`,3,'pass')}
   await saving;rec.id=await saveRun(rec);allRuns=await listRuns();
-  cancelAnimationFrame(raf);showResult(rec);
+  cancelAnimationFrame(raf);showResult(rec);resultFresh=true;
 }
 
 // Save a recording as a new route plus the run on it: drop poor fixes, resample every 10 m, smooth out
@@ -857,7 +857,7 @@ async function finishRecord(){
   Object.assign(rec,{status:'done',running:false,complete:true,route:{id:r.id,name,src:r.src,pts:s,cues:[]},fixes:fx,rd:D,rsplits:spl,finish:rec.elapsed/1000,prof:null});
   await saving;rec.id=await saveRun(rec);allRuns=await listRuns();
   if(voiceOn())speaker.say(`Route saved. ${kmStr(D)} kilometres in ${fmt(rec.elapsed/1000)}.`,2);
-  showResult(rec);
+  showResult(rec);resultFresh=true;
 }
 // Recorded routes saved offline get their elevation when there's signal again
 async function fixRecordedElevation(){
@@ -1130,6 +1130,7 @@ function verdict(r,c=compare(r)){
   return c.diff<0?{icon:isBest(r)?'🏆':'✅',title:`You beat ${w} by ${by}`,short:`Beat ${w} by ${by}`,cls:'win'}:{icon:'🏃',title:`${cap(w)} won by ${by}`,short:`${cap(w)} won by ${by}`,cls:'lose'};
 }
 function showResult(r){
+  resultFresh=false;
   shownRun=r;document.querySelector('.rbig').classList.remove('three');$('ragain').hidden=false;$('ragain').textContent='Run this again';$('rrvbox').hidden=true;if(r.mode==='intervals')return showIntervalResult(r);$('rrace').hidden=r.mode!=='record';$('rpcbox').hidden=r.mode==='record';
   if(r.mode==='record')return showRecordResult(r);
   const c=compare(r),pr=r.prof?.id==='me'?{name:'Like you'}:PROFILES.find(p=>p.id===r.prof?.id),w=r.ghost?(r.ghost.who?`${r.ghost.who}'s run`:`your ${shortDate(r.ghost.started)} run`):'the pacer',W=w[0].toUpperCase()+w.slice(1);
@@ -1271,7 +1272,12 @@ $('ragain').onclick=()=>{
   show('home');selectRoute(b);openSetup(r.mode==='intervals'?'intcard':'vscard');
 };
 $('rrace').onclick=()=>{const r=routes.find(x=>x.id===shownRun.route.id);show('home');if(r){selectRoute(r);openSetup()}refreshHistory()};
-$('rdone').onclick=()=>{show('home');refreshHistory()};
+// Done: a run you've just finished goes back to Today, where this week's plan ticks it off; one you were
+// looking back at returns to where you were
+let resultFresh=false,planJust=false;
+function doneResult(){const fresh=resultFresh;resultFresh=false;show('home');if(fresh){planJust=true;tab('today');setTimeout(()=>{planJust=false},2500)}
+  refreshHistory().then(()=>{if(fresh&&!$('plancard').hidden)setTimeout(()=>$('plancard').scrollIntoView({behavior:'smooth',block:'center'}),150)})}
+$('rdone').onclick=()=>doneResult();
 $('rgpx').onclick=()=>{
   const r=shownRun,name=`pacer-${new Date(r.started).toISOString().slice(0,16).replace(/[:T]/g,'-')}.gpx`;
   if(!r.route)return;
@@ -1375,9 +1381,45 @@ function tab(t){
 }
 document.querySelectorAll('#tabbar button').forEach(b=>b.onclick=()=>tab(b.dataset.tab));
 // Sheets slide over the tabs: race setup and settings
-const sheetOpen=id=>{closeSheets();$(id).hidden=false;$(id).scrollTop=0;document.documentElement.style.overflow='hidden'};
+const sheetOpen=id=>{closeSheets();$(id).hidden=false;$(id).scrollTop=0;$(id).style.transform='';document.documentElement.style.overflow='hidden';syncNav()};
 function openSetup(focus){if(!base)return tab('routes');sheetOpen('setup');if(focus)requestAnimationFrame(()=>{const e=$(focus);if(e&&!e.hidden)$('setup').scrollTo({top:e.offsetTop-70,behavior:'smooth'})})}
-function closeSheets(){$('setup').hidden=$('settings').hidden=true;document.documentElement.style.overflow=''}
+function closeSheets(){$('setup').hidden=$('settings').hidden=$('addmenu').hidden=true;document.documentElement.style.overflow='';syncNav()}
+// The + menu: the less everyday ways to run (race your best, intervals, another route, record, import)
+function openMenu(){$('addmenu').hidden=false;$('addmenu').querySelector('.menubox').style.transform='';syncNav()}
+function closeMenu(){$('addmenu').hidden=true;syncNav()}
+$('addbtn').onclick=()=>openMenu();$('mclose').onclick=()=>closeMenu();
+$('addmenu').onclick=e=>{if(e.target===$('addmenu'))closeMenu()};
+// The phone's back (Android's back gesture, a browser's back button): everything over Today (a sheet, the
+// menu, a result, the run screen) is one step in the history, so back closes it instead of leaving the
+// app. A run in progress can't be backed out of: pause it first.
+const layerOpen=()=>!$('addmenu').hidden||!$('settings').hidden||!$('setup').hidden||!$('result').hidden||!$('run').hidden;
+let popSkip=false;
+if(history.state?.pacer)history.replaceState(null,''); // (reloaded with a sheet open: nothing's open now)
+function syncNav(){
+  if(popSkip)return;
+  const open=layerOpen(),mark=!!history.state?.pacer;
+  if(open&&!mark)history.pushState({pacer:1},'');
+  else if(!open&&mark){popSkip=true;history.back()}
+}
+addEventListener('popstate',()=>{
+  if(popSkip){popSkip=false;syncNav();return}
+  if(!$('addmenu').hidden)closeMenu();
+  else if(!$('settings').hidden||!$('setup').hidden){closeSheets();renderToday()}
+  else if(!$('result').hidden)doneResult();
+  else if(!$('run').hidden&&(phase==='idle'||phase==='paused'||phase==='done'))$('back').onclick();
+  setTimeout(syncNav,0);
+});
+// Swipe a sheet (from its top) or the menu down to close it
+function swipeClose(el,box,close){
+  let y0=null,dy=0;
+  el.addEventListener('touchstart',e=>{y0=el.scrollTop<=0?e.touches[0].clientY:null;dy=0},{passive:true});
+  el.addEventListener('touchmove',e=>{if(y0==null)return;dy=e.touches[0].clientY-y0;if(dy<=0){box.style.transform='';return}
+    e.preventDefault();box.style.transition='none';box.style.transform=`translateY(${dy}px)`},{passive:false});
+  el.addEventListener('touchend',()=>{if(y0==null)return;y0=null;box.style.transition='';
+    if(dy>110){box.style.transform='translateY(100%)';setTimeout(()=>{box.style.transform='';close()},180)}else box.style.transform=''});
+}
+swipeClose($('setup'),$('setup'),()=>{closeSheets();renderToday()});swipeClose($('settings'),$('settings'),()=>closeSheets());
+swipeClose($('addmenu'),$('addmenu').querySelector('.menubox'),()=>closeMenu());
 $('setupback').onclick=()=>{closeSheets();renderToday()};
 $('gear').onclick=()=>sheetOpen('settings');
 $('setback').onclick=()=>closeSheets();
@@ -1388,6 +1430,8 @@ if(!SIM){const h=new Date().getHours(),n=opt.get('me:name','');$('hello').textCo
 
 // Quick actions (Today, and the welcome card)
 function act(a){
+  if(!$('addmenu').hidden)closeMenu();
+  if(a==='routes')return tab('routes');
   if(a==='gpx')return $('gpx').click();
   if(a==='rec')return enterRecord();
   if(!base)return tab('routes');
@@ -1479,41 +1523,59 @@ function planInputs(){
     routes:routes.filter(r=>!r.laps).map(r=>({id:r.id,name:r.name,D:r.pts.at(-1).d,climb:climbOf(r)}))};
 }
 const PICON={rest:'·',easy:'🌿',long:'🛤️',tempo:'🔥',int:'⏱️',race:'🏁'};
-function renderPlan(){
-  $('plancard').hidden=!routes.length;if(!routes.length)return;
+function planNow(){
+  if(!routes.length)return null;
   const I=planInputs(),p=weekPlan(I),today=Math.floor((Date.now()-I.monday)/864e5);
-  const did=p.days.map(d=>I.own.filter(r=>r.started>=d.date&&r.started<d.date+864e5));
-  if(planSel==null)planSel=today;
-  const doneKm=did.flat().reduce((a,r)=>a+(r.yd??r.rd??0),0)/1000,d=p.days[planSel],ran=did[planSel];
+  return {I,p,today,did:p.days.map(d=>I.own.filter(r=>r.started>=d.date&&r.started<d.date+864e5))};
+}
+// Load today's planned session into the Today card, once a day and only if you haven't run yet
+function autoLoad(pl){
+  const td=pl.p.days[pl.today],key=new Date().toDateString();
+  if(!td?.route||td.kind==='rest'||pl.did[pl.today].length||opt.get('plan:auto',null)===key)return false;
+  opt.set('plan:auto',key);loadSession(td,true);return true;
+}
+function renderPlan(pl){
+  $('plancard').hidden=!pl;if(!pl)return;
+  const {I,p,today,did}=pl;
+  if(planSel===today)planSel=null; // today is the big card above
+  const doneKm=did.flat().reduce((a,r)=>a+(r.yd??r.rd??0),0)/1000,d=planSel!=null?p.days[planSel]:null,ran=d?did[planSel]:[];
   const col=x=>x.kind==='rest'?'#475569':x.rehearse?'#f472b6':KCOL[x.kind];
   const strip=p.days.map((x,i)=>{const st=did[i].length?'done':i<today?(x.kind!=='rest'?'missed':'past'):i===today?'today':'';
-    return `<button class="pd ${st} ${i===planSel?'sel':''}" data-i="${i}" style="--k:${col(x)}"><small>${DOW[i]}</small><i>${did[i].length?'✓':x.rehearse?'🎯':PICON[x.kind]}</i><span>${x.km?Math.round(x.km)+'k':''}</span></button>`}).join('');
+    return `<button class="pd ${st} ${i===planSel?'sel':''} ${i===today&&planJust&&did[i].length?'just':''}" data-i="${i}" style="--k:${col(x)}"><small>${DOW[i]}</small><i>${did[i].length?'✓':x.rehearse?'🎯':PICON[x.kind]}</i><span>${x.km?Math.round(x.km)+'k':''}</span></button>`}).join('');
+  let body='';
+  if(d){
   const where=d.route?`${esc(d.route.name)}${d.how==='part'?` · first ${kmStr(d.len)} km`:''}`:'';
-  let body=`<div class="pl-h"><span class="ktag" style="--k:${col(d)}">${d.title}</span><small>${planSel===today?'Today':new Date(d.date).toLocaleDateString(undefined,{weekday:'long'})}</small></div>`+
+  body=`<div class="pl-h"><span class="ktag" style="--k:${col(d)}">${d.title}</span><small>${new Date(d.date).toLocaleDateString(undefined,{weekday:'long'})}</small><button class="link pl-x" id="plx">Close</button></div>`+
     (d.kind!=='rest'?`<b class="pl-what">${esc(d.what||d.title)}</b>${where&&!d.rehearse&&!d.goalRace?`<small class="pl-where">${where}</small>`:''}`:'')+`<p class="pl-why">${esc(d.why)}</p>`;
   if(ran.length){const r=ran[0],u=r.status==='done'?outcome(r):null;body+=`<button class="pl-done" id="pldone">✓ Done: ${esc(r.route?.name||'Run')} · ${kmStr(r.yd??r.rd??0)} km · ${fmt((r.elapsed||0)/1000)}${u?` · ${esc(u.text)}`:''}<i class="chev"></i></button>`}
-  else if(d.route&&planSel>=today)body+=`<button class="btn go" id="plgo">${planSel===today?'Set it up':`Set it up for ${DOW[planSel]}`}</button>`;
+  else if(d.route&&planSel>=today)body+=`<button class="btn go" id="plgo">Run it now instead</button>`;
+  }
   $('plancard').innerHTML=`<div class="pl-top"><div><div class="eyebrow">Your week</div><b>${esc(p.title)}</b></div><div class="pl-km"><b>${doneKm.toFixed(0)}</b><span>of ${Math.round(p.km)} km</span></div></div>`+
-    `<div class="pl-bar"><i style="width:${Math.min(100,doneKm/Math.max(1,p.km)*100)}%"></i></div><div class="pdays">${strip}</div><div class="pl-d">${body}</div>`+
+    `<div class="pl-bar"><i style="width:${Math.min(100,doneKm/Math.max(1,p.km)*100)}%"></i></div><div class="pdays">${strip}</div>${body?`<div class="pl-d">${body}</div>`:''}`+
     `<div class="pl-n"><span>Runs a week</span><div class="seg">${[3,4,5,6].map(k=>`<button data-n="${k}" class="${k===I.runsPerWeek?'on':''}">${k}</button>`).join('')}</div></div>`;
-  $('plancard').querySelectorAll('.pd').forEach(b=>b.onclick=()=>{planSel=+b.dataset.i;renderPlan()});
+  $('plancard').querySelectorAll('.pd').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;
+    if(i===today&&!did[i].length){planSel=null;renderPlan(planNow());$('hero').scrollIntoView({behavior:'smooth',block:'start'});return}
+    planSel=planSel===i?null:i;renderPlan(planNow())});
+  if($('plx'))$('plx').onclick=()=>{planSel=null;renderPlan(planNow())};
   $('plancard').querySelectorAll('.pl-n button').forEach(b=>b.onclick=()=>{opt.set('plan:n',+b.dataset.n);renderToday()});
   if($('plgo'))$('plgo').onclick=()=>loadSession(d);
   if($('pldone'))$('pldone').onclick=()=>showResult(ran[0]);
 }
 // Load a planned session into Pacer: the route, how to run it, what it's for and its target
-function loadSession(d){
+function loadSession(d,quiet){
   const b=routes.find(x=>x.id===d.route.id);if(!b)return;
   if(d.how==='int'){opt.set('how:'+b.id,'int');const {pace,...c}=d.int;opt.set('int:'+b.id,pace?{...c,pace}:c)}
   else{
     opt.set('how:'+b.id,d.how==='part'?'part':'full');if(d.how==='part')opt.set('part:'+b.id,d.len);
     const cid=d.how==='part'?`${b.id}:p${d.len}`:b.id,pu=d.purpose||'race',g=goalOf();
     opt.set('purpose:'+cid,pu);opt.set('pcmode:'+cid,'profile');
+    // racing your best: your quickest own run there alongside the pacer
+    if(d.vsBest){const best=runsOn(b).filter(mine)[0];if(best){opt.set('pcmode:'+cid,'both');opt.set('ghost:'+cid,best.id)}}
     // a rehearsal runs the start of the goal race exactly as the goal-race pacer would; the race, the goal
     let t=null;if(d.rehearse&&g)t=Math.round(timeAt(buildPacer(b.pts,g.time,prof),d.len));if(d.goalRace&&g)t=g.time;
     opt.set(finKey(cid,pu),t);
   }
-  selectRoute(b);renderToday();requestAnimationFrame(()=>$('hero').scrollIntoView({behavior:'smooth',block:'start'}));
+  planSel=null;selectRoute(b);if(quiet)return;renderToday();requestAnimationFrame(()=>$('hero').scrollIntoView({behavior:'smooth',block:'start'}));
 }
 
 // ---- Goal race: a race on one of your courses to train towards ----
@@ -1568,9 +1630,15 @@ function renderGoal(){
 // ---- Today ----
 function renderToday(){
   $('welcome').hidden=routes.length>0;
-  const ok=!!(base&&route&&P);$('hero').hidden=$('quick').hidden=!ok;
+  // Today's run comes from your week's plan: loaded into the card once a day (change it freely after)
+  const pl=planNow();if(pl&&autoLoad(pl))return;
+  const td=pl?.p.days[pl.today],ranToday=!!pl?.did[pl.today].length,planned=td&&td.kind!=='rest'&&td.route?.id===base?.id&&!ranToday;
+  const ok=!!(base&&route&&P);$('hero').hidden=!ok;
   if(ok){
-    $('hname').textContent=route.name;$('hero').querySelector('.eyebrow').textContent=howOf()==='int'?'Ready for the session':vsMode==='ghost'||purposeOf()==='race'?'Ready to race':`Ready for a${purposeOf()==='easy'?'n easy':' tempo'} run`;
+    $('hname').textContent=route.name;
+    $('hero').querySelector('.eyebrow').textContent=ranToday?'Done today ✓':planned?`Today · ${td.title}`:td?.kind==='rest'?'Rest day':
+      howOf()==='int'?'Ready for the session':vsMode==='ghost'||purposeOf()==='race'?'Ready to race':`Ready for a${purposeOf()==='easy'?'n easy':' tempo'} run`;
+    $('hwhy').hidden=!planned;$('hwhy').textContent=planned?td.why:'';
     $('hchips').innerHTML=[`${kmStr(P.total)} km`,`${Math.round(climbOf(route))} m climb`,`${turns.length} turn${turns.length===1?'':'s'}`].map(t=>`<span>${t}</span>`).join('');
     drawPlanMap($('hmap'));
     const lo=Math.min(...P.es),span=Math.max(Math.max(...P.es)-lo,15),X=d=>(d/P.total*300).toFixed(1),Y=e=>(40-(e-lo)/span*34).toFixed(1);let e='';
@@ -1589,12 +1657,12 @@ function renderToday(){
     if(P.wx&&o.wxOn&&purposeOf()!=='easy'){const d=P.wx.suggested-P.target;if(Math.abs(d)>=1)bits.push(`conditions ${d>0?'cost':'save'} <b>${gapFmt(Math.abs(d))}</b>`)}
     if(ct)bits.push(`🔮 you: about <b>${fmt(ct.t)}</b>`);
     $('hwx').innerHTML=bits.map(b=>`<span>${b}</span>`).join('');
-    const g=ghosts0()[0];$('qbest').textContent=g?`${fmt(g.time)} · ${g.run.imported?.who||(g.run.imported?'imported':'you')}`:'Run it once first';
+    const g=ghosts0().find(x=>mine(x.run));$('qbest').textContent=g?`${fmt(g.time)} on ${route.name}`:'Run this route once first';
   }
   // last run
   const done=allRuns.filter(r=>r.status==='done').sort((a,b)=>b.started-a.started),last=done[0];
   $('lastcard').hidden=!last;
-  renderGoal();renderPlan();
+  renderPlan(pl);renderGoal();
   if(last){const u=outcome(last);
     $('lastcard').innerHTML=`<button class="lastrun" id="lastbtn"><span class="lr-ic">${u.icon}</span><span class="lr-t"><small>Last run · ${when(last.started)}${last.sim?' · sim':''}</small><b>${esc(last.route?.name||'Run')}</b><small>${kmStr(u.c.d||last.yd||0)} km · ${fmt(u.c.you)}</small><div class="lr-r ${u.cls}">${esc(u.text)}</div></span><i class="chev"></i></button>`;
     $('lastbtn').onclick=()=>showResult(last)}

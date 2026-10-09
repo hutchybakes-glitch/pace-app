@@ -480,3 +480,21 @@ a{color:var(--you)}
 .pl-done .chev{margin-left:auto;border-color:var(--good)}
 .pl-n{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}.pl-n span{color:var(--mut);font-size:13px;flex:none}.pl-n .seg{max-width:200px}
 .pl-n .seg button{padding:6px 2px}
+
+/* ---------- v3.2: navigation ---------- */
+.hbtns{display:flex;gap:8px}
+.iconbtn.add{background:linear-gradient(160deg,#1f2c46,var(--card));border-color:rgba(96,165,250,.35)}.iconbtn.add svg{color:#fff}
+.hwhy{margin:10px 0 0;color:var(--mut2);font-size:14px;line-height:1.45}
+.menu{position:fixed;inset:0;z-index:40;background:rgba(2,6,23,.6);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;animation:fade .2s}
+.menu[hidden]{display:none}
+@keyframes fade{from{opacity:0}}
+.menubox{width:100%;max-width:560px;background:var(--bg2);border:1px solid var(--line);border-bottom:0;border-radius:24px 24px 0 0;padding:8px 16px calc(env(safe-area-inset-bottom) + 16px);transition:transform .18s;animation:up .28s cubic-bezier(.2,.8,.2,1)}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--card3);margin:4px auto 10px}
+.menubox>button[data-act]{display:flex;align-items:center;gap:14px;width:100%;text-align:left;border:0;background:var(--card);border-radius:16px;padding:13px 14px;margin-top:8px;color:#fff;font:inherit}
+.menubox>button i{font-style:normal;font-size:22px;width:30px;text-align:center;flex:none}
+.menubox>button b{display:block;font-size:16px}.menubox>button small{display:block;color:var(--mut);font-size:13px;margin-top:1px}
+.menubox .recdot{display:inline-block;width:18px;height:18px;border-radius:50%;background:#ef4444;box-shadow:0 0 0 4px rgba(239,68,68,.25);margin:0 6px}
+.sheet{transition:transform .18s}
+.pl-x{margin-left:auto;font-size:13px}
+.pd.just{animation:just 1.4s ease 2}
+@keyframes just{0%,100%{transform:none}30%{transform:scale(1.12);box-shadow:0 0 0 3px var(--good),0 0 22px rgba(74,222,128,.7)}}

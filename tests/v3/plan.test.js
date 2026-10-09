@@ -7,9 +7,12 @@ const routes=[{id:1,name:'Hills loop',D:8000,climb:72},{id:2,name:'Park 5K',D:50
 const kinds=p=>p.days.map(d=>d.kind[0]).join('');
 
 test('plan: a week with no goal: intervals Tue, tempo Thu, long Sun, easy runs, the rest rest',()=>{
-  const p=weekPlan({monday:mon,runsPerWeek:4,weekKm:30,form:268,routes});
+  // weeks alternate: a tempo on Thursday, or (no tempo) a Saturday race against your best on the 5K course
+  const [p,q]=[mon,mon+7*DAY].map(m=>weekPlan({monday:m,runsPerWeek:4,weekKm:30,form:268,routes})).sort((a,b)=>a.days[5].kind==='race'?1:-1);
   assert.equal(p.phase,'keep');assert.equal(kinds(p),'rirtrel');
   assert.deepEqual(p.days.map(d=>d.kind),['rest','int','rest','tempo','rest','easy','long']);
+  assert.deepEqual(q.days.map(d=>d.kind),['rest','int','rest','easy','rest','race','long']);
+  assert.ok(q.days[5].vsBest&&q.days[5].route.id===2,'race your best on the park 5K');
   const L=p.days[6];assert.equal(L.route.id,4,'a third of the week: about 10 km');assert.equal(weekPlan({monday:mon,runsPerWeek:4,weekKm:45,form:268,routes}).days[6].route.id,3,'a bigger week: the long route');assert.ok(L.pace>paceFor(268,16000)*1.2);
   const I=p.days[1];assert.equal(I.how,'int');assert.equal(I.route.id,2,'speed work on the flattest route');assert.ok(I.int.reps>=4&&I.int.pace<268);
   assert.ok(Math.abs(p.km-30*1.04)<9,`about the usual week: ${p.km}`);

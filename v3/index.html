@@ -22,7 +22,8 @@
   <div class="pane" id="tab-today">
     <header class="hdr">
       <div><small id="hello">Pacer</small><h1>Today</h1></div>
-      <button id="gear" class="iconbtn" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+      <div class="hbtns"><button id="addbtn" class="iconbtn add" aria-label="More ways to run"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+      <button id="gear" class="iconbtn" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button></div>
     </header>
 
     <div id="chin" class="card chal" hidden>
@@ -50,13 +51,11 @@
       <div class="bt2"><button class="btn go" data-act="gpx">Load a GPX</button><button class="btn rec" data-act="rec">● Record a route</button></div>
     </div>
 
-    <div id="goalcard" class="card goal" hidden></div>
-    <div id="plancard" class="card plan" hidden></div>
-
     <div id="hero" class="card hero" hidden>
       <div class="hero-top"><span class="eyebrow">Ready to race</span><button id="hchange" class="link">Change route</button></div>
       <h2 id="hname"></h2>
       <div id="hchips" class="chips"></div>
+      <p id="hwhy" class="hwhy" hidden></p>
       <div class="hmapw"><svg id="hmap" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg><svg id="hele" viewBox="0 0 300 40" preserveAspectRatio="none" aria-hidden="true"></svg></div>
       <div class="seg purpose" id="hpurpose"><button data-v="race">🏁 Race</button><button data-v="tempo">🔥 Tempo</button><button data-v="easy">🌿 Easy</button></div>
       <div id="hvs" class="vs"></div>
@@ -65,12 +64,8 @@
       <button id="hsetup" class="btn ghost">Race setup</button>
     </div>
 
-    <div class="quick" id="quick">
-      <button data-act="best"><i>🏆</i><b>Race your best</b><small id="qbest">Your quickest run here</small></button>
-      <button data-act="int"><i>⏱️</i><b>Intervals</b><small>Reps on this route</small></button>
-      <button data-act="rec"><i class="recdot"></i><b>Record a route</b><small>Run it, then race it</small></button>
-      <button data-act="gpx"><i>📥</i><b>Import a run</b><small>GPX from Strava, Garmin…</small></button>
-    </div>
+    <div id="plancard" class="card plan" hidden></div>
+    <div id="goalcard" class="card goal" hidden></div>
 
     <div id="lastcard" class="card" hidden></div>
     <div id="weekcard" class="card week" hidden></div>
@@ -264,6 +259,19 @@
       <div class="bt2"><button id="bk" class="btn ghost">Back up everything</button><label class="btn ghost">Restore a backup<input type="file" id="rsfile" accept=".json,application/json" hidden></label></div>
     </div>
     <p class="foot"><a href="../v2/">Pacer v2</a> · <a href="../">Classic Pace (v1)</a></p>
+  </div>
+</section>
+
+<!-- ============ More ways to run (the + menu) ============ -->
+<section id="addmenu" class="menu" hidden>
+  <div class="menubox" role="dialog" aria-label="More ways to run">
+    <div class="grab"></div>
+    <button data-act="best"><i>🏆</i><span><b>Race your best</b><small id="qbest">Your quickest run on this route</small></span></button>
+    <button data-act="int"><i>⏱️</i><span><b>Intervals</b><small>Reps on this route</small></span></button>
+    <button data-act="routes"><i>🗺️</i><span><b>Choose a route</b><small>All your courses</small></span></button>
+    <button data-act="rec"><i class="recdot"></i><span><b>Record a new route</b><small>Run it, then race it</small></span></button>
+    <button data-act="gpx"><i>📥</i><span><b>Import a run or route</b><small>GPX from Strava, Garmin, Komoot…</small></span></button>
+    <button id="mclose" class="btn ghost">Cancel</button>
   </div>
 </section>
 

@@ -61,7 +61,11 @@ test('analysis: flat-equivalent pace, trend and race predictions',()=>{
   const tenK=A.predict.find(p=>p.id==='10k'),five=A.predict.find(p=>p.id==='5k');
   // the best run was 2910 s over hilly 10 km: on the flat, a little quicker
   assert.ok(tenK.t<2910&&tenK.t>2750,`10k ${tenK.t}`);close(five.t,riegel(tenK.t,10000,5000),5);
-  assert.ok(A.predict.find(p=>p.id==='mar'),'10 km runs predict a marathon (4.2×)');
+  // the long races need a long run first: 10 km runs don't predict a half or a marathon
+  assert.ok(!A.predict.find(p=>p.id==='mar')&&!A.predict.find(p=>p.id==='half'));
+  assert.deepEqual(A.locked.map(p=>[p.id,p.need]),[['half',13],['mar',26]]);
+  const pts16=route(16000),B=analyse([...runs,runOf(pts16,5600,fit,{started:t0+45*day})],t0+50*day);
+  assert.ok(B.predict.find(p=>p.id==='half'),'a 16 km run unlocks the half');assert.ok(B.locked.some(p=>p.id==='mar'));
 });
 
 test('analysis: pacing scores: even vs fading',()=>{

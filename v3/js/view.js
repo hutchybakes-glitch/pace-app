@@ -94,6 +94,8 @@ export function createView(canvas){
     ctx.fillStyle=fg;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,x,y+0.5);ctx.restore();
   }
   // Your time gap above your line, F1-style: green when you're ahead, orange when the pacer is
+  // A runner's tag that would sit on top of your gap label moves up above it
+  const dodge=(x,y,w,gx,gy,gw=140)=>Math.abs(y-gy)<26&&Math.abs(x-gx)<(w+gw)/2?gy-28:y;
   function gapLabel(g,x,y,size=16){
     if(g==null)return;
     const level=Math.abs(g)<0.05,ahead=g>0;
@@ -157,7 +159,7 @@ export function createView(canvas){
     across(0,'#22c55e',5);across(R.total,'#ffffff',6,true);
 
     // Target pace written on the road ahead, wherever it changes
-    const near=d=>Math.abs(d-s.you)<20||(s.pacer!=null&&Math.abs(d-s.pacer)<20)||R.turns.some(t=>Math.abs(t.d-d)<20);
+    const near=d=>Math.abs(d-s.you)<20||(s.pacer!=null&&Math.abs(d-s.pacer)<30)||(s.rival&&Math.abs(d-s.rival.d)<30)||R.turns.some(t=>Math.abs(t.d-d)<20);
     for(const m of R.marks){
       if(m.d<s.you+20||m.d>s.you+reach*0.75||near(m.d)||coveredD(m.d,s.you))continue;
       const p=at(m.d),q=T(p.x,p.y);paceText(mmss(m.pace),q[0],q[1],Math.max(16,Math.min(22,roadW)));
@@ -182,8 +184,8 @@ export function createView(canvas){
     // Labels last so nothing covers them: PACER beside its line, your gap above you
     // Labels last so nothing covers them: live paces at the line ends, your gap above you
     const clampX=(x,w)=>Math.max(lft+w/2+2,Math.min(lft+vw-w/2-2,x));
-    if(rq){dot(rq.c[0],rq.c[1],8,PURPLE);pill(s.rival.label,clampX(rq.left[0]-40,64),rq.left[1],PURPLE,'#1e0b2e',12)}
-    if(pq){dot(pq.c[0],pq.c[1],8,ORANGE);pill(s.label||'PACER',clampX(pq.right[0]+34,58),pq.right[1],ORANGE,'#1c1003',12)}
+    if(rq){dot(rq.c[0],rq.c[1],8,PURPLE);const x=clampX(rq.left[0]-40,64);pill(s.rival.label,x,dodge(x,rq.left[1],64,ax,ay-36),PURPLE,'#1e0b2e',12)}
+    if(pq){dot(pq.c[0],pq.c[1],8,ORANGE);const x=clampX(pq.right[0]+34,58);pill(s.label||'PACER',x,dodge(x,pq.right[1],58,ax,ay-36),ORANGE,'#1c1003',12)}
     pill(metres(s.you),clampX(yq.left[0]-42,76),yq.left[1],'rgba(2,6,23,.88)','#f1f5f9',14);
     gapLabel(s.gap,ax,ay-36,17);
     const hdDeg=(Math.atan2(hd.x,hd.y)*180/Math.PI+360)%360;heads={view:hdDeg,travel:hdDeg};
@@ -312,7 +314,7 @@ export function createView(canvas){
 
     // Target pace painted on the road ahead (front view)
     if(!rear)for(const m of R.marks){
-      if(m.d<s.you+12||m.d>s.you+350||(s.pacer!=null&&Math.abs(m.d-s.pacer)<12)||coveredD(m.d,s.you))continue;
+      if(m.d<s.you+12||m.d>s.you+350||(s.pacer!=null&&Math.abs(m.d-s.pacer)<15)||(s.rival&&Math.abs(m.d-s.rival.d)<15)||coveredD(m.d,s.you))continue;
       const pt=onRoad(m.d,0.1);if(!pt||hidden(pt)||pt[2]>320)continue;
       const size=Math.max(11,Math.min(36,F*2.8/pt[2]));paceText(mmss(m.pace),pt[0],pt[1],size,Math.max(0.35,1-pt[2]/340));
     }
@@ -338,8 +340,9 @@ export function createView(canvas){
       const side=Math.max(44,F*1.1/head[2]);
       const inView=(x,w)=>Math.max(lft+w/2+2,Math.min(lft+vw-w/2-2,x)); // keep tags clear of the side columns
       if(o.me){pill(metres(s.you),inView(head[0]-side-10,76),head[1]+lift*0.4,'rgba(2,6,23,.88)','#f1f5f9',13);gapLabel(s.gap,inView(head[0],110),head[1]-lift-6,16)}
-      else if(o.rival)pill(s.rival.label,inView(head[0]-side,64),head[1],PURPLE,'#1e0b2e',12,ghost?0.6:1);
-      else pill(s.label||'PACER',inView(head[0]+side,58),head[1],ORANGE,'#1c1003',12,ghost?0.6:1);
+      else{const me=onRoad(s.you,2.4),ml=me&&Math.max(16,F*0.55/me[2]),gx=me?inView(me[0],110):-1e9,gy=me?me[1]-ml-6:-1e9;
+        if(o.rival){const x=inView(head[0]-side,64);pill(s.rival.label,x,dodge(x,head[1],64,gx,gy),PURPLE,'#1e0b2e',12,ghost?0.6:1)}
+        else{const x=inView(head[0]+side,58);pill(s.label||'PACER',x,dodge(x,head[1],58,gx,gy),ORANGE,'#1c1003',12,ghost?0.6:1)}}
     }
     const camDeg=(Math.atan2(f[0],f[1])*180/Math.PI+360)%360,runDeg=(Math.atan2(cd.x,cd.y)*180/Math.PI+360)%360;
     heads={view:camDeg,travel:runDeg};

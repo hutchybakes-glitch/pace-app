@@ -16,7 +16,8 @@ import {SIM,SPEED,now,every,sim,simWatch,SCENARIOS} from './sim.js';
 import {createCoach,createSpeaker,gapPhrase,STYLES} from './coach.js';
 import {createMotion,cadenceAt,strideOf,kmMotion,motionInsight,UPDATE_MS,STRIDE_MS,cadenceBaseline,cadencePlan,planAt,cadenceSigns,cadenceTip} from './motion.js';
 import {fetchWeather,at as wxAt,windStretches,compass16,mph,SHELTER} from './weather.js';
-import {analyse as analyseRuns,learnedProfile,courseTime,mine,bests as bestsOf,KINDS} from './analysis.js';
+import {analyse as analyseRuns,learnedProfile,courseTime,mine,bests as bestsOf,KINDS,sessionProgress,formAt} from './analysis.js';
+import {weekPlan,DOW} from './plan.js';
 import {renderInsights,runFacts,KCOL} from './insights-ui.js';
 import {encodeChallenge,decodeChallenge,challengeRoute,challengeRun,drawCard} from './share.js';
 
@@ -531,7 +532,7 @@ function enterRecord(){
 }
 function resetRun(){
   phase='idle';acc=0;track.reset();smoother.reset();rd=0;rsplits=[];rpts=[];spts=[];curPace=null;vNow=0;shownD=0;offRoute=false;
-  rec=null;dirty=false;gate=null;sim.restart=true;sim.moving=false;trail=[];spokenSplits=0;
+  $('rvbar').hidden=true;rec=null;dirty=false;gate=null;sim.restart=true;sim.moving=false;trail=[];spokenSplits=0;
   steps=[];stepN=0;stepSplits=[];dhist=[];cadNow=strNow=null;motionT=-1e9;motionFrom=0;signI=0;tipAt=-1e9;lowCount=0;driftAt=-1e9;
   course=runP?createCourse(runP):null;rivalCourse=runRival?createCourse(runRival.P):null;rvLead=null;rvLeadAt=-1e9;rvCand=null;rvSplits=0;yd=0;offWarned=false;lineAt=fullAt=null;line=null;$('offcard').hidden=true;
   matcher=runRoute?createMatcher(runRoute.pts):null;
@@ -601,9 +602,15 @@ function onPos(p){
 // ---- The past run alongside the pacer: its gap in the pacer tile; calls when the lead changes and at
 // each km ----
 function rivalHud(t){
-  $('rstate').hidden=!runRival||mode!=='race';if(!runRival||mode!=='race')return;
+  // The past run (or friend) gets its own bar above the tiles: who, the gap, and how far apart you are
+  const on=!!runRival&&mode==='race'&&phase!=='idle'&&phase!=='armed';
+  if($('rvbar').hidden===on){$('rvbar').hidden=!on;requestAnimationFrame(layout)}
+  if(!on)return;
   const D=runP.total,g=fullAt!=null?runRival.P.finish-fullAt/1000:lineAt!=null?rivalCourse.pacerT(D)-lineAt/1000:rivalCourse.pacerT(rd)-t;
-  $('rstate').textContent=`${runRival.label}: ${Math.abs(g)<0.5?'level':`${gapText(g)} s`}`;
+  const m=Math.round(rivalCourse.pacerD(t)-rd),nm=runRival.label;
+  $('rvname').textContent=nm;$('rvbar').className='rvbar '+(Math.abs(g)<0.5?'level':g>0?'lead':'trail');
+  $('rvgap').textContent=Math.abs(g)<0.5?'Level':g>0?`You lead by ${gapFmt(g)}`:`${gapFmt(-g)} ahead of you`;
+  $('rvm').textContent=lineAt==null&&Math.abs(m)>=5?`${Math.abs(m)} m ${m>0?'up the road':'back'}`:'';
   if(phase!=='running'||lineAt!=null)return;
   // lead changes (held 3 s, at most one a minute)
   const lead=g>0.5?'you':g<-0.5?'them':rvLead,n=Date.now();
@@ -1403,7 +1410,7 @@ let bestC=null,bestFor=null;
 const getBests=()=>{if(bestFor!==allRuns){bestFor=allRuns;bestC=bestsOf(allRuns.filter(r=>SIM||!r.sim))}return bestC};
 function renderIns(){
   renderInsights($('insights'),getA(),{meOn:prof.id==='me',onMe:on=>{const me=learnedProfile(getA());setProf(on&&me?profOf(me):profOf(PROFILES[0]));renderIns()},
-    bests:getBests(),onRun:id=>{const r=allRuns.find(x=>x.id===id);if(r)showResult(r)}});
+    bests:getBests(),sessions:sessionProgress(allRuns.filter(r=>SIM||!r.sim)),onRun:id=>{const r=allRuns.find(x=>x.id===id);if(r)showResult(r)}});
 }
 // What kind of run: race, tempo, easy, long (learned from how hard it was, or what you set it as), intervals;
 // a friend's run is theirs
@@ -1456,6 +1463,59 @@ function renderPurpose(){
     easy:'Easy: the pacer runs your easy pace. Stay with it or let it go; the coach won\'t push you to catch it.'}[pu];
 }
 
+// ---- Your week: a suggested week of sessions (plan.js), each loaded into Pacer with a tap ----
+let planSel=null;
+function planInputs(){
+  const d0=new Date();d0.setHours(0,0,0,0);d0.setDate(d0.getDate()-((d0.getDay()+6)%7));const monday=d0.getTime(),W=7*864e5;
+  const own=allRuns.filter(r=>mine(r)&&r.status==='done'&&(SIM||!r.sim));
+  // your usual week: the four weeks before this one (weeks you ran in, so a holiday doesn't drag it down)
+  const prev=own.filter(r=>r.started<monday&&r.started>=monday-4*W),wks=new Set(prev.map(r=>Math.floor((monday-r.started)/W)));
+  const weekKm=wks.size?prev.reduce((a,r)=>a+(r.yd??r.rd??0),0)/1000/wks.size:0;
+  // runs a week: the middle of those four weeks (a light week doesn't drag it down either)
+  const per=[0,1,2,3].map(k=>new Set(prev.filter(r=>Math.floor((monday-r.started)/W)===k).map(r=>new Date(r.started).toDateString())).size).filter(Boolean).sort((a,b)=>a-b);
+  const n=opt.get('plan:n',null)??(per.length?Math.max(3,Math.min(6,per[Math.floor(per.length/2)])):4),longKm=Math.max(0,...prev.map(r=>(r.yd??r.rd??0)/1000));
+  const A=getA(),form=A.ready?(formAt(A.per,monday)??A.form):null,g=goalOf(),gr=g&&routes.find(r=>r.id===g.route);
+  return {monday,runsPerWeek:n,weekKm,longKm,form,goal:gr?{...g,D:gr.pts.at(-1).d}:null,raceFade:A.raceFade??null,own,
+    routes:routes.filter(r=>!r.laps).map(r=>({id:r.id,name:r.name,D:r.pts.at(-1).d,climb:climbOf(r)}))};
+}
+const PICON={rest:'·',easy:'🌿',long:'🛤️',tempo:'🔥',int:'⏱️',race:'🏁'};
+function renderPlan(){
+  $('plancard').hidden=!routes.length;if(!routes.length)return;
+  const I=planInputs(),p=weekPlan(I),today=Math.floor((Date.now()-I.monday)/864e5);
+  const did=p.days.map(d=>I.own.filter(r=>r.started>=d.date&&r.started<d.date+864e5));
+  if(planSel==null)planSel=today;
+  const doneKm=did.flat().reduce((a,r)=>a+(r.yd??r.rd??0),0)/1000,d=p.days[planSel],ran=did[planSel];
+  const col=x=>x.kind==='rest'?'#475569':x.rehearse?'#f472b6':KCOL[x.kind];
+  const strip=p.days.map((x,i)=>{const st=did[i].length?'done':i<today?(x.kind!=='rest'?'missed':'past'):i===today?'today':'';
+    return `<button class="pd ${st} ${i===planSel?'sel':''}" data-i="${i}" style="--k:${col(x)}"><small>${DOW[i]}</small><i>${did[i].length?'✓':x.rehearse?'🎯':PICON[x.kind]}</i><span>${x.km?Math.round(x.km)+'k':''}</span></button>`}).join('');
+  const where=d.route?`${esc(d.route.name)}${d.how==='part'?` · first ${kmStr(d.len)} km`:''}`:'';
+  let body=`<div class="pl-h"><span class="ktag" style="--k:${col(d)}">${d.title}</span><small>${planSel===today?'Today':new Date(d.date).toLocaleDateString(undefined,{weekday:'long'})}</small></div>`+
+    (d.kind!=='rest'?`<b class="pl-what">${esc(d.what||d.title)}</b>${where&&!d.rehearse&&!d.goalRace?`<small class="pl-where">${where}</small>`:''}`:'')+`<p class="pl-why">${esc(d.why)}</p>`;
+  if(ran.length){const r=ran[0],u=r.status==='done'?outcome(r):null;body+=`<button class="pl-done" id="pldone">✓ Done: ${esc(r.route?.name||'Run')} · ${kmStr(r.yd??r.rd??0)} km · ${fmt((r.elapsed||0)/1000)}${u?` · ${esc(u.text)}`:''}<i class="chev"></i></button>`}
+  else if(d.route&&planSel>=today)body+=`<button class="btn go" id="plgo">${planSel===today?'Set it up':`Set it up for ${DOW[planSel]}`}</button>`;
+  $('plancard').innerHTML=`<div class="pl-top"><div><div class="eyebrow">Your week</div><b>${esc(p.title)}</b></div><div class="pl-km"><b>${doneKm.toFixed(0)}</b><span>of ${Math.round(p.km)} km</span></div></div>`+
+    `<div class="pl-bar"><i style="width:${Math.min(100,doneKm/Math.max(1,p.km)*100)}%"></i></div><div class="pdays">${strip}</div><div class="pl-d">${body}</div>`+
+    `<div class="pl-n"><span>Runs a week</span><div class="seg">${[3,4,5,6].map(k=>`<button data-n="${k}" class="${k===I.runsPerWeek?'on':''}">${k}</button>`).join('')}</div></div>`;
+  $('plancard').querySelectorAll('.pd').forEach(b=>b.onclick=()=>{planSel=+b.dataset.i;renderPlan()});
+  $('plancard').querySelectorAll('.pl-n button').forEach(b=>b.onclick=()=>{opt.set('plan:n',+b.dataset.n);renderToday()});
+  if($('plgo'))$('plgo').onclick=()=>loadSession(d);
+  if($('pldone'))$('pldone').onclick=()=>showResult(ran[0]);
+}
+// Load a planned session into Pacer: the route, how to run it, what it's for and its target
+function loadSession(d){
+  const b=routes.find(x=>x.id===d.route.id);if(!b)return;
+  if(d.how==='int'){opt.set('how:'+b.id,'int');const {pace,...c}=d.int;opt.set('int:'+b.id,pace?{...c,pace}:c)}
+  else{
+    opt.set('how:'+b.id,d.how==='part'?'part':'full');if(d.how==='part')opt.set('part:'+b.id,d.len);
+    const cid=d.how==='part'?`${b.id}:p${d.len}`:b.id,pu=d.purpose||'race',g=goalOf();
+    opt.set('purpose:'+cid,pu);opt.set('pcmode:'+cid,'profile');
+    // a rehearsal runs the start of the goal race exactly as the goal-race pacer would; the race, the goal
+    let t=null;if(d.rehearse&&g)t=Math.round(timeAt(buildPacer(b.pts,g.time,prof),d.len));if(d.goalRace&&g)t=g.time;
+    opt.set(finKey(cid,pu),t);
+  }
+  selectRoute(b);renderToday();requestAnimationFrame(()=>$('hero').scrollIntoView({behavior:'smooth',block:'start'}));
+}
+
 // ---- Goal race: a race on one of your courses to train towards ----
 const goalOf=()=>opt.get('goal',null);
 const isoDay=ms=>{const d=new Date(ms),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`};
@@ -1501,7 +1561,7 @@ function renderGoal(){
   const was=v.length?v[0]:null;
   $('goalcard').innerHTML=`<button class="goalbtn" id="glopen"><div class="eyebrow">🎯 Goal race · ${days<=0?'today':days===1?'tomorrow':`in ${days} days`}</div><h3>${esc(g.name)}</h3><small class="gdate">${dayStr(g.date)}</small>`+
     `<div class="gnums"><div><span>Goal</span><b>${fmt(g.time)}</b></div><div><span>You today</span><b>${pred!=null?'≈ '+fmt(pred):'–'}</b></div></div>`+spark+
-    `<div class="gstat ${gap!=null&&gap<=0?'win':''}">${gap==null?'Run or import a few runs and Pacer predicts your time on this course.':gap<=0?`On track ✓ about ${gapFmt(-gap)} in hand`:`${gapFmt(gap)} to find${days>0?` in ${days} days`:''}`}${was!=null&&pred!=null&&was-pred>=5?` · ${gapFmt(was-pred)} quicker than 12 weeks ago`:''}</div></button>`;
+    `<div class="gstat ${gap!=null&&gap<=0?'win':''}">${gap==null?'Run or import a few runs and Pacer predicts your time on this course.':Math.abs(gap)<3?'Right on your goal: keep it going':gap<=0?`On track ✓ about ${gapFmt(-gap)} in hand`:`${gapFmt(gap)} to find${days>0?` in ${days} days`:''}`}${was!=null&&pred!=null&&was-pred>=5?` · ${gapFmt(was-pred)} quicker than 12 weeks ago`:''}</div></button>`;
   $('glopen').onclick=open;
 }
 
@@ -1526,7 +1586,7 @@ function renderToday(){
     $('hvs').innerHTML=cells.map(c=>`<div class="${c.k}"><span>${esc(c.l)}</span><b>${c.v}</b><small>${esc(c.s)}</small></div>`).join('');
     const wc=wx.w?wxAt(wx.w,raceStart):null,ct=vsMode==='ghost'||how==='int'||purposeOf()!=='race'?null:courseTime(getA(),P),bits=[];
     if(wc)bits.push(`🌡 <b>${Math.round(wc.temp)}°C</b>`,`💨 <b>${Math.round(mph(wc.wind))} mph</b> ${compass16(wc.dir)}`);
-    if(P.wx&&o.wxOn){const d=P.wx.suggested-P.target;if(Math.abs(d)>=1)bits.push(`conditions ${d>0?'cost':'save'} <b>${gapFmt(Math.abs(d))}</b>`)}
+    if(P.wx&&o.wxOn&&purposeOf()!=='easy'){const d=P.wx.suggested-P.target;if(Math.abs(d)>=1)bits.push(`conditions ${d>0?'cost':'save'} <b>${gapFmt(Math.abs(d))}</b>`)}
     if(ct)bits.push(`🔮 you: about <b>${fmt(ct.t)}</b>`);
     $('hwx').innerHTML=bits.map(b=>`<span>${b}</span>`).join('');
     const g=ghosts0()[0];$('qbest').textContent=g?`${fmt(g.time)} · ${g.run.imported?.who||(g.run.imported?'imported':'you')}`:'Run it once first';
@@ -1534,7 +1594,7 @@ function renderToday(){
   // last run
   const done=allRuns.filter(r=>r.status==='done').sort((a,b)=>b.started-a.started),last=done[0];
   $('lastcard').hidden=!last;
-  renderGoal();
+  renderGoal();renderPlan();
   if(last){const u=outcome(last);
     $('lastcard').innerHTML=`<button class="lastrun" id="lastbtn"><span class="lr-ic">${u.icon}</span><span class="lr-t"><small>Last run · ${when(last.started)}${last.sim?' · sim':''}</small><b>${esc(last.route?.name||'Run')}</b><small>${kmStr(u.c.d||last.yd||0)} km · ${fmt(u.c.you)}</small><div class="lr-r ${u.cls}">${esc(u.text)}</div></span><i class="chev"></i></button>`;
     $('lastbtn').onclick=()=>showResult(last)}
@@ -1546,7 +1606,7 @@ function renderToday(){
   for(const r of done.filter(r=>SIM||!r.sim))if(r.started>=wk[0].t&&mine(r)){const k=wk.findLastIndex(x=>x.t<=r.started),kd=kindOf(r);wk[k].km+=(r.yd??r.rd??0)/1000;n++;secs+=(r.elapsed||0)/1000;
     if(!wk[k].kind||HARD.indexOf(kd)<HARD.indexOf(wk[k].kind))wk[k].kind=kd}
   const tot=wk.reduce((a,x)=>a+x.km,0),mx=Math.max(1,...wk.map(x=>x.km));
-  $('weekcard').hidden=!done.length;
+  $('weekcard').hidden=!done.length||!$('plancard').hidden; // (your week's plan shows the week instead)
   $('weekcard').innerHTML=`<div class="wk-top"><div class="h">Last 7 days</div></div><div class="wk-num"><div><b>${tot.toFixed(1)}</b><span>km</span></div><div><b>${n}</b><span>run${n===1?'':'s'}</span></div><div><b>${fmt(secs)}</b><span>time</span></div></div>`+
     `<div class="wkbars">${wk.map((x,i)=>`<div class="${i===6?'today':''}"><i class="${x.km?'':'z'}" style="height:${x.km?Math.max(8,x.km/mx*100):4}%${x.kind?`;background:${KCOL[x.kind]}`:''}"></i><small>${x.lab}</small></div>`).join('')}</div>`;
   // Runner DNA

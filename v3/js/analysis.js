@@ -173,6 +173,7 @@ export function pacing(segs,m){
 
 // Riegel: time over D2 from time T1 over D1
 export const riegel=(T1,D1,D2)=>T1*Math.pow(D2/D1,1.06);
+export const LONG_NEED=0.6;
 export const RACES=[{id:'5k',name:'5K',d:5000},{id:'10k',name:'10K',d:10000},{id:'half',name:'Half marathon',d:21097.5},{id:'mar',name:'Marathon',d:42195}];
 
 // Scores out of 100 (50 = a typical runner)
@@ -239,7 +240,11 @@ export function analyse(runs,now=Date.now()){
   // predictions: from each recent run of 3 km or more, its flat-equivalent time scaled by Riegel; the
   // best (quickest) for each distance, not reaching further than 4.5 times the run's distance
   const src=(recent.length?recent:per).filter(x=>x.dist>=3000);
+  // the long races also need the legs for them: a long run of at least LONG_NEED of the distance in the
+  // last four months (else Riegel flatters a runner who's never gone that far)
+  const longest=Math.max(0,...(recent.length?recent:per).map(x=>x.dist)),locked=[];
   const predict=RACES.map(rc=>{
+    if(rc.d>15000&&longest<rc.d*LONG_NEED){locked.push({...rc,need:Math.ceil(rc.d*LONG_NEED/1000)});return null}
     let best=null;for(const x of src){if(rc.d/x.dist>4.5)continue;const t=riegel(x.fp*x.dist/1000,x.dist,rc.d);if(!best||t<best.t)best={t,from:x.run}}
     return best&&{...rc,...best};
   }).filter(Boolean);
@@ -249,7 +254,7 @@ export function analyse(runs,now=Date.now()){
     cadence:cad?score.cadence(cad.base):null,speed:score.speed(bestFp)};
   return {ready:R.length>=1,runs:R.length,need:1,km,segs:pts.length,model:m,hills:binned(pts),per,trend,predict,cadence:cad,
     cv:cvs.length?median(cvs):null,fade:fades.length?median(fades):null,scores:s,type:runnerType(s),bestFp,
-    form:formAt(per,now),raceFade:races.length>=2?median(races.map(x=>x.fade)):null,nRaces:per.filter(x=>x.kind==='race').length,
+    locked,longest,form:formAt(per,now),raceFade:races.length>=2?median(races.map(x=>x.fade)):null,nRaces:per.filter(x=>x.kind==='race').length,
     kindOf:new Map(per.map(x=>[x.run.id,x.kind]))};
 }
 
@@ -274,4 +279,23 @@ export function courseTime(A,P,now=Date.now()){
   let best=null;for(const x of pool){const fp=x.fp*Math.pow(D/x.dist,0.06);if(!best||fp<best.fp)best={fp,from:x.run}}
   let T=0;for(let i=1;i<P.d.length;i++)T+=best.fp*effortOf(A.model,(P.grade[i-1]+P.grade[i])/2)*(P.d[i]-P.d[i-1])/1000;
   return {t:T,from:best.from};
+}
+
+// Interval sessions you've repeated (the same reps on the same stretch of the same route), session by
+// session: average rep pace, against target, and how much the last rep slows on the first (s/km)
+export function sessionProgress(runs){
+  const key=r=>{const c=r.session||{};return `${r.route?.id}|${c.kind}|${c.kind==='split'?c.slen:`${c.from}-${c.len}-${c.dir}`}`};
+  const G={};
+  for(const r of runs){if(!mine(r)||r.mode!=='intervals'||r.status!=='done'||!(r.reps||[]).some(x=>x.done&&x.dist>0))continue;(G[key(r)]??=[]).push(r)}
+  return Object.values(G).filter(g=>g.length>=2).map(g=>{
+    g.sort((a,b)=>a.started-b.started);
+    const S=g.map(r=>{
+      const R=r.reps.filter(x=>x.done&&x.dist>0),T=R.reduce((a,x)=>a+x.time,0),D=R.reduce((a,x)=>a+x.dist,0);
+      return {run:r,t:r.started,n:R.length,pace:T/(D/1000),vs:R.reduce((a,x)=>a+x.time-(x.pacer??x.time),0)/R.length,
+        fade:R.length>=3?(R.at(-1).time/(R.at(-1).dist/1000)-R[0].time/(R[0].dist/1000)):null};
+    });
+    const c=g.at(-1).session||{},len=c.kind==='split'?c.slen:c.len,fades=S.map(x=>x.fade).filter(x=>x!=null);
+    return {route:g[0].route?.name||'',len,reps:S.at(-1).n,sessions:S,first:S[0].pace,last:S.at(-1).pace,best:Math.min(...S.map(x=>x.pace)),
+      fade:fades.length?median(fades):null};
+  }).sort((a,b)=>b.sessions.at(-1).t-a.sessions.at(-1).t);
 }

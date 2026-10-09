@@ -1621,7 +1621,11 @@ function progState(){
   const P=programme(cfg,{vdot:v,easyAdj:ad.easyAdj,fatigue:ad.fatigue,pain:ad.pain,now});
   // where to run each session
   const R=routes.filter(r=>!r.laps&&r!==course),RV=course?[...R,course]:R;
-  for(const s of P.weeks.flatMap(w=>w.days))if(s.venue&&s.kind!=='rest'){const vr=venueFor(s.venue,s,RV,course);if(vr){s.vres=vr;s.where=vr.note;s.whereRoute=vr.route.id}}
+  // (a route you chose for a session wins: anything but the course tests can be run anywhere)
+  for(const s of P.weeks.flatMap(w=>w.days))if(s.venue&&s.kind!=='rest'){
+    const pick=opt.get('prog:route:'+s.key,null),pr=pick!=null&&s.kind!=='test'?routes.find(r=>r.id===pick):null;
+    const vr=pr?venueFor(s.venue,s,[pr],pr===course?course:null):venueFor(s.venue,s,RV,course);
+    if(vr){s.vres=vr;s.where=vr.note;s.anywhere=vr.anywhere;s.whereRoute=vr.route.id;s.chosen=!!pr;s.routeOpts=s.kind==='test'?null:RV.map(r=>({id:r.id,name:r.name}))}}
   // which run did which session: one started from a session is that session, whatever the day; others go by date
   const did={},keys=new Set(P.weeks.flatMap(w=>w.days.map(s=>s.key)));
   for(const r of own)if(r.prog?.key&&keys.has(r.prog.key))(did[r.prog.key]??=[]).push(r);
@@ -1679,6 +1683,7 @@ function renderPlanView(){
   }
   renderPlanTab(el,{...st,dayNum,feelOf:r=>r.feel,open:pgOpen,openWeek:pgWeek},{
     onToggle:k=>{pgOpen=pgOpen===k?null:k;renderPlanView()},
+    onRoute:(k,id)=>{opt.set('prog:route:'+k,id);progKey=null;renderPlanView();renderToday()},
     onWeek:i=>{pgWeek=pgWeek===i?null:i;pgOpen=null;renderPlanView()},
     onRun:s=>{tab('today');loadSession(progDay(s,st))},
     onOpenRun:id=>{const r=allRuns.find(x=>x.id===id);if(r)showResult(r)},

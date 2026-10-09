@@ -190,12 +190,12 @@ export function programme(cfg,st){
       if(B!=null&&hardOK(B)&&ti==null){ // (a test week keeps just one sub-threshold session, so you test fresh)
         if(ph==='peak'&&course&&short){
           const len=Math.round(clip(cfg.courseD*(0.45+0.15*p),3000,cfg.courseD-1000)/500)*500;
-          set(B,sess('rehearsal',{dist:len,pace:racePace,venue:{type:'course-part',len},what:`First ${kmt(len)} km of the course at race pace`,
-            why:`Run the start of ${cName} exactly as you'll race it: the pacer takes each climb and descent at your goal effort. You learn where to hold back and where the course gives you time back.`,
+          set(B,sess('rehearsal',{dist:len,pace:racePace,venue:{type:'course-part',len},what:`${kmt(len)} km at race pace`,
+            why:`${kmt(len)} km at your race pace, best on the start of ${cName} so the pacer takes each of its climbs and descents at goal effort and you learn where to hold back. Anywhere rolling works if you can't get there.`,
             now:'Peak: race-specific. With your threshold built, rehearsing the race on its own hills turns fitness into a race plan.'}));
         }else{
           const r=ph==='base'?subReps(Math.round(2+p),10,pc,90):subReps(Math.round(3+p),ph==='build'?8:10,pc,75);
-          set(B,sess('sub',{...r,venue:{type:course?'course':'rolling'},why:`Sub-threshold by effort over rolling ground: the pacer slows on the climbs and speeds up on the descents so the effort stays even, exactly as you'll need to on race day${course?` on ${cName}`:''}. Same benefit as Tuesday, plus learning to hold effort on hills.`,
+          set(B,sess('sub',{...r,venue:{type:course?'course':'rolling'},why:`Sub-threshold again, ideally over some hills: the pacer eases on the climbs and lifts on the descents so the effort stays even, as you'll need to on race day${course?` on ${cName}`:''}. On the flat it does just as much for your threshold, so run it wherever suits you.`,
             now:ph==='base'?'Base: two or three long reps teach you to settle into the effort and hold it over changing ground.':'Build: longer total time at sub-threshold, on hills, so climbing at effort becomes second nature.'}));
         }
       }
@@ -217,7 +217,7 @@ export function programme(cfg,st){
       else{
         const reps=ph==='build'?Math.round(10+6*p):12;
         set(hDay,sess('hills',{reps,len:200,rest:75,pace:pc.hill,hill:true,repWhat:'uphill',venue:{type:'hill',len:200},
-          main:[`${reps} × 200 m uphill, strong (about 5K effort): drive the arms, stay tall, quick feet`,'Easy jog back down as the recovery'],
+          main:[`${reps} × 200 m uphill, strong (about 5K effort): drive the arms, stay tall, quick feet`,'Easy jog back down as the recovery','No hill handy? 45–60 s hard on the flat with a 90 s jog does a similar job'],
           why:`The Norwegian method's one session faster than threshold: the Ingebrigtsens' 20 × 200 m uphill, scaled down. Climbing at a strong effort builds the strength and form ${course?`the climbs on ${cName} demand`:'that climbs demand'}, and running up a hill means far less pounding than fast reps on the flat.`,
           now:ph==='build'?'Build: with the hill sprints done, the hill reps start, adding a couple each week.':'Peak: holding the hill session steady keeps the strength you\'ve built for the course\'s climbs.'}));
       }

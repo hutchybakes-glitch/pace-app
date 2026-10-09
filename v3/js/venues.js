@@ -40,10 +40,23 @@ function hilliestStretch(r,L){
 const flattest=(routes,L)=>{const ok=routes.filter(r=>len(r)>=L-30);return (ok.length?ok:routes).slice().sort((a,b)=>hilliness(a)-hilliness(b))[0]};
 const closest=(routes,L)=>{const ok=routes.filter(r=>len(r)>=L*0.85);return ok.length?ok.sort((a,b)=>Math.abs(len(a)-L)-Math.abs(len(b)-L))[0]:routes.slice().sort((a,b)=>len(b)-len(a))[0]};
 
+// What a session needs from where it's run: only the course tests need the course; everything else can be
+// run anywhere, and the route is a suggestion
+export const ANYWHERE={flat:'Anywhere reasonably flat: then pace equals effort.',course:'Anywhere. Some hills help you practise holding effort over them, but flat ground does the same job for your threshold.',
+  rolling:'Anywhere. Some hills help you practise holding effort over them, but flat ground does the same job for your threshold.',
+  hill:'Any hill of about 4–8 %, around 200 m long.','hill-short':'Anywhere, with a short, steep hill for the sprints.','course-part':'Best on the course itself; otherwise any route with a few hills, at race pace.',
+  'course-start':'Anywhere flat or gently rolling.','course-full':'The full race course: that is the test.','flat-5k':'Any flat 5 km.','long-rolling':'Anywhere.','long-flat':'Anywhere.',any:'Anywhere.'};
 // Where to run a session. v: the session's venue hint {type, len}; s: the session (reps, len…);
-// course: the race course route (or null). Returns {route, how ('full'|'part'|'int'), from, len, dir, note}
+// course: the race course route (or null). Returns {route, how ('full'|'part'|'int'), from, len, dir, note
+// (the suggestion and why), anywhere (what any route needs)}
 export function venueFor(v,s,routes,course){
+  const out=venueFor0(v,s,routes,course);if(out)out.anywhere=ANYWHERE[v.type]||ANYWHERE.any;return out;
+}
+function venueFor0(v,s,routes,course){
   if(!routes.length)return null;
+  // without the course, its sessions run on whatever route you're using
+  if(!course&&v.type.startsWith('course'))v={...v,type:{course:'rolling','course-part':'any','course-start':'flat','course-full':'any-full'}[v.type]};
+  if(v.type==='any-full'){const r=closest(routes,s.dist||10000);return {route:r,how:'full',len:len(r),note:`${r.name}.`}}
   const main=course?climbs(course)[0]:null,all=course&&!routes.includes(course)?[...routes,course]:routes;
   const full=(r,note)=>({route:r,how:'full',len:len(r),note});
   const part=(r,L,note)=>len(r)>L+50?{route:r,how:'part',len:L,note}:full(r,note);
@@ -55,7 +68,8 @@ export function venueFor(v,s,routes,course){
     case 'course':if(course&&s.reps){const h=hilliestStretch(course,s.len);
       return reps(course,h.from,'alternate',`${course.name}, ${kmS(h.from)}–${kmS(h.from+s.len)} km: its hilliest stretch, there and back, so one rep climbs and the next descends. The pacer keeps the effort even.`)}break;
     case 'rolling':if(s.reps){const r=all.slice().sort((a,b)=>hilliness(b)-hilliness(a))[0],h=hilliestStretch(r,s.len);
-      return reps(r,h.from,'alternate',`${r.name}, ${kmS(h.from)} km on, there and back: your hilliest stretch, so you practise holding effort over hills.`)}break;
+      if(hilliness(r)<4)return reps(r,0,'alternate',`${r.name}: flat, which does just as much for your threshold.`);
+      return reps(r,h.from,'alternate',`${r.name}, ${kmS(h.from)} km on, there and back: ${all.length>1?'your hilliest stretch, so you practise holding effort over hills':'its hilliest stretch'}.`)}break;
     case 'hill':{ // match the course's steepest real climb (hill reps want 4–8 %)
       const steep=course?climbs(course).sort((a,b)=>b.grade-a.grade)[0]:null,target=steep?Math.max(4,Math.min(8,steep.grade)):6,h=bestHill(all,s.len||200,target);
       if(h)return reps(h.route,Math.round(h.from/10)*10,'same',`${h.route.name}, from ${kmS(h.from)} km: ${s.len||200} m at ${h.grade.toFixed(1)} %${steep?`, ${h.route===course&&Math.abs(h.from-steep.from)<=steep.len?`the course's own steepest climb`:`the closest match to ${course.name}'s steepest climb (${steep.grade.toFixed(1)} % at ${kmS(steep.from)} km)`}`:''}. Jog back down to the same spot each time.`);

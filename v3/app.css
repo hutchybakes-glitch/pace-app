@@ -569,3 +569,7 @@ select.txt{width:150px;color-scheme:dark}.txt.wide{width:100%;box-sizing:border-
 .pgw{cursor:pointer}.pgw .chev{transform:rotate(45deg);transition:transform .2s;margin-right:4px}.pgw.open .chev{transform:rotate(-135deg)}
 .pgwd{padding:4px 0 8px}.pgwd .wf{color:var(--mut2);font-size:14px;line-height:1.45;margin:4px 0 6px;padding-left:36px}
 .pgall .note{margin-bottom:6px}
+
+.sesd .sec.where .sug{color:#fff}
+.rpick{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--mut)}.rpick select{flex:1;min-width:0;width:auto}
+.rpick select{background:#040814;border:1px solid var(--line);border-radius:10px;color:#fff;font:inherit;font-size:14px;padding:7px 8px;color-scheme:dark}

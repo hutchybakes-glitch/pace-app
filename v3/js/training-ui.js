@@ -60,6 +60,7 @@ export function renderPlanTab(el,d,h){
   o+=methods();
   el.innerHTML=o;
   el.querySelectorAll('.ses').forEach(b=>b.onclick=e=>{if(e.target.closest('button'))return;h.onToggle(b.dataset.key)});
+  el.querySelectorAll('select[data-route]').forEach(x=>x.onchange=()=>h.onRoute(x.dataset.route,x.value?+x.value:null));
   el.querySelectorAll('.pgw').forEach(b=>b.onclick=()=>h.onWeek(+b.dataset.week));
   const all=W.flatMap(w=>w.days);
   el.querySelectorAll('.act[data-run]').forEach(b=>b.onclick=()=>h.onRun(all.find(s=>s.key===b.dataset.run)));
@@ -85,7 +86,7 @@ function sessionRow(s,d){
   const sec=(t,lines)=>lines?.length?`<div class="sec"><b>${t}</b>${lines.map(l=>`<div class="stp">${esc(l)}</div>`).join('')}</div>`:'';
   x+=`<div class="sesd" style="--k:${col}">`;
   if(s.kind!=='rest'){
-    if(s.where)x+=`<div class="sec where"><b>📍 Where</b><p>${esc(s.where)}</p></div>`;
+    if(s.where)x+=`<div class="sec where"><b>📍 Where</b>${s.anywhere?`<p>${esc(s.anywhere)}</p>`:''}<p class="sug">${s.chosen?'Your choice':'Suggested'}: ${esc(s.where)}</p>${s.routeOpts?`<label class="rpick">Run it on <select data-route="${s.key}"><option value="">${s.chosen?'the suggestion':'the suggested route'}</option>${s.routeOpts.map(r=>`<option value="${r.id}" ${s.chosen&&r.id===s.whereRoute?'selected':''}>${esc(r.name)}</option>`).join('')}</select></label>`:''}</div>`;
     x+=sec('Warm-up',s.warm)+sec('Main set',mainSet(s))+sec('Cool-down',s.cool);
     x+=`<div class="sec"><b>Why</b><p>${esc(s.why)}</p></div>${s.now?`<div class="sec"><b>Why now</b><p>${esc(s.now)}</p></div>`:''}`;
   }else x+=`<p>${esc(s.why)}</p>`;

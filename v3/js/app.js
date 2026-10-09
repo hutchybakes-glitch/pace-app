@@ -17,7 +17,9 @@ import {createCoach,createSpeaker,gapPhrase,STYLES} from './coach.js';
 import {createMotion,cadenceAt,strideOf,kmMotion,motionInsight,UPDATE_MS,STRIDE_MS,cadenceBaseline,cadencePlan,planAt,cadenceSigns,cadenceTip} from './motion.js';
 import {fetchWeather,at as wxAt,windStretches,compass16,mph,SHELTER} from './weather.js';
 import {analyse as analyseRuns,learnedProfile,courseTime,mine,bests as bestsOf,KINDS,sessionProgress,formAt} from './analysis.js';
-import {weekPlan,DOW} from './plan.js';
+import {weekPlan,DOW,pickRoute} from './plan.js';
+import {programme,adapt,load as loadOf,vdotOf,raceTime as vdotTime,DIST,STYLES as TSTYLES,KINDS as TKINDS,PHASES,dayNum,mondayOf,addDays} from './training.js';
+import {renderPlanTab,renderPlanIntro,renderBuilder,renderFeel,ICON as TICON} from './training-ui.js';
 import {renderInsights,runFacts,KCOL} from './insights-ui.js';
 import {encodeChallenge,decodeChallenge,challengeRoute,challengeRun,drawCard} from './share.js';
 
@@ -777,10 +779,13 @@ function start(at){
   if(!rec&&sess)rec={rival:sess.rival?{runId:sess.rival.id,started:sess.rival.started}:null,started:Date.now(),status:'active',mode:'intervals',sim:SIM,route:{id:sess.base.id,name:sess.base.name,src:sess.base.src},
     session:{...sess.cfg,n:sess.reps.length},reps:[],prof:{...prof},speed:o.speed,fixes:[]};
   if(!rec&&mode==='record')rec={started:Date.now(),status:'active',mode:'record',sim:SIM,route:null,speed:o.speed,fixes:[]};
-  if(!rec)rec={started:Date.now(),status:'active',mode:'race',sim:SIM,route:{id:runRoute.id,name:runRoute.name,src:runRoute.src,pts:runRoute.pts,cues:runRoute.cues||[]},
+  if(!rec){rec={started:Date.now(),status:'active',mode:'race',sim:SIM,route:{id:runRoute.id,name:runRoute.name,src:runRoute.src,pts:runRoute.pts,cues:runRoute.cues||[]},
     finish:runP.target??runP.finish,prof:{...prof},speed:o.speed,cond:runCond,fixes:[],purpose:runGhost?'race':purposeOf(),
     ghost:runGhost?{...runGhost,time:runP.time.map(x=>+x.toFixed(1))}:null,
-    rival:runRival?{runId:runRival.run.id,started:runRival.run.started,label:runRival.label,imported:runRival.run.imported?.name??null,who:runRival.run.imported?.who??null,time:runRival.P.time.map(x=>+x.toFixed(1))}:null};
+    rival:runRival?{runId:runRival.run.id,started:runRival.run.started,label:runRival.label,imported:runRival.run.imported?.name??null,who:runRival.run.imported?.who??null,time:runRival.P.time.map(x=>+x.toFixed(1))}:null}}
+  // a session from your training plan, loaded today on this route: the run is that session
+  const pp=opt.get('prog:pending',null);
+  if(rec&&!rec.prog&&mode!=='record'&&pp&&pp.day===new Date().toDateString()&&String((sess?.base||runRoute)?.id??'').split(':')[0]===String(pp.routeId))rec.prog={key:pp.key,kind:pp.kind,test:!!pp.test};
   phase='running';t0=at??now();track.last=null;rpts=[];spts=[];sim.moving=true;
   ensureWatch();wake();setPhaseUI();
 }
@@ -1371,19 +1376,19 @@ $('rsfile').onchange=async e=>{
 // =====================================================================================
 // v3: tabs, sheets, Today, Insights, sharing and challenges
 // =====================================================================================
-const TABS=['today','routes','insights','runs'];
+const TABS=['today','plan','routes','insights','runs'];
 let curTab=opt.get('tab','today');
 function tab(t){
   if(!TABS.includes(t))t='today';curTab=t;opt.set('tab',t);
   for(const x of TABS)$('tab-'+x).hidden=x!==t;
   document.querySelectorAll('#tabbar button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
-  scrollTo(0,0);if(t==='insights')renderIns();
+  scrollTo(0,0);if(t==='insights')renderIns();if(t==='plan')renderPlanView();
 }
 document.querySelectorAll('#tabbar button').forEach(b=>b.onclick=()=>tab(b.dataset.tab));
 // Sheets slide over the tabs: race setup and settings
 const sheetOpen=id=>{closeSheets();$(id).hidden=false;$(id).scrollTop=0;$(id).style.transform='';document.documentElement.style.overflow='hidden';syncNav()};
 function openSetup(focus){if(!base)return tab('routes');sheetOpen('setup');if(focus)requestAnimationFrame(()=>{const e=$(focus);if(e&&!e.hidden)$('setup').scrollTo({top:e.offsetTop-70,behavior:'smooth'})})}
-function closeSheets(){$('setup').hidden=$('settings').hidden=$('addmenu').hidden=true;document.documentElement.style.overflow='';syncNav()}
+function closeSheets(){$('setup').hidden=$('settings').hidden=$('addmenu').hidden=$('progsheet').hidden=true;document.documentElement.style.overflow='';syncNav()}
 // The + menu: the less everyday ways to run (race your best, intervals, another route, record, import)
 function openMenu(){$('addmenu').hidden=false;$('addmenu').querySelector('.menubox').style.transform='';syncNav()}
 function closeMenu(){$('addmenu').hidden=true;syncNav()}
@@ -1392,7 +1397,7 @@ $('addmenu').onclick=e=>{if(e.target===$('addmenu'))closeMenu()};
 // The phone's back (Android's back gesture, a browser's back button): everything over Today (a sheet, the
 // menu, a result, the run screen) is one step in the history, so back closes it instead of leaving the
 // app. A run in progress can't be backed out of: pause it first.
-const layerOpen=()=>!$('addmenu').hidden||!$('settings').hidden||!$('setup').hidden||!$('result').hidden||!$('run').hidden;
+const layerOpen=()=>!$('addmenu').hidden||!$('settings').hidden||!$('setup').hidden||!$('progsheet').hidden||!$('result').hidden||!$('run').hidden;
 let popSkip=false;
 if(history.state?.pacer)history.replaceState(null,''); // (reloaded with a sheet open: nothing's open now)
 function syncNav(){
@@ -1404,7 +1409,7 @@ function syncNav(){
 addEventListener('popstate',()=>{
   if(popSkip){popSkip=false;syncNav();return}
   if(!$('addmenu').hidden)closeMenu();
-  else if(!$('settings').hidden||!$('setup').hidden){closeSheets();renderToday()}
+  else if(!$('settings').hidden||!$('setup').hidden||!$('progsheet').hidden){closeSheets();renderToday()}
   else if(!$('result').hidden)doneResult();
   else if(!$('run').hidden&&(phase==='idle'||phase==='paused'||phase==='done'))$('back').onclick();
   setTimeout(syncNav,0);
@@ -1418,7 +1423,7 @@ function swipeClose(el,box,close){
   el.addEventListener('touchend',()=>{if(y0==null)return;y0=null;box.style.transition='';
     if(dy>110){box.style.transform='translateY(100%)';setTimeout(()=>{box.style.transform='';close()},180)}else box.style.transform=''});
 }
-swipeClose($('setup'),$('setup'),()=>{closeSheets();renderToday()});swipeClose($('settings'),$('settings'),()=>closeSheets());
+swipeClose($('setup'),$('setup'),()=>{closeSheets();renderToday()});swipeClose($('progsheet'),$('progsheet'),()=>closeSheets());swipeClose($('settings'),$('settings'),()=>closeSheets());
 swipeClose($('addmenu'),$('addmenu').querySelector('.menubox'),()=>closeMenu());
 $('setupback').onclick=()=>{closeSheets();renderToday()};
 $('gear').onclick=()=>sheetOpen('settings');
@@ -1525,13 +1530,17 @@ function planInputs(){
 const PICON={rest:'·',easy:'🌿',long:'🛤️',tempo:'🔥',int:'⏱️',race:'🏁'};
 function planNow(){
   if(!routes.length)return null;
-  const I=planInputs(),p=weekPlan(I),today=Math.floor((Date.now()-I.monday)/864e5);
-  return {I,p,today,did:p.days.map(d=>I.own.filter(r=>r.started>=d.date&&r.started<d.date+864e5))};
+  const I=planInputs(),st=progState(),w=st&&st.P.weeks.find(x=>dayNum(x.monday)===dayNum(I.monday));
+  const p=w&&dayNum(st.pg.raceDate)>=dayNum(Date.now())?{phase:w.phase,prog:true,km:w.days.reduce((a,s)=>a+(s.km||0),0),
+      title:`${PHASES[w.phase].name} · week ${st.P.weeks.indexOf(w)+1} of ${st.P.weeks.length} · ${DIST[st.pg.dist].name}`,days:w.days.map(s=>progDay(s,st))}:weekPlan(I);
+  const today=Math.floor((Date.now()-I.monday)/864e5);
+  const ranToday=I.own.some(r=>dayNum(r.started)===dayNum(Date.now()));
+  return {I,p,today,ranToday,did:p.prog?w.days.map(s=>st.did[s.key]||[]):p.days.map(d=>I.own.filter(r=>r.started>=d.date&&r.started<d.date+864e5))};
 }
 // Load today's planned session into the Today card, once a day and only if you haven't run yet
 function autoLoad(pl){
   const td=pl.p.days[pl.today],key=new Date().toDateString();
-  if(!td?.route||td.kind==='rest'||pl.did[pl.today].length||opt.get('plan:auto',null)===key)return false;
+  if(!td?.route||td.kind==='rest'||pl.ranToday||pl.did[pl.today].length||opt.get('plan:auto',null)===key)return false;
   opt.set('plan:auto',key);loadSession(td,true);return true;
 }
 function renderPlan(pl){
@@ -1541,7 +1550,7 @@ function renderPlan(pl){
   const doneKm=did.flat().reduce((a,r)=>a+(r.yd??r.rd??0),0)/1000,d=planSel!=null?p.days[planSel]:null,ran=d?did[planSel]:[];
   const col=x=>x.kind==='rest'?'#475569':x.rehearse?'#f472b6':KCOL[x.kind];
   const strip=p.days.map((x,i)=>{const st=did[i].length?'done':i<today?(x.kind!=='rest'?'missed':'past'):i===today?'today':'';
-    return `<button class="pd ${st} ${i===planSel?'sel':''} ${i===today&&planJust&&did[i].length?'just':''}" data-i="${i}" style="--k:${col(x)}"><small>${DOW[i]}</small><i>${did[i].length?'✓':x.rehearse?'🎯':PICON[x.kind]}</i><span>${x.km?Math.round(x.km)+'k':''}</span></button>`}).join('');
+    return `<button class="pd ${st} ${i===planSel?'sel':''} ${i===today&&planJust&&did[i].length?'just':''}" data-i="${i}" style="--k:${col(x)}"><small>${DOW[i]}</small><i>${did[i].length?'✓':x.pkind?TICON[x.pkind]:x.rehearse?'🎯':PICON[x.kind]}</i><span>${x.km?Math.round(x.km)+'k':''}</span></button>`}).join('');
   let body='';
   if(d){
   const where=d.route?`${esc(d.route.name)}${d.how==='part'?` · first ${kmStr(d.len)} km`:''}`:'';
@@ -1552,13 +1561,14 @@ function renderPlan(pl){
   }
   $('plancard').innerHTML=`<div class="pl-top"><div><div class="eyebrow">Your week</div><b>${esc(p.title)}</b></div><div class="pl-km"><b>${doneKm.toFixed(0)}</b><span>of ${Math.round(p.km)} km</span></div></div>`+
     `<div class="pl-bar"><i style="width:${Math.min(100,doneKm/Math.max(1,p.km)*100)}%"></i></div><div class="pdays">${strip}</div>${body?`<div class="pl-d">${body}</div>`:''}`+
-    `<div class="pl-n"><span>Runs a week</span><div class="seg">${[3,4,5,6].map(k=>`<button data-n="${k}" class="${k===I.runsPerWeek?'on':''}">${k}</button>`).join('')}</div></div>`;
+    (p.prog?`<button class="link pl-more" id="plopen">The whole plan →</button>`:`<div class="pl-n"><span>Runs a week</span><div class="seg">${[3,4,5,6].map(k=>`<button data-n="${k}" class="${k===I.runsPerWeek?'on':''}">${k}</button>`).join('')}</div></div><button class="link pl-more" id="plbuild">Training for a race? Build a plan →</button>`);
   $('plancard').querySelectorAll('.pd').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;
     if(i===today&&!did[i].length){planSel=null;renderPlan(planNow());$('hero').scrollIntoView({behavior:'smooth',block:'start'});return}
     planSel=planSel===i?null:i;renderPlan(planNow())});
   if($('plx'))$('plx').onclick=()=>{planSel=null;renderPlan(planNow())};
   $('plancard').querySelectorAll('.pl-n button').forEach(b=>b.onclick=()=>{opt.set('plan:n',+b.dataset.n);renderToday()});
   if($('plgo'))$('plgo').onclick=()=>loadSession(d);
+  if($('plopen'))$('plopen').onclick=()=>tab('plan');if($('plbuild'))$('plbuild').onclick=()=>openBuilder();
   if($('pldone'))$('pldone').onclick=()=>showResult(ran[0]);
 }
 // Load a planned session into Pacer: the route, how to run it, what it's for and its target
@@ -1572,10 +1582,173 @@ function loadSession(d,quiet){
     // racing your best: your quickest own run there alongside the pacer
     if(d.vsBest){const best=runsOn(b).filter(mine)[0];if(best){opt.set('pcmode:'+cid,'both');opt.set('ghost:'+cid,best.id)}}
     // a rehearsal runs the start of the goal race exactly as the goal-race pacer would; the race, the goal
-    let t=null;if(d.rehearse&&g)t=Math.round(timeAt(buildPacer(b.pts,g.time,prof),d.len));if(d.goalRace&&g)t=g.time;
+    let t=null;if(d.rehearse&&g)t=Math.round(timeAt(buildPacer(b.pts,g.time,prof),d.len));if(d.goalRace&&g)t=g.time;if(d.target)t=d.target;
     opt.set(finKey(cid,pu),t);
   }
+  opt.set('prog:pending',d.prog?{key:d.key,kind:d.pkind,test:d.pkind==='test',routeId:b.id,day:new Date().toDateString()}:null);
+  // what Today's card now holds (a session from another day says which)
+  const dn=d.date?new Date(d.date).toLocaleDateString(undefined,{weekday:'long'}):null;
+  opt.set('hero:loaded',{routeId:b.id,day:new Date().toDateString(),title:d.title,why:d.why,dow:d.date&&new Date(d.date).toDateString()!==new Date().toDateString()?dn:null});
   planSel=null;selectRoute(b);if(quiet)return;renderToday();requestAnimationFrame(()=>$('hero').scrollIntoView({behavior:'smooth',block:'start'}));
+}
+
+// =====================================================================================
+// Training plans (training.js builds them, training-ui.js draws them)
+// =====================================================================================
+const progCfg=()=>opt.get('program',null);
+let progC=null,progKey=null;
+// The plan as it stands today: your fitness (the last test, nudged by how sessions felt, or a race that
+// says you're fitter), the programme, which run did which session, your load, the coach's notes
+function progState(){
+  const pg=progCfg();if(!pg)return null;
+  const key=JSON.stringify(pg)+'|'+new Date().toDateString();
+  if(progC&&progKey===key&&progC.runs===allRuns)return progC;
+  const A=getA(),now=Date.now(),own=allRuns.filter(r=>mine(r)&&r.status==='done'&&r.started>=pg.start-6*3600e3&&(SIM||!r.sim));
+  const tests=own.filter(r=>r.prog?.test&&(r.yd??r.rd??0)>=1500).map(r=>{const x=A.per?.find(y=>y.run.id===r.id),d=x?x.dist:(r.yd??r.rd),t=x?x.fp*x.dist/1000:r.elapsed/1000;return {t:r.started,v:vdotOf(d,t),run:r}}).sort((a,b)=>a.t-b.t);
+  const lastT=tests.at(-1),since=lastT?.t??pg.start;let v=lastT?lastT.v:pg.base.v;
+  // the schedule as planned says which session each run was
+  const sesAt=new Map(programme(pg,{vdot:v}).weeks.flatMap(w=>w.days).map(s=>[dayNum(s.date),s]));
+  const kindOfRun=r=>r.prog?.kind??(()=>{const s=sesAt.get(dayNum(r.started));return s&&s.kind!=='rest'?s.kind:r.mode==='intervals'?'vo2':({race:'race',tempo:'tempo',long:'long',int:'vo2'})[kindOf(r)]??'easy'})();
+  const fb=own.filter(r=>r.feel).map(r=>({t:r.started,kind:kindOfRun(r),feel:r.feel})),ad=adapt(fb,{since,now});
+  const raceV=Math.max(0,...(A.per||[]).filter(x=>x.kind==='race'&&x.run.started>since&&mine(x.run)).map(x=>vdotOf(10000,x.eq*10)));
+  let from=lastT?'test':pg.base.from,raced=false;
+  if(raceV>v+ad.dv+0.5){v=raceV;raced=true}else v+=ad.dv;
+  const P=programme(pg,{vdot:v,easyAdj:ad.easyAdj,fatigue:ad.fatigue,pain:ad.pain,now});
+  // which run did which session: one started from a session is that session, whatever the day; others go by date
+  const did={},keys=new Set(P.weeks.flatMap(w=>w.days.map(s=>s.key)));
+  for(const r of own)if(r.prog?.key&&keys.has(r.prog.key))(did[r.prog.key]??=[]).push(r);
+  for(const w of P.weeks)for(const s of w.days){const rs=own.filter(r=>!(r.prog?.key&&keys.has(r.prog.key))&&dayNum(r.started)===dayNum(s.date));if(rs.length)(did[s.key]??=[]).push(...rs)}
+  const today=dayNum(now);let wk=P.weeks.findIndex(w=>dayNum(w.monday)<=today&&today<dayNum(w.monday)+7);
+  if(wk<0)wk=today<dayNum(P.weeks[0].monday)?0:P.weeks.length-1;
+  const loadRuns=allRuns.filter(r=>mine(r)&&r.status==='done'&&now-r.started<60*864e5&&(SIM||!r.sim)).map(r=>({t:r.started,min:(r.elapsed||0)/60000,rpe:r.feel?.rpe??(TKINDS[kindOfRun(r)]?.rpe?.[1]||4)}));
+  // what the coach has to say
+  const notes=[],all=P.weeks.flatMap(w=>w.days);
+  if(ad.pain)notes.push('🩹 You noted pain, so today and tomorrow are rest. If it\'s still there on an easy run, stop and get it looked at before any hard running.');
+  const sw=all.find(s=>s.adapted==='tired');if(sw&&!ad.pain)notes.push(`😮‍💨 Heavy legs and low energy lately: <b>${esc(sw.swapped)}</b> on ${DOW[sw.i]} is now an easy run. It comes back next week.`);
+  if(raced)notes.push(`🏁 A recent race says you're fitter than your plan thought: paces updated to VDOT ${v.toFixed(1)}.`);
+  else if(ad.dv>=0.3)notes.push(`📈 Hard sessions have felt easier than planned, so your paces are a little quicker (+${ad.dv.toFixed(1)} VDOT).`);
+  else if(ad.dv<=-0.3)notes.push(`🧭 Hard sessions have felt tougher than planned, so your paces are eased a little (${ad.dv.toFixed(1)} VDOT). No shame in it: fitness comes from sessions you can finish.`);
+  if(ad.easyAdj>1)notes.push(`🌿 Easy runs have been feeling hard: easy pace eased to ${fmt(P.paces.easy)}/km. Slow is the point.`);
+  const nt=all.find(s=>s.kind==='test'&&dayNum(s.date)>=today&&!did[s.key]);if(nt)notes.push(`🧪 Next fitness test: <b>${new Date(nt.date).toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short'})}</b>.`);
+  const missed=all.filter(s=>s.hard&&dayNum(s.date)<today&&dayNum(s.date)>=today-7&&!did[s.key]).length;
+  if(missed>=2)notes.push('📅 Missed a couple of sessions? Don\'t try to catch up: just pick up from today.');
+  progC={runs:allRuns,pg,P,pc:P.paces,vdot:v,v0:pg.base.v,adj:ad.dv,ad,tests,did,today,wk,kindOfRun,load:loadOf(loadRuns,now),notes,from};progKey=key;
+  return progC;
+}
+// A plan session as a day on Today and something Pacer can run: the route, how, what it's for, and the
+// target (the session's flat pace, with the hills taken the way you take them)
+function progDay(s,st){
+  const day={...s,kind:TKINDS[s.kind].fam,pkind:s.kind,prog:true};
+  const R=routes.filter(r=>!r.laps);if(s.kind==='rest'||!R.length)return day;
+  const RP=R.map(r=>({id:r.id,name:r.name,D:r.pts.at(-1).d,climb:climbOf(r)})),me=learnedProfile(getA()),hp=me?profOf(me):prof;
+  const flatness=x=>x.climb/(x.D/1000)/10;
+  if(s.reps){
+    let r=null,from=0,dir=s.len>=600?'alternate':'same';
+    if(s.hill){let best=null;for(const x of R)for(let i=0;i+20<x.pts.length;i+=5){const a=x.pts[i],b=x.pts[i+20];if(a.ele==null||b.ele==null)continue;const g=(b.ele-a.ele)/(b.d-a.d)*100;if(!best||g>best.g)best={g,r:x,from:a.d}}
+      if(best&&best.g>=3){r=best.r;from=Math.round(best.from/10)*10;dir='same'}}
+    if(!r){const pk=pickRoute(RP.filter(x=>x.D>=s.len),s.len,{prefer:flatness});r=pk&&R.find(x=>x.id===pk.route.id)}
+    if(!r)return day;
+    const len=Math.min(s.len,r.pts.at(-1).d-from);
+    return {...day,route:RP.find(x=>x.id===r.id),how:'int',int:{kind:'repeat',from,len,reps:s.reps,dir,slen:1000,rest:Math.round(s.hill?Math.max(s.rest,len/1000*st.pc.easy):s.rest),pace:Math.round(s.pace),step:0},
+      why:s.hill&&!from?`${s.why} (None of your routes has a real hill, so these run on the flat: hard for about a minute each.)`:s.why};
+  }
+  const pg=st.pg;let pk=s.kind==='race'&&pg.route&&RP.find(x=>x.id===pg.route)?{route:RP.find(x=>x.id===pg.route),how:'full'}:pickRoute(RP,s.dist,s.kind==='test'?{prefer:flatness}:{});
+  if(!pk)return day;
+  const r=R.find(x=>x.id===pk.route.id),D=r.pts.at(-1).d;
+  if(s.kind==='test'&&D>s.dist+50)pk={...pk,how:'part',len:s.dist};
+  const pts=pk.how==='part'?slice(r.pts,0,pk.len):r.pts,pu=['test','race'].includes(s.kind)?'race':['tempo','progression','cruise','sub'].includes(s.kind)?'tempo':'easy';
+  return {...day,route:pk.route,how:pk.how,len:pk.how==='part'?pk.len:D,purpose:pu,target:Math.round(s.kind==='race'&&pg.goalTime&&pk.how==='full'&&Math.abs(D-DIST[pg.dist].d)<300?pg.goalTime:effortTime(pts,s.pace,hp))};
+}
+// ---- The Plan tab ----
+let pgOpen=null;
+function renderPlanView(){
+  const el=$('progview'),st=progState();
+  if(!st)return renderPlanIntro(el,{},{onNew:()=>openBuilder()});
+  if(dayNum(Date.now())>dayNum(st.pg.raceDate)+1){ // race day has been
+    const pg=st.pg,D=DIST[pg.dist],run=allRuns.filter(r=>mine(r)&&r.status==='done'&&Math.abs(dayNum(r.started)-dayNum(pg.raceDate))<=1&&(r.yd??r.rd??0)>=D.d*0.95).sort((a,b)=>raceTime0(a)-raceTime0(b))[0];
+    const t=run&&raceTime0(run),km=Object.values(st.did).flat().reduce((a,r)=>a+(r.yd??r.rd??0)/1000,0);
+    return renderPlanIntro(el,{finished:{name:`${D.name}${pg.route?` · ${routes.find(r=>r.id===pg.route)?.name||''}`:''}`,time:t,
+      line:t?(pg.goalTime?(t<=pg.goalTime?`Goal smashed by ${gapFmt(pg.goalTime-t)} 🎉`:`${gapFmt(t-pg.goalTime)} off your ${fmt(pg.goalTime)} goal`):'Race done 🎉'):'',
+      sum:`${st.P.weeks.length} weeks · ${Math.round(km)} km of training · fitness ${st.v0.toFixed(1)} → ${st.vdot.toFixed(1)} VDOT.`}},{onNew:()=>{opt.set('program',null);openBuilder()}});
+  }
+  renderPlanTab(el,{...st,dayNum,feelOf:r=>r.feel,routeName:routes.find(r=>r.id===st.pg.route)?.name,open:pgOpen},{
+    onToggle:k=>{pgOpen=pgOpen===k?null:k;renderPlanView()},
+    onRun:s=>{tab('today');loadSession(progDay(s,st))},
+    onOpenRun:id=>{const r=allRuns.find(x=>x.id===id);if(r)showResult(r)},
+    onEdit:()=>openBuilder(true),
+    onEnd:()=>{if(!confirm('End this training plan? Your runs stay; the plan goes.'))return;opt.set('program',null);renderPlanView();renderToday()}});
+}
+const raceTime0=r=>(r.fullAt??r.lineAt??r.elapsed)/1000;
+// ---- The plan builder ----
+let pf=null,pfErr=[],pfV=null;
+const parseTime=t=>{const m=String(t||'').trim().match(/^(?:(\d+):)?(\d{1,2}):(\d{2})$/);return m?(+(m[1]||0))*3600+ +m[2]*60+ +m[3]:null};
+const parseDay=v=>{const [y,m,d]=v.split('-').map(Number);return new Date(y,m-1,d).getTime()};
+const nearestDist=D=>Object.entries(DIST).sort((a,b)=>Math.abs(a[1].d-D)-Math.abs(b[1].d-D))[0][0];
+function openBuilder(edit){
+  const pg=progCfg(),I=planInputs(),A=getA(),g=goalOf();
+  pfV=A.ready&&A.form?vdotOf(10000,A.form*10):null;
+  pf=edit&&pg?{dist:pg.dist,date:isoDay(pg.raceDate),route:pg.route??null,goal:pg.goalTime?fmt(pg.goalTime):'',days:pg.days,longDay:pg.longDay,km:pg.km,longKm:pg.longKm,style:pg.style,start:pg.base.from,rdist:'5000',rtime:'',edit:true}
+    :{dist:g?nearestDist(routes.find(r=>r.id===g.route)?.pts.at(-1).d||10000):'10k',date:isoDay(g&&g.date>Date.now()+28*864e5?g.date:addDays(mondayOf(Date.now()),7*10+6)),route:g?.route??null,goal:'',
+      days:I.runsPerWeek,longDay:6,km:Math.max(8,Math.round(I.weekKm||20)),longKm:Math.max(5,Math.round(I.longKm||8)),style:'balanced',start:'test',rdist:'5000',rtime:''};
+  if(pf.start==='runs'&&!pfV)pf.start='test';
+  pfErr=[];sheetOpen('progsheet');$('pfgo').textContent=edit?'Update my plan':'Build my plan';drawBuilder();
+}
+const pfWeeks=()=>pf.date?Math.round((dayNum(mondayOf(parseDay(pf.date)))-dayNum(mondayOf(Date.now())))/7)+1:null;
+function drawBuilder(){
+  const peak=Object.fromEntries(Object.keys(TSTYLES).map(k=>[k,Math.round(Math.max(pf.km,Math.min(DIST[pf.dist].peak[k]*Math.max(0.7,Math.min(1.3,pf.days/5)),pf.km*1.6)))]));
+  renderBuilder($('progform'),pf,{routes:routes.filter(r=>!r.laps).map(r=>({id:r.id,name:r.name,D:r.pts.at(-1).d})),runsVdot:pfV,weeks:pfWeeks(),peak,errors:pfErr},(patch,quiet)=>{
+    Object.assign(pf,patch);if(patch.route){const r=routes.find(x=>x.id===patch.route);if(r)pf.dist=nearestDist(r.pts.at(-1).d)}if(!quiet)drawBuilder()});
+}
+$('progback').onclick=()=>closeSheets();
+$('pfgo').onclick=()=>{
+  pfErr=[];const w=pfWeeks(),goal=pf.goal?parseTime(pf.goal):null,old=progCfg();
+  if(!pf.date)pfErr.push('Choose your race day.');else if(w<4||w>30)pfErr.push('Your race needs to be between 4 and 30 weeks away.');
+  if(pf.goal&&!goal)pfErr.push('That goal time doesn\'t look right: try 44:59 or 1:45:00.');
+  let base=null;
+  if(pf.start==='race'){const t=parseTime(pf.rtime);if(!t)pfErr.push('Add your race time, like 22:30.');else base={v:vdotOf(+pf.rdist,t),from:'race'}}
+  else if(pf.start==='runs'&&pfV)base={v:pfV,from:'runs'};
+  else base={v:pfV??Math.max(30,Math.min(50,32+pf.km*0.3)),from:'test'};
+  if(pf.dist==='mar'&&pf.km<25)pfErr.push('A marathon on under 25 km a week is a big step: consider a half first, or start with more weeks.');
+  if(pfErr.length&&!(pfErr.length===1&&pf.dist==='mar'&&pf.km<25&&pf.warned)){pf.warned=pf.dist==='mar';drawBuilder();$('progsheet').scrollTo({top:$('progsheet').scrollHeight,behavior:'smooth'});return}
+  const raceDate=parseDay(pf.date)+9*3600e3;
+  const pg={start:pf.edit&&old?old.start:Date.now(),raceDate,dist:pf.dist,style:pf.style,days:pf.days,longDay:pf.longDay,km:pf.km,longKm:pf.longKm,
+    test:pf.edit&&old?old.test:pf.start==='test',testD:pf.km<15?3000:5000,goalTime:goal,route:pf.route,base:pf.edit&&old&&pf.start===old.base.from?old.base:base};
+  opt.set('program',pg);
+  const r=pf.route&&routes.find(x=>x.id===pf.route);
+  if(r)opt.set('goal',{route:r.id,name:r.name,date:raceDate,time:goal??Math.round(vdotTime(pg.base.v,r.pts.at(-1).d))});
+  closeSheets();tab('plan');renderToday();
+};
+// ---- After a run: a fitness test's result, and how it felt ----
+function renderTestCard(r){
+  const st=progState(),t=st?.tests.find(x=>x.run.id===r.id);$('rtest').hidden=!t;if(!t)return;
+  const i=st.tests.indexOf(t),was=i?st.tests[i-1].v:st.v0,D=DIST[st.pg.dist],pc=st.pc;
+  $('rtest').innerHTML=`<div class="h">🧪 Fitness test</div><div class="tst"><b>${t.v.toFixed(1)}</b><span>VDOT${Math.abs(t.v-was)>=0.1?` · <em class="${t.v>was?'up':'down'}">${t.v>was?'+':''}${(t.v-was).toFixed(1)}</em> on ${i?'your last test':'your estimate'}`:''}</span></div>
+    <p class="sub">That's about <b>${fmt(vdotTime(t.v,D.d))}</b> for a ${D.name} on the flat. Your paces from now: easy <b>${fmt(pc.easy)}</b> · threshold <b>${fmt(pc.thr)}</b> · interval <b>${fmt(pc.int)}</b> /km.</p>`;
+}
+function renderFeelCard(r){
+  const ok=mine(r)&&r.status==='done'&&!r.imported?.who&&(r.fixes?.length||0)>5;$('rfeel').hidden=!ok;if(!ok)return;
+  const st=progState(),kind=st?st.kindOfRun(r):r.mode==='intervals'?'vo2':({race:'race',tempo:'tempo',long:'long',int:'vo2'})[kindOf(r)]??'easy';
+  const draw=reply=>renderFeel($('rfeel'),{kind,title:TKINDS[kind]?.name,feel:r.feel||null,reply},async f=>{
+    const before=progState();r.feel=f;await saveRun(r);allRuns=await listRuns();const after=progState();draw(coachReply(before,after,f,kind));
+  });
+  draw(null);
+}
+// The coach's answer to how a session felt: what (if anything) it changed
+function coachReply(b,a,f,kind){
+  const out=[],e=TKINDS[kind]?.rpe;
+  if(f.pain)out.push('🩹 Pain noted: today and tomorrow are now rest days. If it\'s still there on an easy run, stop and get it looked at before any hard running.');
+  if(a&&b){
+    if(Math.abs(a.vdot-b.vdot)>=0.1)out.push(`${a.vdot>b.vdot?'📈 Easier than planned':'🧭 Harder than planned'}: your paces ${a.vdot>b.vdot?'move a little quicker':'ease a little'}. Threshold is now <b>${fmt(a.pc.thr)}</b>/km (was ${fmt(b.pc.thr)}).`);
+    if(a.ad.easyAdj>b.ad.easyAdj)out.push(`🌿 Easy runs have felt hard lately: easy pace eased to <b>${fmt(a.pc.easy)}</b>/km.`);
+    const sw=a.P.weeks.flatMap(w=>w.days).find(s=>s.adapted==='tired'),was=sw&&b.P.weeks.flatMap(w=>w.days).find(s=>s.key===sw.key);
+    if(sw&&was?.adapted!=='tired')out.push(`😮‍💨 ${esc(sw.swapped)} on ${DOW[sw.i]} becomes an easy run: your legs need it more than the session.`);
+  }
+  if(!out.length&&e&&e[1]){
+    if(f.rpe>=e[0]&&f.rpe<=e[1]&&f.how==='plan')out.push(`✅ Right where a ${TKINDS[kind].name.toLowerCase()} should be (${e[0]}–${e[1]} out of 10). Nothing to change.`);
+    else if(['easy','recovery','long','strides'].includes(kind)&&f.rpe>e[1])out.push(`🌿 That's hard work for an ${kind==='long'?'long easy run':'easy run'}. Next time, slow right down: easy should be conversational.`);
+    else out.push('Noted. One session doesn\'t change the plan; a pattern will.');
+  }
+  return out.join('<br>');
 }
 
 // ---- Goal race: a race on one of your courses to train towards ----
@@ -1632,11 +1805,14 @@ function renderToday(){
   $('welcome').hidden=routes.length>0;
   // Today's run comes from your week's plan: loaded into the card once a day (change it freely after)
   const pl=planNow();if(pl&&autoLoad(pl))return;
-  const td=pl?.p.days[pl.today],ranToday=!!pl?.did[pl.today].length,planned=td&&td.kind!=='rest'&&td.route?.id===base?.id&&!ranToday;
+  const td0=pl?.p.days[pl.today],ranToday=!!pl?.ranToday,hl=opt.get('hero:loaded',null);
+  // the session you loaded into the card today (maybe another day's), else today's plan
+  const td=hl&&hl.day===new Date().toDateString()&&hl.routeId===base?.id?{...hl,kind:'run',route:{id:base.id}}:td0;
+  const planned=td&&td.kind!=='rest'&&td.route?.id===base?.id&&!ranToday;
   const ok=!!(base&&route&&P);$('hero').hidden=!ok;
   if(ok){
     $('hname').textContent=route.name;
-    $('hero').querySelector('.eyebrow').textContent=ranToday?'Done today ✓':planned?`Today · ${td.title}`:td?.kind==='rest'?'Rest day':
+    $('hero').querySelector('.eyebrow').textContent=ranToday?'Done today ✓':planned?`${td.dow||'Today'} · ${td.title}`:td?.kind==='rest'?'Rest day':
       howOf()==='int'?'Ready for the session':vsMode==='ghost'||purposeOf()==='race'?'Ready to race':`Ready for a${purposeOf()==='easy'?'n easy':' tempo'} run`;
     $('hwhy').hidden=!planned;$('hwhy').textContent=planned?td.why:'';
     $('hchips').innerHTML=[`${kmStr(P.total)} km`,`${Math.round(climbOf(route))} m climb`,`${turns.length} turn${turns.length===1?'':'s'}`].map(t=>`<span>${t}</span>`).join('');
@@ -1692,6 +1868,7 @@ function resultExtras(r){
   const before=r.mode==='intervals'||!mine(r)?[]:bestsOf(allRuns.filter(x=>x.id!==r.id&&x.started<r.started&&(SIM||!x.sim)));
   const pbs=before.length?getBests().filter(b=>b.run.id===r.id&&before.some(p=>p.id===b.id&&b.t<p.t-0.5)):[];
   const f=r.mode==='intervals'?'':runFacts(getA(),r,true,pbs);
+  renderTestCard(r);renderFeelCard(r);
   $('rdna').innerHTML=f;$('rdna').hidden=!f;
 }
 $('rshare').onclick=async()=>{

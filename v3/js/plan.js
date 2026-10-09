@@ -51,7 +51,7 @@ export function weekPlan({monday,runsPerWeek=4,weekKm=20,form=null,goal=null,rou
   const at=p=>P?`, about ${mmss(p)}/km`:'';
   const WU=3; // km of easy running around a session: warm-up and cool-down
   const flat=r=>r.climb/(r.D/1000)/10; // tie-break for speed work: the flattest route
-  const days=DOW.map((dow,i)=>({i,date:monday+i*DAY,dow,kind:'rest',title:'Rest',why:'Rest day. Recovery is when the training lands.'}));
+  const days=DOW.map((dow,i)=>({i,date:new Date(new Date(monday).getFullYear(),new Date(monday).getMonth(),new Date(monday).getDate()+i).getTime(),dow,kind:'rest',title:'Rest',why:'Rest day. Recovery is when the training lands.'}));
   let run=[...DAYS[n]];
   // race week: the race on its day, rest the day before, nothing hard after
   if(phase==='race'){

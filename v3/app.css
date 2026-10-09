@@ -558,3 +558,14 @@ select.txt{width:150px;color-scheme:dark}.txt.wide{width:100%;box-sizing:border-
 .rtest{text-align:left;background:radial-gradient(90% 80% at 0% 0%,rgba(192,132,252,.2),transparent 60%),var(--card)}
 .tst{display:flex;align-items:baseline;gap:10px;margin-top:8px}.tst b{font-size:40px;color:#c4b5fd}.tst span{color:var(--mut2)}.tst em{font-style:normal;font-weight:800}.tst em.up{color:var(--good)}.tst em.down{color:var(--bad)}
 .rtest .sub b{color:#fff}
+/* ---------- v3.4: the Norwegian plan ---------- */
+.pgcourse .cprof svg{display:block;width:100%;height:56px;margin-top:10px;border-radius:10px;background:#040814}
+.pgcourse .sub b{color:#fff}
+.sesd .sec{margin-top:10px}.sesd .sec:first-child{margin-top:0}
+.sesd .sec>b{display:block;font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--k);margin-bottom:4px}
+.sesd .sec p{margin:2px 0 0}
+.sesd .sec.where{background:rgba(96,165,250,.08);border-radius:10px;padding:8px 10px}.sesd .sec.where>b{color:var(--you)}
+.sesd .sec.extra{background:rgba(192,132,252,.08);border-radius:10px;padding:8px 10px}.sesd .sec.extra>b{color:#d8b4fe}
+.pgw{cursor:pointer}.pgw .chev{transform:rotate(45deg);transition:transform .2s;margin-right:4px}.pgw.open .chev{transform:rotate(-135deg)}
+.pgwd{padding:4px 0 8px}.pgwd .wf{color:var(--mut2);font-size:14px;line-height:1.45;margin:4px 0 6px;padding-left:36px}
+.pgall .note{margin-bottom:6px}

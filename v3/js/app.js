@@ -18,7 +18,8 @@ import {createMotion,cadenceAt,strideOf,kmMotion,motionInsight,UPDATE_MS,STRIDE_
 import {fetchWeather,at as wxAt,windStretches,compass16,mph,SHELTER} from './weather.js';
 import {analyse as analyseRuns,learnedProfile,courseTime,mine,bests as bestsOf,KINDS,sessionProgress,formAt} from './analysis.js';
 import {weekPlan,DOW,pickRoute} from './plan.js';
-import {programme,adapt,load as loadOf,vdotOf,raceTime as vdotTime,DIST,STYLES as TSTYLES,KINDS as TKINDS,PHASES,dayNum,mondayOf,addDays} from './training.js';
+import {programme,adapt,load as loadOf,vdotOf,raceTime as vdotTime,DIST,KINDS as TKINDS,PHASES,dayNum,mondayOf,addDays} from './training.js';
+import {venueFor,climbs} from './venues.js';
 import {renderPlanTab,renderPlanIntro,renderBuilder,renderFeel,ICON as TICON} from './training-ui.js';
 import {renderInsights,runFacts,KCOL} from './insights-ui.js';
 import {encodeChallenge,decodeChallenge,challengeRoute,challengeRun,drawCard} from './share.js';
@@ -1581,6 +1582,8 @@ function loadSession(d,quiet){
     opt.set('purpose:'+cid,pu);opt.set('pcmode:'+cid,'profile');
     // racing your best: your quickest own run there alongside the pacer
     if(d.vsBest){const best=runsOn(b).filter(mine)[0];if(best){opt.set('pcmode:'+cid,'both');opt.set('ghost:'+cid,best.id)}}
+    // a course test races your last one alongside the pacer
+    if(d.vsRun&&allRuns.some(x=>x.id===d.vsRun)){opt.set('pcmode:'+cid,'both');opt.set('ghost:'+cid,d.vsRun)}
     // a rehearsal runs the start of the goal race exactly as the goal-race pacer would; the race, the goal
     let t=null;if(d.rehearse&&g)t=Math.round(timeAt(buildPacer(b.pts,g.time,prof),d.len));if(d.goalRace&&g)t=g.time;if(d.target)t=d.target;
     opt.set(finKey(cid,pu),t);
@@ -1593,27 +1596,32 @@ function loadSession(d,quiet){
 }
 
 // =====================================================================================
-// Training plans (training.js builds them, training-ui.js draws them)
+// Training plans, the Norwegian way (training.js builds them, venues.js says where, training-ui.js draws them)
 // =====================================================================================
 const progCfg=()=>opt.get('program',null);
 let progC=null,progKey=null;
-// The plan as it stands today: your fitness (the last test, nudged by how sessions felt, or a race that
-// says you're fitter), the programme, which run did which session, your load, the coach's notes
+// The plan as it stands today: your fitness (the last course test, nudged by how sessions felt, or a race
+// that says you're fitter), the programme with where to run each session, which run did which session,
+// your load, the coach's notes
 function progState(){
   const pg=progCfg();if(!pg)return null;
-  const key=JSON.stringify(pg)+'|'+new Date().toDateString();
+  const key=JSON.stringify(pg)+'|'+new Date().toDateString()+'|'+routes.length;
   if(progC&&progKey===key&&progC.runs===allRuns)return progC;
   const A=getA(),now=Date.now(),own=allRuns.filter(r=>mine(r)&&r.status==='done'&&r.started>=pg.start-6*3600e3&&(SIM||!r.sim));
+  const course=pg.route?routes.find(r=>r.id===pg.route)||null:null;
+  const cfg={...pg,course:!!course,courseD:course?.pts.at(-1).d,courseName:course?.name,firstTest:pg.firstTest??null};
   const tests=own.filter(r=>r.prog?.test&&(r.yd??r.rd??0)>=1500).map(r=>{const x=A.per?.find(y=>y.run.id===r.id),d=x?x.dist:(r.yd??r.rd),t=x?x.fp*x.dist/1000:r.elapsed/1000;return {t:r.started,v:vdotOf(d,t),run:r}}).sort((a,b)=>a.t-b.t);
   const lastT=tests.at(-1),since=lastT?.t??pg.start;let v=lastT?lastT.v:pg.base.v;
   // the schedule as planned says which session each run was
-  const sesAt=new Map(programme(pg,{vdot:v}).weeks.flatMap(w=>w.days).map(s=>[dayNum(s.date),s]));
-  const kindOfRun=r=>r.prog?.kind??(()=>{const s=sesAt.get(dayNum(r.started));return s&&s.kind!=='rest'?s.kind:r.mode==='intervals'?'vo2':({race:'race',tempo:'tempo',long:'long',int:'vo2'})[kindOf(r)]??'easy'})();
+  const sesAt=new Map(programme(cfg,{vdot:v}).weeks.flatMap(w=>w.days).map(s=>[dayNum(s.date),s]));
+  const kindOfRun=r=>r.prog?.kind??(()=>{const s=sesAt.get(dayNum(r.started));return s&&s.kind!=='rest'?s.kind:r.mode==='intervals'?'sub':({race:'race',tempo:'sub',long:'long',int:'hills'})[kindOf(r)]??'easy'})();
   const fb=own.filter(r=>r.feel).map(r=>({t:r.started,kind:kindOfRun(r),feel:r.feel})),ad=adapt(fb,{since,now});
-  const raceV=Math.max(0,...(A.per||[]).filter(x=>x.kind==='race'&&x.run.started>since&&mine(x.run)).map(x=>vdotOf(10000,x.eq*10)));
-  let from=lastT?'test':pg.base.from,raced=false;
-  if(raceV>v+ad.dv+0.5){v=raceV;raced=true}else v+=ad.dv;
-  const P=programme(pg,{vdot:v,easyAdj:ad.easyAdj,fatigue:ad.fatigue,pain:ad.pain,now});
+  const raceV=Math.max(0,...(A.per||[]).filter(x=>x.kind==='race'&&x.run.started>since&&mine(x.run)&&!x.run.prog?.test).map(x=>vdotOf(10000,x.eq*10)));
+  let raced=false;if(raceV>v+ad.dv+0.5){v=raceV;raced=true}else v+=ad.dv;
+  const P=programme(cfg,{vdot:v,easyAdj:ad.easyAdj,fatigue:ad.fatigue,pain:ad.pain,now});
+  // where to run each session
+  const R=routes.filter(r=>!r.laps&&r!==course),RV=course?[...R,course]:R;
+  for(const s of P.weeks.flatMap(w=>w.days))if(s.venue&&s.kind!=='rest'){const vr=venueFor(s.venue,s,RV,course);if(vr){s.vres=vr;s.where=vr.note;s.whereRoute=vr.route.id}}
   // which run did which session: one started from a session is that session, whatever the day; others go by date
   const did={},keys=new Set(P.weeks.flatMap(w=>w.days.map(s=>s.key)));
   for(const r of own)if(r.prog?.key&&keys.has(r.prog.key))(did[r.prog.key]??=[]).push(r);
@@ -1621,58 +1629,57 @@ function progState(){
   const today=dayNum(now);let wk=P.weeks.findIndex(w=>dayNum(w.monday)<=today&&today<dayNum(w.monday)+7);
   if(wk<0)wk=today<dayNum(P.weeks[0].monday)?0:P.weeks.length-1;
   const loadRuns=allRuns.filter(r=>mine(r)&&r.status==='done'&&now-r.started<60*864e5&&(SIM||!r.sim)).map(r=>({t:r.started,min:(r.elapsed||0)/60000,rpe:r.feel?.rpe??(TKINDS[kindOfRun(r)]?.rpe?.[1]||4)}));
+  // the course: its profile and climbs, and your predicted time on it
+  const me=learnedProfile(getA()),hp=me?profOf(me):prof;
+  let cinfo=null,coursePred=null;
+  if(course){
+    const pts=course.pts,D=pts.at(-1).d,es=pts.map(p=>p.ele??0),lo=Math.min(...es),span=Math.max(Math.max(...es)-lo,15),X=d=>(d/D*300).toFixed(1),Y=e=>(44-(e-lo)/span*38).toFixed(1);
+    let svg='';for(let i=0;i<pts.length-1;i+=2){const j=Math.min(pts.length-1,i+2),g=pts[j].d>pts[i].d?((pts[j].ele??0)-(pts[i].ele??0))/(pts[j].d-pts[i].d)*100:0,c=gradeColor(g);svg+=`<polygon points="${X(pts[i].d)},44 ${X(pts[i].d)},${Y(es[i])} ${X(pts[j].d)},${Y(es[j])} ${X(pts[j].d)},44" fill="${c}" stroke="${c}" stroke-width=".6"/>`}
+    cinfo={id:course.id,name:course.name,D,climb:climbOf(course),climbs:climbs(course),svg:`<svg viewBox="0 0 300 44" preserveAspectRatio="none">${svg}</svg>`};
+    if(D<=10500)coursePred=effortTime(pts,vdotTime(v,DIST[pg.dist].d)/(DIST[pg.dist].d/1000),hp);
+  }
   // what the coach has to say
   const notes=[],all=P.weeks.flatMap(w=>w.days);
   if(ad.pain)notes.push('🩹 You noted pain, so today and tomorrow are rest. If it\'s still there on an easy run, stop and get it looked at before any hard running.');
-  const sw=all.find(s=>s.adapted==='tired');if(sw&&!ad.pain)notes.push(`😮‍💨 Heavy legs and low energy lately: <b>${esc(sw.swapped)}</b> on ${DOW[sw.i]} is now an easy run. It comes back next week.`);
+  const sw=all.find(s=>s.adapted==='tired');if(sw&&!ad.pain)notes.push(`😮‍💨 Heavy legs and low energy lately: <b>${esc(sw.swapped)}</b> on ${DOW[sw.i]} is now an easy run.`);
   if(raced)notes.push(`🏁 A recent race says you're fitter than your plan thought: paces updated to VDOT ${v.toFixed(1)}.`);
-  else if(ad.dv>=0.3)notes.push(`📈 Hard sessions have felt easier than planned, so your paces are a little quicker (+${ad.dv.toFixed(1)} VDOT).`);
-  else if(ad.dv<=-0.3)notes.push(`🧭 Hard sessions have felt tougher than planned, so your paces are eased a little (${ad.dv.toFixed(1)} VDOT). No shame in it: fitness comes from sessions you can finish.`);
-  if(ad.easyAdj>1)notes.push(`🌿 Easy runs have been feeling hard: easy pace eased to ${fmt(P.paces.easy)}/km. Slow is the point.`);
-  const nt=all.find(s=>s.kind==='test'&&dayNum(s.date)>=today&&!did[s.key]);if(nt)notes.push(`🧪 Next fitness test: <b>${new Date(nt.date).toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short'})}</b>.`);
+  else if(ad.dv>=0.3)notes.push(`📈 Sessions have felt easier than planned, so your paces are a little quicker (+${ad.dv.toFixed(1)} VDOT).`);
+  else if(ad.dv<=-0.3)notes.push(`🧭 Sessions have felt harder than planned, so your paces are eased a little (${ad.dv.toFixed(1)} VDOT). In the Norwegian method that's exactly right: controlled beats heroic.`);
+  if(ad.easyAdj>1)notes.push(`🌿 Easy runs have been feeling hard: easy pace eased to ${fmt(P.paces.easy)}/km.`);
+  if(!tests.length&&!all.some(s=>s.kind==='test'))notes.push('🧪 No course test in the plan (no first test day set): your paces come from your recent runs.');
+  const nt=all.find(s=>s.kind==='test'&&dayNum(s.date)>=today&&!did[s.key]);if(nt)notes.push(`🧪 Next course test: <b>${new Date(nt.date).toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short'})}</b>${course&&nt.vres?.route===course?`, the full ${esc(course.name)}`:''}.`);
   const missed=all.filter(s=>s.hard&&dayNum(s.date)<today&&dayNum(s.date)>=today-7&&!did[s.key]).length;
   if(missed>=2)notes.push('📅 Missed a couple of sessions? Don\'t try to catch up: just pick up from today.');
-  progC={runs:allRuns,pg,P,pc:P.paces,vdot:v,v0:pg.base.v,adj:ad.dv,ad,tests,did,today,wk,kindOfRun,load:loadOf(loadRuns,now),notes,from};progKey=key;
+  progC={runs:allRuns,pg,P,pc:P.paces,vdot:v,v0:pg.base.v,adj:ad.dv,ad,tests,did,today,wk,kindOfRun,load:loadOf(loadRuns,now),notes,course:cinfo,coursePred,hp};progKey=key;
   return progC;
 }
-// A plan session as a day on Today and something Pacer can run: the route, how, what it's for, and the
-// target (the session's flat pace, with the hills taken the way you take them)
+// A plan session as a day on Today and something Pacer can run: the route and how (from venues.js), what
+// it's for, and the target (the session's flat pace with the hills taken the way you take them)
 function progDay(s,st){
-  const day={...s,kind:TKINDS[s.kind].fam,pkind:s.kind,prog:true};
-  const R=routes.filter(r=>!r.laps);if(s.kind==='rest'||!R.length)return day;
-  const RP=R.map(r=>({id:r.id,name:r.name,D:r.pts.at(-1).d,climb:climbOf(r)})),me=learnedProfile(getA()),hp=me?profOf(me):prof;
-  const flatness=x=>x.climb/(x.D/1000)/10;
-  if(s.reps){
-    let r=null,from=0,dir=s.len>=600?'alternate':'same';
-    if(s.hill){let best=null;for(const x of R)for(let i=0;i+20<x.pts.length;i+=5){const a=x.pts[i],b=x.pts[i+20];if(a.ele==null||b.ele==null)continue;const g=(b.ele-a.ele)/(b.d-a.d)*100;if(!best||g>best.g)best={g,r:x,from:a.d}}
-      if(best&&best.g>=3){r=best.r;from=Math.round(best.from/10)*10;dir='same'}}
-    if(!r){const pk=pickRoute(RP.filter(x=>x.D>=s.len),s.len,{prefer:flatness});r=pk&&R.find(x=>x.id===pk.route.id)}
-    if(!r)return day;
-    const len=Math.min(s.len,r.pts.at(-1).d-from);
-    return {...day,route:RP.find(x=>x.id===r.id),how:'int',int:{kind:'repeat',from,len,reps:s.reps,dir,slen:1000,rest:Math.round(s.hill?Math.max(s.rest,len/1000*st.pc.easy):s.rest),pace:Math.round(s.pace),step:0},
-      why:s.hill&&!from?`${s.why} (None of your routes has a real hill, so these run on the flat: hard for about a minute each.)`:s.why};
-  }
-  const pg=st.pg;let pk=s.kind==='race'&&pg.route&&RP.find(x=>x.id===pg.route)?{route:RP.find(x=>x.id===pg.route),how:'full'}:pickRoute(RP,s.dist,s.kind==='test'?{prefer:flatness}:{});
-  if(!pk)return day;
-  const r=R.find(x=>x.id===pk.route.id),D=r.pts.at(-1).d;
-  if(s.kind==='test'&&D>s.dist+50)pk={...pk,how:'part',len:s.dist};
-  const pts=pk.how==='part'?slice(r.pts,0,pk.len):r.pts,pu=['test','race'].includes(s.kind)?'race':['tempo','progression','cruise','sub'].includes(s.kind)?'tempo':'easy';
-  return {...day,route:pk.route,how:pk.how,len:pk.how==='part'?pk.len:D,purpose:pu,target:Math.round(s.kind==='race'&&pg.goalTime&&pk.how==='full'&&Math.abs(D-DIST[pg.dist].d)<300?pg.goalTime:effortTime(pts,s.pace,hp))};
+  const day={...s,kind:TKINDS[s.kind].fam,pkind:s.kind,prog:true},v=s.vres;
+  if(s.kind==='rest'||!v)return day;
+  const r=routes.find(x=>x.id===v.route.id)||v.route,RP={id:r.id,name:r.name,D:r.pts.at(-1).d};
+  if(v.how==='int')return {...day,route:RP,how:'int',int:{kind:'repeat',from:v.from,len:v.len,reps:s.reps,dir:v.dir,slen:1000,rest:Math.round(s.hill?Math.max(s.rest,v.len/1000*st.pc.easy):s.rest),pace:Math.round(s.pace),step:0}};
+  const pts=v.how==='part'?slice(r.pts,0,v.len):r.pts,pu=['test','race','rehearsal'].includes(s.kind)?'race':'easy';
+  const goal=s.kind==='race'&&st.pg.goalTime&&v.how==='full'&&Math.abs(RP.D-DIST[st.pg.dist].d)<400;
+  const lastTest=s.kind==='test'?st.tests.filter(t=>t.run.route?.id===r.id&&!t.run.route?.part).at(-1):null;
+  return {...day,route:RP,how:v.how,len:v.how==='part'?v.len:RP.D,purpose:pu,target:Math.round(goal?st.pg.goalTime:effortTime(pts,s.pace,st.hp)),vsRun:lastTest?.run.id??null};
 }
 // ---- The Plan tab ----
-let pgOpen=null;
+let pgOpen=null,pgWeek=null;
 function renderPlanView(){
   const el=$('progview'),st=progState();
   if(!st)return renderPlanIntro(el,{},{onNew:()=>openBuilder()});
   if(dayNum(Date.now())>dayNum(st.pg.raceDate)+1){ // race day has been
     const pg=st.pg,D=DIST[pg.dist],run=allRuns.filter(r=>mine(r)&&r.status==='done'&&Math.abs(dayNum(r.started)-dayNum(pg.raceDate))<=1&&(r.yd??r.rd??0)>=D.d*0.95).sort((a,b)=>raceTime0(a)-raceTime0(b))[0];
     const t=run&&raceTime0(run),km=Object.values(st.did).flat().reduce((a,r)=>a+(r.yd??r.rd??0)/1000,0);
-    return renderPlanIntro(el,{finished:{name:`${D.name}${pg.route?` · ${routes.find(r=>r.id===pg.route)?.name||''}`:''}`,time:t,
+    return renderPlanIntro(el,{finished:{name:st.course?.name||D.name,time:t,
       line:t?(pg.goalTime?(t<=pg.goalTime?`Goal smashed by ${gapFmt(pg.goalTime-t)} 🎉`:`${gapFmt(t-pg.goalTime)} off your ${fmt(pg.goalTime)} goal`):'Race done 🎉'):'',
       sum:`${st.P.weeks.length} weeks · ${Math.round(km)} km of training · fitness ${st.v0.toFixed(1)} → ${st.vdot.toFixed(1)} VDOT.`}},{onNew:()=>{opt.set('program',null);openBuilder()}});
   }
-  renderPlanTab(el,{...st,dayNum,feelOf:r=>r.feel,routeName:routes.find(r=>r.id===st.pg.route)?.name,open:pgOpen},{
+  renderPlanTab(el,{...st,dayNum,feelOf:r=>r.feel,open:pgOpen,openWeek:pgWeek},{
     onToggle:k=>{pgOpen=pgOpen===k?null:k;renderPlanView()},
+    onWeek:i=>{pgWeek=pgWeek===i?null:i;pgOpen=null;renderPlanView()},
     onRun:s=>{tab('today');loadSession(progDay(s,st))},
     onOpenRun:id=>{const r=allRuns.find(x=>x.id===id);if(r)showResult(r)},
     onEdit:()=>openBuilder(true),
@@ -1687,16 +1694,18 @@ const nearestDist=D=>Object.entries(DIST).sort((a,b)=>Math.abs(a[1].d-D)-Math.ab
 function openBuilder(edit){
   const pg=progCfg(),I=planInputs(),A=getA(),g=goalOf();
   pfV=A.ready&&A.form?vdotOf(10000,A.form*10):null;
-  pf=edit&&pg?{dist:pg.dist,date:isoDay(pg.raceDate),route:pg.route??null,goal:pg.goalTime?fmt(pg.goalTime):'',days:pg.days,longDay:pg.longDay,km:pg.km,longKm:pg.longKm,style:pg.style,start:pg.base.from,rdist:'5000',rtime:'',edit:true}
+  const sun=addDays(Date.now(),(7-new Date().getDay())%7); // this Sunday (today if it's Sunday)
+  pf=edit&&pg?{dist:pg.dist,date:isoDay(pg.raceDate),route:pg.route??null,goal:pg.goalTime?fmt(pg.goalTime):'',days:pg.days,km:pg.km,longKm:pg.longKm,test:pg.firstTest?isoDay(pg.firstTest):'',edit:true}
     :{dist:g?nearestDist(routes.find(r=>r.id===g.route)?.pts.at(-1).d||10000):'10k',date:isoDay(g&&g.date>Date.now()+28*864e5?g.date:addDays(mondayOf(Date.now()),7*10+6)),route:g?.route??null,goal:'',
-      days:I.runsPerWeek,longDay:6,km:Math.max(8,Math.round(I.weekKm||20)),longKm:Math.max(5,Math.round(I.longKm||8)),style:'balanced',start:'test',rdist:'5000',rtime:''};
-  if(pf.start==='runs'&&!pfV)pf.start='test';
+      days:I.runsPerWeek,km:Math.max(8,Math.round(I.weekKm||20)),longKm:Math.max(5,Math.round(I.longKm||8)),test:isoDay(sun)};
   pfErr=[];sheetOpen('progsheet');$('pfgo').textContent=edit?'Update my plan':'Build my plan';drawBuilder();
 }
 const pfWeeks=()=>pf.date?Math.round((dayNum(mondayOf(parseDay(pf.date)))-dayNum(mondayOf(Date.now())))/7)+1:null;
 function drawBuilder(){
-  const peak=Object.fromEntries(Object.keys(TSTYLES).map(k=>[k,Math.round(Math.max(pf.km,Math.min(DIST[pf.dist].peak[k]*Math.max(0.7,Math.min(1.3,pf.days/5)),pf.km*1.6)))]));
-  renderBuilder($('progform'),pf,{routes:routes.filter(r=>!r.laps).map(r=>({id:r.id,name:r.name,D:r.pts.at(-1).d})),runsVdot:pfV,weeks:pfWeeks(),peak,errors:pfErr},(patch,quiet)=>{
+  const D=DIST[pf.dist],peak=Math.round(Math.max(pf.km,Math.min(D.peak*Math.max(0.7,Math.min(1.3,pf.days/5)),pf.km*1.6)));
+  const c=pf.route&&routes.find(r=>r.id===pf.route),onCourse=c&&D.d<=10500;
+  renderBuilder($('progform'),pf,{routes:routes.filter(r=>!r.laps).map(r=>({id:r.id,name:r.name,D:r.pts.at(-1).d})),weeks:pfWeeks(),peak,errors:pfErr,
+    testNote:onCourse?`The full ${esc(c.name)}, all-out`:c?`A 5 km time trial (a full ${esc(D.name)} is too much to test with)`:'A 5 km time trial on your flattest route (choose a race course to test on it)'},(patch,quiet)=>{
     Object.assign(pf,patch);if(patch.route){const r=routes.find(x=>x.id===patch.route);if(r)pf.dist=nearestDist(r.pts.at(-1).d)}if(!quiet)drawBuilder()});
 }
 $('progback').onclick=()=>closeSheets();
@@ -1704,30 +1713,31 @@ $('pfgo').onclick=()=>{
   pfErr=[];const w=pfWeeks(),goal=pf.goal?parseTime(pf.goal):null,old=progCfg();
   if(!pf.date)pfErr.push('Choose your race day.');else if(w<4||w>30)pfErr.push('Your race needs to be between 4 and 30 weeks away.');
   if(pf.goal&&!goal)pfErr.push('That goal time doesn\'t look right: try 44:59 or 1:45:00.');
-  let base=null;
-  if(pf.start==='race'){const t=parseTime(pf.rtime);if(!t)pfErr.push('Add your race time, like 22:30.');else base={v:vdotOf(+pf.rdist,t),from:'race'}}
-  else if(pf.start==='runs'&&pfV)base={v:pfV,from:'runs'};
-  else base={v:pfV??Math.max(30,Math.min(50,32+pf.km*0.3)),from:'test'};
-  if(pf.dist==='mar'&&pf.km<25)pfErr.push('A marathon on under 25 km a week is a big step: consider a half first, or start with more weeks.');
-  if(pfErr.length&&!(pfErr.length===1&&pf.dist==='mar'&&pf.km<25&&pf.warned)){pf.warned=pf.dist==='mar';drawBuilder();$('progsheet').scrollTo({top:$('progsheet').scrollHeight,behavior:'smooth'});return}
+  const ft=pf.test?parseDay(pf.test)+9*3600e3:null;
+  if(ft&&pf.date&&dayNum(ft)>dayNum(parseDay(pf.date))-14)pfErr.push('Your first test needs to be at least two weeks before the race.');
+  if(ft&&!pf.edit&&dayNum(ft)<dayNum(Date.now()))pfErr.push('Your first test can\'t be in the past.');
+  if(pf.dist==='mar'&&pf.km<25&&!pf.warned){pf.warned=true;pfErr.push('A marathon on under 25 km a week is a big step: consider a half first. Tap Build again to go ahead anyway.')}
+  if(pfErr.length){drawBuilder();$('progsheet').scrollTo({top:$('progsheet').scrollHeight,behavior:'smooth'});return}
   const raceDate=parseDay(pf.date)+9*3600e3;
-  const pg={start:pf.edit&&old?old.start:Date.now(),raceDate,dist:pf.dist,style:pf.style,days:pf.days,longDay:pf.longDay,km:pf.km,longKm:pf.longKm,
-    test:pf.edit&&old?old.test:pf.start==='test',testD:pf.km<15?3000:5000,goalTime:goal,route:pf.route,base:pf.edit&&old&&pf.start===old.base.from?old.base:base};
+  const pg={start:pf.edit&&old?old.start:Date.now(),raceDate,dist:pf.dist,style:'norwegian',days:pf.days,km:pf.km,longKm:pf.longKm,firstTest:ft,goalTime:goal,route:pf.route,
+    base:pf.edit&&old?old.base:{v:pfV??Math.max(30,Math.min(50,32+pf.km*0.3)),from:pfV?'runs':'estimate'}};
   opt.set('program',pg);
   const r=pf.route&&routes.find(x=>x.id===pf.route);
   if(r)opt.set('goal',{route:r.id,name:r.name,date:raceDate,time:goal??Math.round(vdotTime(pg.base.v,r.pts.at(-1).d))});
   closeSheets();tab('plan');renderToday();
 };
-// ---- After a run: a fitness test's result, and how it felt ----
+// ---- After a run: a course test's result, and how it felt ----
 function renderTestCard(r){
   const st=progState(),t=st?.tests.find(x=>x.run.id===r.id);$('rtest').hidden=!t;if(!t)return;
-  const i=st.tests.indexOf(t),was=i?st.tests[i-1].v:st.v0,D=DIST[st.pg.dist],pc=st.pc;
-  $('rtest').innerHTML=`<div class="h">🧪 Fitness test</div><div class="tst"><b>${t.v.toFixed(1)}</b><span>VDOT${Math.abs(t.v-was)>=0.1?` · <em class="${t.v>was?'up':'down'}">${t.v>was?'+':''}${(t.v-was).toFixed(1)}</em> on ${i?'your last test':'your estimate'}`:''}</span></div>
-    <p class="sub">That's about <b>${fmt(vdotTime(t.v,D.d))}</b> for a ${D.name} on the flat. Your paces from now: easy <b>${fmt(pc.easy)}</b> · threshold <b>${fmt(pc.thr)}</b> · interval <b>${fmt(pc.int)}</b> /km.</p>`;
+  const i=st.tests.indexOf(t),was=i?st.tests[i-1].v:st.v0,D=DIST[st.pg.dist],pc=st.pc,prev=i?st.tests[i-1].run:null;
+  const ct=prev&&prev.route?.id===r.route?.id?prev.elapsed/1000-r.elapsed/1000:null;
+  $('rtest').innerHTML=`<div class="h">🧪 Course test${st.tests.length>1?` ${i+1}`:''}</div><div class="tst"><b>${t.v.toFixed(1)}</b><span>VDOT${Math.abs(t.v-was)>=0.1?` · <em class="${t.v>was?'up':'down'}">${t.v>was?'+':''}${(t.v-was).toFixed(1)}</em> on ${i?'your last test':'the estimate'}`:''}</span></div>
+    ${ct!=null?`<p class="sub">${ct>0?`<b>${gapFmt(ct)} quicker</b> on the course than your last test`:`${gapFmt(-ct)} slower than your last test: a hard day, or tired legs? The plan adjusts either way`}.</p>`:''}
+    <p class="sub">About <b>${fmt(vdotTime(t.v,D.d))}</b> for a ${D.name} on the flat. Your paces for the next four weeks: easy <b>${fmt(pc.easy)}</b> · sub-threshold <b>${fmt(pc.subS)}–${fmt(pc.subL)}</b> · hills <b>${fmt(pc.hill)}</b> /km.</p>`;
 }
 function renderFeelCard(r){
   const ok=mine(r)&&r.status==='done'&&!r.imported?.who&&(r.fixes?.length||0)>5;$('rfeel').hidden=!ok;if(!ok)return;
-  const st=progState(),kind=st?st.kindOfRun(r):r.mode==='intervals'?'vo2':({race:'race',tempo:'tempo',long:'long',int:'vo2'})[kindOf(r)]??'easy';
+  const st=progState(),kind=st?st.kindOfRun(r):r.mode==='intervals'?'sub':({race:'race',tempo:'sub',long:'long',int:'hills'})[kindOf(r)]??'easy';
   const draw=reply=>renderFeel($('rfeel'),{kind,title:TKINDS[kind]?.name,feel:r.feel||null,reply},async f=>{
     const before=progState();r.feel=f;await saveRun(r);allRuns=await listRuns();const after=progState();draw(coachReply(before,after,f,kind));
   });
@@ -1738,14 +1748,15 @@ function coachReply(b,a,f,kind){
   const out=[],e=TKINDS[kind]?.rpe;
   if(f.pain)out.push('🩹 Pain noted: today and tomorrow are now rest days. If it\'s still there on an easy run, stop and get it looked at before any hard running.');
   if(a&&b){
-    if(Math.abs(a.vdot-b.vdot)>=0.1)out.push(`${a.vdot>b.vdot?'📈 Easier than planned':'🧭 Harder than planned'}: your paces ${a.vdot>b.vdot?'move a little quicker':'ease a little'}. Threshold is now <b>${fmt(a.pc.thr)}</b>/km (was ${fmt(b.pc.thr)}).`);
+    if(Math.abs(a.vdot-b.vdot)>=0.1)out.push(`${a.vdot>b.vdot?'📈 Easier than planned':'🧭 Harder than planned'}: your paces ${a.vdot>b.vdot?'move a little quicker':'ease a little'}. Sub-threshold is now <b>${fmt(a.pc.sub)}</b>/km (was ${fmt(b.pc.sub)}).`);
     if(a.ad.easyAdj>b.ad.easyAdj)out.push(`🌿 Easy runs have felt hard lately: easy pace eased to <b>${fmt(a.pc.easy)}</b>/km.`);
     const sw=a.P.weeks.flatMap(w=>w.days).find(s=>s.adapted==='tired'),was=sw&&b.P.weeks.flatMap(w=>w.days).find(s=>s.key===sw.key);
     if(sw&&was?.adapted!=='tired')out.push(`😮‍💨 ${esc(sw.swapped)} on ${DOW[sw.i]} becomes an easy run: your legs need it more than the session.`);
   }
   if(!out.length&&e&&e[1]){
-    if(f.rpe>=e[0]&&f.rpe<=e[1]&&f.how==='plan')out.push(`✅ Right where a ${TKINDS[kind].name.toLowerCase()} should be (${e[0]}–${e[1]} out of 10). Nothing to change.`);
-    else if(['easy','recovery','long','strides'].includes(kind)&&f.rpe>e[1])out.push(`🌿 That's hard work for an ${kind==='long'?'long easy run':'easy run'}. Next time, slow right down: easy should be conversational.`);
+    if(kind==='sub'&&f.rpe>=8)out.push('🌊 Sub-threshold should feel comfortably hard, not hard. If that keeps happening the plan eases your paces; next time, start the first rep a little slower.');
+    else if(f.rpe>=e[0]&&f.rpe<=e[1]&&f.how==='plan')out.push(`✅ Right where ${TKINDS[kind].name.toLowerCase()} should be (${e[0]}–${e[1]} out of 10). Nothing to change.`);
+    else if(['easy','recovery','long','strides','hillsprints'].includes(kind)&&f.rpe>e[1])out.push(`🌿 That's hard work for an ${kind==='long'?'easy long run':'easy run'}. Next time, slow right down: easy should be conversational.`);
     else out.push('Noted. One session doesn\'t change the plan; a pattern will.');
   }
   return out.join('<br>');

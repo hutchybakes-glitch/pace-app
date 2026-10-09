@@ -1,219 +1,281 @@
-// Training plans: a programme from now to race day, built on current coaching practice:
-//   - fitness as VDOT (Daniels & Gilbert's oxygen-cost model): a race or a time trial gives it, and it
-//     gives every training pace (easy, marathon, threshold, interval, repetition) and race predictions
-//   - periodised: base (aerobic, hills, strides) → build (threshold and VO2max) → peak (race-specific)
-//     → taper (volume down ~40–60 %, intensity kept), with a lighter week every fourth week and a fitness
-//     retest at the end of it
-//   - mostly easy running (80/20 or pyramidal), volume up no more than ~10 % a week
-//   - four styles: endurance (more volume, polarised), balanced (pyramidal), quality (lower mileage, three
-//     key runs), threshold (Norwegian singles: two or three sub-threshold interval sessions)
-//   - how each session felt (effort 1–10, legs, energy, pain) nudges paces and swaps hard days for easy
-//     ones when you're tired
-// Paces s/km, distances m, times s (dates ms). No DOM: runs under node --test.
+// Training plans, the Norwegian way, customised to your race and its course.
+//
+// The method (adapted from the Norwegian model for runners who train once a day, "Norwegian singles"):
+//   - most of the work is sub-threshold intervals: comfortably hard, never straining, with short rests,
+//     two (three with five or more runs a week) sessions a week. Shorter reps run a little quicker,
+//     longer reps a little slower, so every session is controlled and repeatable
+//   - the one weekly session above threshold is short hill reps (the Ingebrigtsens' 20 × 200 m uphill,
+//     scaled down): strength and form for the climbs without flat-out speedwork. Early on they start as
+//     hill sprints of a few seconds
+//   - everything else is genuinely easy, with strides to keep the legs quick
+//   - periodised: base → build → peak (race-specific: rehearsing race pace on the course) → taper
+//     (less running, the same quality), the week of each fitness test lighter
+//   - fitness tests are the race course itself, all-out: the first on the day you choose, then every
+//     four weeks. Each sets your fitness (VDOT, from the run with its hills taken out) and so every pace
+//   - how each session felt (effort, legs, energy, pain) nudges paces, turns a hard day easy when you're
+//     tired and rests you when you're hurt
+// Every session says where to run it (venue hints, resolved against your routes in venues.js), how to
+// warm up and cool down, why it's in the plan and why at this point.
+// Paces s/km, distances m, times s, dates ms. No DOM: runs under node --test.
 
-const DAY=864e5,WEEK=7*DAY;
+const DAY=864e5;
 const clip=(x,a,b)=>Math.max(a,Math.min(b,x));
 const mmss=s=>{s=Math.round(s);return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`};
 const kmt=m=>{const k=m/1000;return Math.abs(k-Math.round(k))<0.05?String(Math.round(k)):k.toFixed(1)};
+const R100=m=>Math.max(200,Math.round(m/100)*100);
 
 // ---------------------------------------------------------------------------------------------------
-// Fitness: VDOT
+// Dates (local calendar: a week across the clocks changing is still seven days)
 // ---------------------------------------------------------------------------------------------------
-// Oxygen cost (ml/kg/min) of running at v m/min, and the fraction of VO2max you can hold for t minutes
-export const vo2=v=>-4.60+0.182258*v+0.000104*v*v;
-export const pctMax=t=>0.8+0.1894393*Math.exp(-0.012778*t)+0.2989558*Math.exp(-0.1932605*t);
-// VDOT from a race or time trial: d m in s seconds
+export const mondayOf=ms=>{const d=new Date(ms);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d.getTime()};
+export const addDays=(ms,n)=>{const d=new Date(ms);d.setHours(0,0,0,0);d.setDate(d.getDate()+n);return d.getTime()};
+export const dayNum=ms=>{const d=new Date(ms);return Math.round(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/DAY)};
+
+// ---------------------------------------------------------------------------------------------------
+// Fitness: VDOT (Daniels & Gilbert)
+// ---------------------------------------------------------------------------------------------------
+export const vo2=v=>-4.60+0.182258*v+0.000104*v*v;                     // ml/kg/min at v m/min
+export const pctMax=t=>0.8+0.1894393*Math.exp(-0.012778*t)+0.2989558*Math.exp(-0.1932605*t); // of VO2max, for t min
 export const vdotOf=(d,s)=>{const t=s/60;return vo2(d/t)/pctMax(t)};
-// Race time (s) over d m for a VDOT
-export function raceTime(v,d){
-  let lo=d/1000*100,hi=d/1000*1200;
-  for(let k=0;k<60;k++){const m=(lo+hi)/2;if(vdotOf(d,m)>v)lo=m;else hi=m}
-  return (lo+hi)/2;
-}
-// Pace (s/km) that costs fraction f of VDOT
+export function raceTime(v,d){let lo=d/1000*100,hi=d/1000*1200;for(let k=0;k<60;k++){const m=(lo+hi)/2;if(vdotOf(d,m)>v)lo=m;else hi=m}return (lo+hi)/2}
 export const paceAtPct=(v,f)=>{const a=0.000104,b=0.182258,c=-4.60-f*v,vel=(-b+Math.sqrt(b*b-4*a*c))/(2*a);return 60000/vel};
-// Training paces for a VDOT (flat, still air; the pacer then takes each route's hills)
+// Training paces (flat ground; the pacer then takes each route's hills). Sub-threshold has three gears:
+// short reps (about 3 min) a touch quicker, long reps (10 min) a touch slower
 export function paces(v,{easyAdj=1}={}){
   const P=f=>paceAtPct(v,f);
-  return {easy:P(0.67)*easyAdj,easyLo:P(0.62)*easyAdj,easyHi:P(0.72)*easyAdj,long:P(0.66)*easyAdj,recovery:P(0.6)*easyAdj,
-    mar:raceTime(v,42195)/42.195,half:raceTime(v,21097.5)/21.0975,thr:P(0.88),sub:P(0.845),int:P(0.975),rep:P(1.07),
-    r5k:raceTime(v,5000)/5,r10k:raceTime(v,10000)/10};
+  return {easy:P(0.67)*easyAdj,long:P(0.66)*easyAdj,recovery:P(0.6)*easyAdj,
+    thr:P(0.88),subS:P(0.87),sub:P(0.855),subL:P(0.84),hill:P(0.98),
+    mar:raceTime(v,42195)/42.195,half:raceTime(v,21097.5)/21.0975,r5k:raceTime(v,5000)/5,r10k:raceTime(v,10000)/10};
 }
-export const PACE_NAMES=[['easy','Easy','🌿'],['long','Long run','🛤️'],['mar','Marathon','🏃'],['sub','Sub-threshold','🌊'],['thr','Threshold','🔥'],['int','Interval','⚡'],['rep','Repetition','🚀']];
+export const PACE_NAMES=[['easy','Easy','🌿'],['long','Long run','🛤️'],['subL','Sub-T long reps','🌊'],['sub','Sub-T 6 min reps','🌊'],['subS','Sub-T short reps','🌊'],['thr','Threshold','🔥']];
 
 // ---------------------------------------------------------------------------------------------------
-// Races and styles
+// Races, phases, sessions
 // ---------------------------------------------------------------------------------------------------
 export const DIST={
-  '5k':{name:'5K',d:5000,taper:1,longCap:14,peak:{endurance:42,balanced:36,quality:26,threshold:36}},
-  '10k':{name:'10K',d:10000,taper:1,longCap:18,peak:{endurance:52,balanced:45,quality:32,threshold:45}},
-  half:{name:'Half marathon',d:21097.5,taper:2,longCap:22,peak:{endurance:64,balanced:56,quality:40,threshold:56}},
-  mar:{name:'Marathon',d:42195,taper:3,longCap:32,peak:{endurance:85,balanced:72,quality:52,threshold:72}},
-};
-export const STYLES={
-  endurance:{name:'Endurance',sub:'Higher mileage · 80/20',icon:'🛤️',vol:1.15,longShare:0.28,
-    desc:'About 80 % of your running easy, and more of it, with two hard sessions a week: one fast, one at threshold. Builds the biggest engine; the most time on your feet.'},
-  balanced:{name:'Balanced',sub:'Pyramidal · the all-rounder',icon:'⚖️',vol:1,longShare:0.3,
-    desc:'Mostly easy, a threshold session and a faster session each week, and race-pace work as the race gets close. Research finds it works as well as anything for most runners.'},
-  quality:{name:'Quality',sub:'Lower mileage · three key runs',icon:'🎯',vol:0.8,longShare:0.33,
-    desc:'Three key runs a week (intervals, tempo, long) and little else; other days are short and easy, or cross-training. For busy weeks or injury-prone legs: less running, every run counts.'},
-  threshold:{name:'Threshold',sub:'Norwegian singles',icon:'🌊',vol:1,longShare:0.28,
-    desc:'Two or three sub-threshold interval sessions a week (comfortably hard, never all-out) and easy running in between. Very repeatable, kind to the legs, big aerobic gains; no flat-out speedwork.'},
+  '5k':{name:'5K',d:5000,taper:1,longCap:14,peak:36},
+  '10k':{name:'10K',d:10000,taper:1,longCap:18,peak:45},
+  half:{name:'Half marathon',d:21097.5,taper:2,longCap:22,peak:56},
+  mar:{name:'Marathon',d:42195,taper:3,longCap:32,peak:72},
 };
 export const PHASES={base:{name:'Base',col:'#2dd4bf'},build:{name:'Build',col:'#60a5fa'},peak:{name:'Peak',col:'#fb923c'},taper:{name:'Taper',col:'#4ade80'}};
-
-// How each kind of session should feel (effort out of 10), and its colour family on Today
 export const KINDS={
-  easy:{name:'Easy',rpe:[2,4],fam:'easy'},recovery:{name:'Recovery',rpe:[1,3],fam:'easy'},strides:{name:'Easy + strides',rpe:[2,4],fam:'easy'},
-  fartlek:{name:'Fartlek',rpe:[4,6],fam:'easy'},long:{name:'Long run',rpe:[3,5],fam:'long'},progression:{name:'Progression run',rpe:[5,7],fam:'tempo'},
-  tempo:{name:'Tempo',rpe:[6,7],fam:'tempo'},cruise:{name:'Cruise intervals',rpe:[6,8],fam:'tempo'},sub:{name:'Sub-threshold',rpe:[5,7],fam:'tempo'},
-  hills:{name:'Hill reps',rpe:[7,9],fam:'int'},vo2:{name:'VO2max intervals',rpe:[8,9],fam:'int'},racepace:{name:'Race-pace reps',rpe:[7,9],fam:'int'},
-  test:{name:'Fitness test',rpe:[9,10],fam:'race'},race:{name:'Race day',rpe:[9,10],fam:'race'},rest:{name:'Rest',rpe:[0,0],fam:'rest'},
+  easy:{name:'Easy',rpe:[2,4],fam:'easy'},recovery:{name:'Recovery run',rpe:[1,3],fam:'easy'},strides:{name:'Easy + strides',rpe:[2,4],fam:'easy'},
+  hillsprints:{name:'Easy + hill sprints',rpe:[3,5],fam:'easy'},long:{name:'Long run',rpe:[3,5],fam:'long'},
+  sub:{name:'Sub-threshold',rpe:[5,7],fam:'tempo'},hills:{name:'Hill reps',rpe:[7,8],fam:'int'},rehearsal:{name:'Course rehearsal',rpe:[7,8],fam:'race'},
+  sharpener:{name:'Sharpener',rpe:[6,7],fam:'int'},test:{name:'Course test',rpe:[9,10],fam:'race'},race:{name:'Race day',rpe:[9,10],fam:'race'},rest:{name:'Rest',rpe:[0,0],fam:'rest'},
 };
-export const HARD=new Set(['tempo','cruise','sub','hills','vo2','racepace','progression','test','race']);
+export const HARD=new Set(['sub','hills','rehearsal','sharpener','test','race']);
 export const RPE_WORDS=['','Very easy','Easy','Easy','Steady','Moderate','Comfortably hard','Hard','Very hard','Extremely hard','Max'];
+
+// Warm-ups, cool-downs and the extras, as lines to read before you go
+export const WARM={
+  hard:['10–15 min easy jog','Drills, about 5 min: leg swings ×10 each way, then 2 × 20 m each of A-skips, high knees and butt kicks','4 × 20 s strides, building up to the session\'s pace'],
+  race:['15 min easy jog','Drills, about 5 min: leg swings, A-skips, high knees, butt kicks','4–6 × 20 s strides, the last two at race pace','Be on the line within 5 minutes of finishing them'],
+  easy:['Start the first 5 minutes slower than easy: let your body warm into it'],
+};
+export const COOL={
+  hard:['10 min easy jog','Recovery routine (8 min): calf stretch against a wall, kneeling hip-flexor stretch, hamstring stretch, figure-4 glute stretch: 45 s each side'],
+  easy:['Optional: the recovery routine (calves, hip flexors, hamstrings, glutes, 45 s each side)'],
+  race:['10–15 min very easy jog, then the recovery routine','Refuel within 30 minutes: carbohydrate and some protein'],
+};
+export const STRENGTH={title:'Strength and mobility (20 min)',steps:['Single-leg calf raises 3 × 15 each side (slow down, knee straight then bent)','Split squats 3 × 8 each side','Glute bridges 3 × 12 (single-leg once easy)','Side plank 2 × 30 s each side','Dead bugs 2 × 10'],
+  why:'Strong calves, glutes and hips make you more economical and much less likely to get injured. Twice a week is plenty.'};
 
 // ---------------------------------------------------------------------------------------------------
 // The programme
 // ---------------------------------------------------------------------------------------------------
-// Which days you run (0 = Monday), by runs a week, with the long run on Sunday (6) or Saturday (5)
+// Which days you run (0 = Monday) for runs a week, the long run last
 const RUN_DAYS={3:[1,3,6],4:[1,3,5,6],5:[0,1,3,5,6],6:[0,1,2,3,5,6]};
-export const mondayOf=ms=>{const d=new Date(ms);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d.getTime()};
-// Calendar arithmetic in local time (a week across the clocks changing is still seven days): midnight
-// n days after ms, and a day's number (for comparing days)
-export const addDays=(ms,n)=>{const d=new Date(ms);d.setHours(0,0,0,0);d.setDate(d.getDate()+n);return d.getTime()};
-export const dayNum=ms=>{const d=new Date(ms);return Math.round(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/DAY)};
 
-// The weeks: phase, lighter weeks, tests. cfg: {start (ms, when the plan began), raceDate, dist, test}
+// The weeks: phase, tests (the first on cfg.firstTest, then every four weeks, never in the last 13 days),
+// lighter test weeks, the taper (a week longer when the race is early in the week)
+// cfg: {start, raceDate, dist, firstTest (ms or null)}
 export function skeleton(cfg){
   const m0=mondayOf(cfg.start),W=clip(Math.round((dayNum(mondayOf(cfg.raceDate))-dayNum(m0))/7)+1,1,40),D=DIST[cfg.dist];
-  const T=Math.min(D.taper,Math.max(1,Math.floor(W/4))),R=W-T;
-  const base=R>=4?Math.round(R*0.4):Math.min(R,1),build=R>=3?Math.round(R*0.35):Math.max(0,R-base),peak=Math.max(0,R-base-build);
+  const raceIdx=dayNum(cfg.raceDate)-dayNum(mondayOf(cfg.raceDate));
+  const tests=[];
+  if(cfg.firstTest!=null)for(let t=cfg.firstTest;dayNum(t)<=dayNum(cfg.raceDate)-13;t=addDays(t,28))tests.push(t);
+  const T=Math.min(D.taper+(raceIdx<=2?1:0),Math.max(1,Math.floor(W/4))),Rw=W-T;
+  const base=Rw>=4?Math.round(Rw*0.4):Math.min(Rw,1),build=Rw>=3?Math.round(Rw*0.35):Math.max(0,Rw-base);
   return Array.from({length:W},(_,w)=>{
-    const phase=w<base?'base':w<base+build?'build':w<R?'peak':'taper';
-    const cut=phase!=='taper'&&(w+1)%4===0&&w<R-1;   // every fourth week lighter (not the one before the taper)
-    const start=phase==='base'?0:phase==='build'?base:phase==='peak'?base+build:R,len=phase==='base'?base:phase==='build'?build:phase==='peak'?peak:T;
-    return {w,monday:addDays(m0,7*w),phase,cut,test:(w===0&&cfg.test)||cut,p:len>1?(w-start)/(len-1):1,fromRace:W-1-w};
+    const monday=addDays(m0,7*w),phase=w<base?'base':w<base+build?'build':w<Rw?'peak':'taper';
+    const test=tests.find(t=>dayNum(t)>=dayNum(monday)&&dayNum(t)<dayNum(monday)+7)??null;
+    const start=phase==='base'?0:phase==='build'?base:phase==='peak'?base+build:Rw,len=phase==='base'?base:phase==='build'?build:phase==='peak'?Rw-base-build:T;
+    return {w,monday,phase,test,cut:!!test,p:len>1?(w-start)/(len-1):1,fromRace:W-1-w,raceIdx};
   });
 }
 
-// Weekly distance and long run for each week: from where you are now towards the style's peak, at most
-// +10 % a week, 75 % in lighter weeks, then the taper
+// Weekly distance and long run: from where you are now towards the peak, at most +10 % a week, 75 % in
+// test weeks, then the taper. The long run starts from the one you already do.
 export function volumes(cfg,weeks){
-  const D=DIST[cfg.dist],S=STYLES[cfg.style],K0=Math.max(8,cfg.km||15),peak=Math.max(K0,Math.min(D.peak[cfg.style]*Math.max(0.7,Math.min(1.3,cfg.days/5)),K0*1.6));
-  const build=weeks.filter(x=>x.phase!=='taper').length,taperF={1:[0.6],2:[0.75,0.5],3:[0.8,0.65,0.45]}[weeks.filter(x=>x.phase==='taper').length]||[0.6];
+  const D=DIST[cfg.dist],K0=Math.max(8,cfg.km||15),peak=Math.max(K0,Math.min(D.peak*clip(cfg.days/5,0.7,1.3),K0*1.6));
+  const nT=weeks.filter(x=>x.phase==='taper').length,taperF={1:[0.6],2:[0.7,0.45],3:[0.8,0.6,0.4],4:[0.85,0.7,0.55,0.4]}[nT]||[0.6],build=weeks.length-nT;
   let k=K0,top=K0,lg=Math.max(5,cfg.longKm||K0*0.3);
   return weeks.map((x,i)=>{
-    if(x.phase==='taper'){const f=taperF[i-(weeks.length-taperF.length)]??0.6,K=top*f;return {K,long:Math.min(lg,Math.max(6,K*0.3))}}
+    if(x.phase==='taper'){const K=top*(taperF[i-build]??0.5);return {K,long:Math.min(lg,Math.max(6,K*0.32))}}
     const aim=K0+(peak-K0)*Math.min(1,(i+1)/Math.max(1,build-1));
     if(!x.cut){k=Math.min(aim,k*1.1,top*1.1);top=Math.max(top,k)}
-    const K=x.cut?top*0.75:k;
-    // the long run: its share of the week, but never below the long run you already do (up to 45 % of
-    // the week), growing at most 1.5 km a week
-    const want=Math.max(K*S.longShare,Math.min(cfg.longKm||0,K*0.45)),L=clip(Math.min(want,lg+(x.cut?0:1.5)),5,D.longCap);if(!x.cut)lg=Math.max(lg,L);
+    const K=x.cut?top*0.75:k,want=Math.max(K*0.28,Math.min(cfg.longKm||0,K*0.45));
+    const L=clip(Math.min(want,lg+(x.cut?0:1.5)),5,D.longCap);if(!x.cut)lg=Math.max(lg,L);
     return {K,long:x.cut?L*0.8:L};
   });
 }
 
-// One session. pc: paces; o: what kind and how much
-function sess(kind,pc,o={}){
-  const K=KINDS[kind],s={kind,title:o.title||K.name,rpe:K.rpe,hard:HARD.has(kind),...o};
-  const wu=s.hard&&kind!=='race'?2:0; // ~1 km easy before and after a hard session
-  if(s.reps){const rk=s.reps*s.len/1000;s.km=rk+wu+(s.restKm||0);s.what=`${s.reps} × ${s.len<1000?s.len+' m':kmt(s.len)+' km'}${s.repWhat?' '+s.repWhat:''}`}
+// One session: what it is, its target, the warm-up and cool-down, why, and where (a venue hint)
+function sess(kind,o={}){
+  const K=KINDS[kind],hard=HARD.has(kind),wu=hard&&kind!=='race'&&kind!=='test'?2.5:kind==='test'?3:0; // km of warm-up and cool-down
+  const s={kind,title:o.title||K.name,rpe:K.rpe,hard,warm:hard?(kind==='race'||kind==='test'?WARM.race:WARM.hard):kind==='rest'?[]:WARM.easy,
+    cool:hard?(kind==='race'||kind==='test'?COOL.race:COOL.hard):kind==='rest'?[]:COOL.easy,extras:[],...o};
+  if(s.reps){s.km=s.reps*s.len/1000+wu;s.what=s.what||`${s.reps} × ${s.len<1000?s.len+' m':kmt(s.len)+' km'}${s.repWhat?' '+s.repWhat:''}`}
   else if(s.dist){s.km=s.dist/1000+wu;s.what=s.what||`${kmt(s.dist)} km`}
   return s;
 }
-// Hard sessions by phase, style and race distance; p: how far through the phase (0–1)
-function quality(slot,x,cfg,pc){
-  const D=DIST[cfg.dist].d,st=cfg.style,ph=x.phase,p=x.p,R=k=>Math.round(k);
-  const longRace=D>=21000,racePace=D<=5000?pc.r5k:D<=10000?pc.r10k:D<=21100?pc.half:pc.mar;
-  const sub=(n,len,rest=60)=>sess('sub',pc,{reps:n,len,rest,pace:pc.sub,why:`Just below threshold, about ${mmss(pc.sub)}/km: comfortably hard, never straining. Short rests keep it controlled; this is where the Norwegian method builds its engine.`});
-  const vo2=(n,len)=>sess('vo2',pc,{reps:n,len,rest:R(len/1000*pc.int*0.8),pace:pc.int,why:`At interval pace, about ${mmss(pc.int)}/km, with an easy jog between. Raises your VO2max, your ceiling, so race pace feels easier.`});
-  const cruise=(n,len)=>sess('cruise',pc,{reps:n,len,rest:60,pace:pc.thr,why:`Threshold pace, about ${mmss(pc.thr)}/km, broken up with a minute's jog: the same benefit as a long tempo with less strain.`});
-  const tempo=min=>sess('tempo',pc,{dist:R(min*60/pc.thr*10)*100,pace:pc.thr,what:`${min} min tempo`,why:`${min} minutes at threshold, about ${mmss(pc.thr)}/km: comfortably hard, the pace you could hold for about an hour. The tempo pacer takes the hills for you.`});
-  const hills=n=>sess('hills',pc,{reps:n,len:200,rest:90,pace:pc.int,hill:true,repWhat:'uphill',why:`Hard up a hill for about a minute, jog back down. Builds strength and form for climbs without the pounding of fast flat running.`});
-  const rp=(n,len)=>sess('racepace',pc,{reps:n,len,rest:R(Math.max(60,len/1000*60)),pace:racePace,why:`At your goal-race pace, about ${mmss(racePace)}/km. Rehearses exactly the rhythm you'll race at.`});
-  const prog=km=>sess('progression',pc,{dist:km*1000,pace:(pc.easy+pc.thr)/2,why:`Start easy and finish the last third at threshold, about ${mmss(pc.thr)}/km. Teaches you to run strong on tired legs.`});
-  if(ph==='taper'){
-    if(x.fromRace===0)return slot==='A'?rp(3,1000):null;
-    return slot==='A'?rp(4,1000):slot==='B'?tempo(longRace?20:15):null;
-  }
-  if(st==='threshold'){
-    if(ph==='peak'&&slot==='A')return longRace?rp(R(2+p),3000):rp(R(4+2*p),1000);
-    if(slot==='A')return sub(R(6+2*p),1000);
-    if(slot==='B')return ph==='base'?sub(3,R((6+2*p)*60/pc.sub*10)*100):sub(R(3+p),2000);
-    if(slot==='C')return sub(R(8+4*p),400,45);
-  }
-  if(slot==='A'){
-    if(ph==='base')return hills(R(6+4*p));
-    if(ph==='build')return longRace?cruise(R(4+p),1600):vo2(R(5+p),p<0.5?800:1000);
-    return longRace?rp(R(2+p),D>30000?5000:3000):D<=5000?rp(R(5-p),R(1000+400*p)):rp(R(4-p),R(2000+1000*p));
-  }
-  if(slot==='B'){
-    if(ph==='base')return tempo(R(15+10*p));
-    if(ph==='build')return longRace?tempo(R(25+10*p)):cruise(R(3+p),1600);
-    return longRace?tempo(R(30+10*p)):st==='quality'?tempo(25):prog(Math.max(6,R(D/1000*0.8)));
-  }
-  return null;
+// Sub-threshold reps: minutes each, at the right gear for their length
+function subReps(n,min,pc,rest=60){
+  const pace=min<=4?pc.subS:min<=7?pc.sub:pc.subL,len=R100(min*60/pace*1000);
+  return {reps:n,len,rest,pace,repWhat:`(about ${min} min each)`,min};
 }
 
-// The whole programme. cfg: {start, raceDate, dist, style, days, longDay (5|6), km, longKm, test, goalTime?}
-// st: {vdot, easyAdj, fatigue, pain, now}. Returns {weeks:[{…, K, long, days:[7 sessions with date, i, key]}], paces}
+// The whole programme. cfg: {start, raceDate, dist, days, km, longKm, firstTest, goalTime, course (true if
+// the race course is one of your routes)}. st: {vdot, easyAdj, fatigue, pain, now}
+// Returns {weeks:[{…, K, long, focus, days:[7 sessions: i, date, key, kind, title, what, km, pace, reps…,
+// warm, main, cool, why, now, venue, extras]}], paces}
 export function programme(cfg,st){
-  const pc=paces(st.vdot,{easyAdj:st.easyAdj||1}),weeks=skeleton(cfg),vols=volumes(cfg,weeks);
-  const n=clip(cfg.days||4,3,6),longDay=cfg.longDay===5?5:6,startDay=dayNum(cfg.start)-dayNum(mondayOf(cfg.start));
-  let run=RUN_DAYS[n].map(d=>longDay===5&&(d===5||d===6)?(d===5?6:5):d).sort((a,b)=>a-b);
-  if(longDay===5&&n<4)run=run.map(d=>d===6?5:d);
-  const raceIdx=dayNum(cfg.raceDate)-dayNum(mondayOf(cfg.raceDate));
+  const pc=paces(st.vdot,{easyAdj:st.easyAdj||1}),weeks=skeleton(cfg),vols=volumes(cfg,weeks),D=DIST[cfg.dist];
+  const n=clip(cfg.days||4,3,6),run=RUN_DAYS[n],startDay=dayNum(cfg.start)-dayNum(mondayOf(cfg.start));
+  const racePace=cfg.goalTime?cfg.goalTime/(D.d/1000):raceTime(st.vdot,D.d)/(D.d/1000),short=D.d<=10500;
+  const course=cfg.course,cName=cfg.courseName||'the race course';
   const out=weeks.map((x,w)=>{
-    const days=Array.from({length:7},(_,i)=>({i,date:addDays(x.monday,i),key:`${w}-${i}`,...sess('rest',pc,{why:'Rest day. Recovery is when the training lands.'})}));
+    const days=Array.from({length:7},(_,i)=>({i,date:addDays(x.monday,i),key:`${w}-${i}`,...sess('rest',{why:'Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest.'})}));
     const set=(i,s)=>{if(s)Object.assign(days[i],s,{i,date:addDays(x.monday,i),key:`${w}-${i}`})};
+    const last=w===weeks.length-1,ri=x.raceIdx,ti=x.test!=null?dayNum(x.test)-dayNum(x.monday):null,p=x.p,ph=x.phase;
     let rd=run.slice();
-    const last=w===weeks.length-1;
-    if(w===0){rd=rd.filter(i=>i>=startDay);for(const d of days)if(d.i<startDay)d.pre=true} // the plan starts today
-    if(last)rd=rd.filter(i=>i<raceIdx-1);                     // race week: nothing after, rest the day before
-    const A=rd.includes(1)?1:rd.find(i=>i!==longDay),B=rd.includes(3)&&A!==3?3:rd.find(i=>i!==A&&i!==longDay&&i>(A??-1)+1);
-    const C=cfg.style==='threshold'&&n>=5&&rd.includes(longDay===6?5:4)?(longDay===6?5:4):null;
-    // the test: in the first week, the first run day you have; in lighter weeks, the second key day
-    let testDay=null;
-    if(x.test&&!last){testDay=w===0?rd.find(i=>i!==longDay)??rd[0]:B??A;if(testDay!=null)set(testDay,sess('test',pc,{dist:cfg.testD||5000,pace:pc.r5k,
-      what:`${kmt(cfg.testD||5000)} km time trial`,why:`An all-out ${kmt(cfg.testD||5000)} km on fresh legs, after a good warm-up. The pacer runs your predicted time; beat it if you can. Your result sets every training pace${w?' for the next block':''}.`}))}
-    // key sessions (a lighter week keeps a gentle fartlek; the day after a test is never hard)
-    for(const [slot,day] of [['A',A],['B',B],['C',C]]){
-      if(day==null||day===testDay||days[day].kind!=='rest')continue;
-      if(testDay!=null&&(day===testDay+1||(w===0&&day<testDay)))continue;
-      const q=x.cut?(slot==='A'?sess('fartlek',pc,{dist:Math.round(vols[w].K*0.15)*1000||5000,pace:pc.easy,what:'8 × 1 min brisk',why:'An easy run with eight one-minute pick-ups, one minute easy between. Keeps you sharp in a lighter week.'}):null):quality(slot,x,cfg,pc);
-      if(q)set(day,q);
+    if(w===0){rd=rd.filter(i=>i>=startDay);for(const d of days)if(d.i<startDay)d.pre=true}
+    if(last)rd=rd.filter(i=>i<ri-1);
+    // the test, on its day, on the full course; the day before easy, and no hard session the day after
+    if(ti!=null){
+      set(ti,sess('test',{dist:course?cfg.courseD:short?D.d:5000,pace:raceTime(st.vdot,course?cfg.courseD:short?D.d:5000)/((course?cfg.courseD:short?D.d:5000)/1000),venue:{type:course&&short?'course-full':'flat-5k'},
+        what:course&&short?`The full ${cName}, all-out`:`${short?kmt(D.d):5} km time trial`,vsLastTest:true,
+        main:[course&&short?`The whole course at race effort: start controlled for the first kilometre, then race it`:'All-out, as evenly as you can: controlled first kilometre, then race'],
+        why:`An all-out run of ${course&&short?'the race course itself':'a time trial'}. It measures your fitness (with the hills allowed for, so a hilly course still gives a fair number), and that sets every pace for the next block. ${w?'You race your last test as the purple runner, so you see exactly where you\'ve gained.':'The pacer runs your estimated time: beat it if you can.'}`,
+        now:w===0?'Everything is built on knowing where you are. Testing on the course from the start gives a baseline on the exact hills you\'ll race.'
+          :`Four weeks since your last test: enough time for the training to land. This week is lighter so you test fresh, and the result resets your paces for the next block.`}));
+      if(ti-1>=0)rd=rd.filter(i=>i!==ti-1);           // the day before: rest (or a very easy jog)
+      if(ti-1>=0)days[ti-1].why='Rest, or 15–20 minutes very easy with 4 strides: fresh legs for tomorrow\'s test.';
     }
-    if(last&&raceIdx<7)set(raceIdx,sess('race',pc,{dist:DIST[cfg.dist].d,pace:cfg.goalTime?cfg.goalTime/(DIST[cfg.dist].d/1000):raceTime(st.vdot,DIST[cfg.dist].d)/(DIST[cfg.dist].d/1000),
-      what:DIST[cfg.dist].name,why:'Race day. Start a touch easier than you want to and let the pacer pull you through: even effort, hills and all.'}));
-    if(last&&raceIdx-1>=0&&days[raceIdx-1].kind==='rest')days[raceIdx-1].why='Rest, or 15 minutes very easy with a few strides. Lay out your kit.';
-    // long run
-    if(!last&&rd.includes(longDay)&&days[longDay].kind==='rest'){
-      const L=Math.round(vols[w].long),mpFin=x.phase==='peak'&&DIST[cfg.dist].d>=21000&&!x.cut?Math.round(L*(cfg.dist==='mar'?0.4:0.25)):0;
-      set(longDay,sess('long',pc,{dist:L*1000,pace:pc.long,what:`${L} km${mpFin?`, last ${mpFin} at race pace`:''}`,
-        why:mpFin?`Easy at about ${mmss(pc.long)}/km, then the last ${mpFin} km at ${cfg.dist==='mar'?'marathon':'half-marathon'} pace (${mmss(cfg.dist==='mar'?pc.mar:pc.half)}/km): race rhythm on tired legs.`
-          :`Easy and steady, about ${mmss(pc.long)}/km: conversational the whole way. Builds the endurance for the last third of your race.`}));
+    const hardOK=i=>days[i].kind==='rest'&&rd.includes(i)&&!(ti!=null&&(i===ti+1||i===ti-1));
+    const longDay=rd.includes(6)&&!(ti===6)?6:rd.includes(5)&&ti!==5&&!rd.includes(6)?5:null;
+    // Sub-threshold sessions: Tuesday on flat ground (pace is effort), Thursday on the course (holding
+    // effort over its hills), a third on Saturday with five or more runs a week
+    const A=rd.includes(1)?1:null,B=rd.includes(3)?3:null,C=n>=5&&rd.includes(5)?5:null,H=rd.includes(5)?5:rd.includes(4)?4:null;
+    if(ph==='taper'){
+      if(last){
+        if(A!=null&&A<ri-1)set(A,sess('sharpener',{reps:4,len:400,rest:90,pace:racePace,venue:{type:course?'course-start':'flat'},why:'Four short reps at race pace: just enough to remind your legs of the rhythm. You should finish feeling you could do much more.',now:'Race week: fatigue is dropping fast, and a little race-pace work keeps you sharp without costing anything.'}));
+      }else{
+        if(A!=null)set(A,sess('sub',{...subReps(5,4,pc),venue:{type:'flat'},why:'A shortened sub-threshold session: the same effort as always, less of it.',now:'Taper: the volume drops by about 40 % so the fatigue of the last weeks clears, but the intensity stays so you don\'t lose the edge. This is when the fitness you\'ve built shows up.'}));
+        if(B!=null)set(B,sess('sharpener',{reps:5,len:1000,rest:90,pace:racePace,venue:{type:course?'course-start':'flat'},title:'Race-pace kilometres',why:`Five kilometres at your race pace, ${mmss(racePace)}/km${course?', on the opening stretch of the course':''}, with short recoveries. Locks in the rhythm you\'ll race at.`,now:'The last real session: rehearse race pace while you\'re fresh, then it\'s easy running to race day.'}));
+      }
+    }else{
+      // Tuesday: flat sub-threshold, the reps progressing through the block
+      if(A!=null&&hardOK(A)&&!(ti!=null&&A>=ti-1)){
+        const r=ph==='base'?subReps(Math.round(5+p),6,pc):ph==='build'?(w%2?subReps(Math.round(8+2*p),3,pc):subReps(Math.round(5+p),6,pc)):subReps(10,3,pc);
+        set(A,sess('sub',{...r,venue:{type:'flat'},why:`Sub-threshold: comfortably hard, ${mmss(r.pace)}/km, never straining. The short rests keep your effort just under the point where lactate starts to build, so you can do a lot of it and recover quickly. This is the engine of the Norwegian method: it raises your threshold, the pace you can hold for about an hour, which is what decides your ${D.name}.`,
+          now:ph==='base'?'Base: learning the effort. Longer reps at a steady pace teach you what sub-threshold feels like; the total time at it grows week by week.'
+            :ph==='build'?(r.min<=4?'Build: shorter reps run a touch quicker, alternating with 6-minute reps, so your threshold is pushed from both sides.':'Build: more time at sub-threshold each week. This is the heart of the plan.')
+            :'Peak: short reps a touch quicker keep your threshold sharp while the race-specific work comes in.'}));
+      }
+      // Thursday: on the course (if it's one of your routes): sub-threshold over its hills, then, at the
+      // peak, a rehearsal of the race itself
+      if(B!=null&&hardOK(B)&&ti==null){ // (a test week keeps just one sub-threshold session, so you test fresh)
+        if(ph==='peak'&&course&&short){
+          const len=Math.round(clip(cfg.courseD*(0.45+0.15*p),3000,cfg.courseD-1000)/500)*500;
+          set(B,sess('rehearsal',{dist:len,pace:racePace,venue:{type:'course-part',len},what:`First ${kmt(len)} km of the course at race pace`,
+            why:`Run the start of ${cName} exactly as you'll race it: the pacer takes each climb and descent at your goal effort. You learn where to hold back and where the course gives you time back.`,
+            now:'Peak: race-specific. With your threshold built, rehearsing the race on its own hills turns fitness into a race plan.'}));
+        }else{
+          const r=ph==='base'?subReps(Math.round(2+p),10,pc,90):subReps(Math.round(3+p),ph==='build'?8:10,pc,75);
+          set(B,sess('sub',{...r,venue:{type:course?'course':'rolling'},why:`Sub-threshold by effort over rolling ground: the pacer slows on the climbs and speeds up on the descents so the effort stays even, exactly as you'll need to on race day${course?` on ${cName}`:''}. Same benefit as Tuesday, plus learning to hold effort on hills.`,
+            now:ph==='base'?'Base: two or three long reps teach you to settle into the effort and hold it over changing ground.':'Build: longer total time at sub-threshold, on hills, so climbing at effort becomes second nature.'}));
+        }
+      }
+      // A third sub-threshold session (five or more runs a week): short reps, short rests
+      if(C!=null&&hardOK(C)&&!(ti!=null&&C>=ti-2)&&ph!=='base'){
+        const r=subReps(Math.round(8+4*p),2,pc,45);
+        set(C,sess('sub',{...r,venue:{type:'flat'},title:'Sub-threshold (short)',why:'Short reps with short rests: the third sub-threshold session of the Norwegian week. Quick enough to feel like work, controlled enough to recover from by the next day.',now:'Adding a third session is how the method grows your threshold volume without adding hard days of a different kind.'}));
+      }
     }
-    // easy runs share what's left of the week (quality style: short ones)
+    // The hill element: hill sprints on an easy run in the base and taper, hill reps in the build and peak
+    // (on the hill most like the course's main climb)
+    const hDay=[H,5,4,2,0].find(i=>i!=null&&rd.includes(i)&&days[i].kind==='rest'&&!(ti!=null&&(i>=ti-1&&i<=ti+1))&&!(i===longDay));
+    if(hDay!=null&&ph!=='taper'&&!last){
+      const easyKm=Math.round(clip(vols[w].K*0.15,4,8));
+      if(ph==='base'||x.cut)set(hDay,sess('hillsprints',{dist:easyKm*1000,pace:pc.easy,venue:{type:'hill-short'},what:`${easyKm} km easy + ${x.cut?6:Math.round(6+4*p)} × 10 s hill sprints`,
+        main:[`${easyKm} km easy, about ${mmss(pc.easy)}/km`,`Then ${x.cut?6:Math.round(6+4*p)} × 8–10 s sprints up a steep hill: fast, tall, powerful`,'Walk back down and wait until you feel fully recovered (about 2 min) before the next one'],
+        why:'Very short, very steep sprints: pure power and stride strength. They are too short to build up fatigue, so they make you stronger and quicker without taking anything from the next session.',
+        now:ph==='base'?'Base: hill sprints prepare your legs and tendons for the longer hill reps that start in the build.':'A lighter week: a few sprints keep the legs sharp while you freshen up.'}));
+      else{
+        const reps=ph==='build'?Math.round(10+6*p):12;
+        set(hDay,sess('hills',{reps,len:200,rest:75,pace:pc.hill,hill:true,repWhat:'uphill',venue:{type:'hill',len:200},
+          main:[`${reps} × 200 m uphill, strong (about 5K effort): drive the arms, stay tall, quick feet`,'Easy jog back down as the recovery'],
+          why:`The Norwegian method's one session faster than threshold: the Ingebrigtsens' 20 × 200 m uphill, scaled down. Climbing at a strong effort builds the strength and form ${course?`the climbs on ${cName} demand`:'that climbs demand'}, and running up a hill means far less pounding than fast reps on the flat.`,
+          now:ph==='build'?'Build: with the hill sprints done, the hill reps start, adding a couple each week.':'Peak: holding the hill session steady keeps the strength you\'ve built for the course\'s climbs.'}));
+      }
+    }
+    // Race day
+    if(last)set(ri,sess('race',{dist:D.d,pace:racePace,venue:{type:course?'course-full':'flat'},what:D.name,
+      main:[`Race: the pacer runs ${cfg.goalTime?'your goal':'your predicted time'}, ${mmss(racePace)}/km on the flat, with every hill built in`,'Start a touch easier than you want to; let the pacer pull you through'],
+      why:'Race day. Even effort, hills and all.',now:'Everything has been building to this.'}));
+    if(last&&ri-1>=0&&days[ri-1].kind==='rest')days[ri-1].why='Rest, or 15 minutes very easy with 4 strides. Lay out your kit, and eat a carbohydrate-rich dinner.';
+    // Long run
+    if(longDay!=null&&days[longDay].kind==='rest'&&!last){
+      const L=Math.round(vols[w].long),roll=ph!=='base'&&!x.cut;
+      set(longDay,sess('long',{dist:L*1000,pace:pc.long,venue:{type:roll?'long-rolling':'long-flat',len:L*1000},
+        why:`Easy and conversational, about ${mmss(pc.long)}/km. The long run grows your aerobic engine: more capillaries, more mitochondria, more fat-burning, so the end of a race feels easier.${roll?' On rolling ground now, so climbing on tired legs becomes normal.':''}`,
+        now:ph==='base'?'Base: the long run builds steadily, a kilometre or so a week.':ph==='build'?'Build: the long run keeps growing, now over hills like the race course.':ph==='peak'?'Peak: the longest runs of the plan, still easy: endurance for the last third of the race.':'Taper: shorter, to freshen up.'}));
+    }
+    // Easy runs: what's left of the week, with strides on the last one in the base, peak and taper
     const used=days.reduce((a,d)=>a+(d.km||0),0),easy=rd.filter(i=>days[i].kind==='rest');
-    const each=clip((vols[w].K-used)/Math.max(1,easy.length),cfg.style==='quality'?3:4,cfg.style==='quality'?6:14);
+    const each=clip((vols[w].K-used)/Math.max(1,easy.length),3,12);
     easy.forEach((i,j)=>{
-      const strides=(x.phase==='base'||x.phase==='taper')&&j===easy.length-1&&!x.cut;
-      const km=Math.round(last&&i===raceIdx-2?Math.min(each,5):each);
-      set(i,sess(strides?'strides':'easy',pc,{dist:km*1000,pace:pc.easy,what:`${km} km${strides?' + 6 strides':''}`,
-        why:strides?`Easy, about ${mmss(pc.easy)}/km, then six relaxed 20-second strides: quick, tall and light, walking back between. Keeps your legs sharp.`
-          :cfg.style==='quality'?`Short and easy, about ${mmss(pc.easy)}/km, or swap it for 30–40 minutes of cycling or swimming.`:`Conversational, about ${mmss(pc.easy)}/km. Most of your running should feel like this: it's what lets the hard days work.`}));
+      const strides=ph!=='build'&&j===easy.length-1&&!(ti!=null&&i>=ti-1),km=Math.round(last||(ti!=null&&i===ti+1)?Math.min(each,5):each),rec=ti!=null&&i===ti+1;
+      set(i,sess(rec?'recovery':strides?'strides':'easy',{dist:km*1000,pace:rec?pc.recovery:pc.easy,venue:{type:'any',len:km*1000},what:`${km} km${strides?' + 6 strides':''}`,
+        main:strides?[`${km} km easy, about ${mmss(pc.easy)}/km`,'Then 6 × 20 s strides: quick, tall and relaxed, building to about mile pace, walking back between']:[`${km} km at about ${mmss(rec?pc.recovery:pc.easy)}/km: you should be able to chat`],
+        why:rec?'Very easy, short: blood flow to flush out the test without adding any stress.':strides?'Easy running with strides at the end: the strides keep your stride quick and economical without any fatigue.':'Genuinely easy: this is what lets the hard days work. Most of your running should feel like this.',
+        now:rec?'The day after a hard effort: recovery first.':'Easy days make room for the sub-threshold sessions: run them easy even when you feel great.'}));
     });
-    return {...x,...vols[w],days};
+    // Keep the week within about 10 % of its budget (warm-ups count): take reps off the longest
+    // sub-threshold session first, then shorten the easy part of a hill-sprint run, and only then the long
+    // run (never below the long run you already do, up to 45 % of the week)
+    const tot=()=>days.reduce((a,d)=>a+(d.km||0),0),Lmin=Math.max(6000,Math.min((cfg.longKm||0)*1000,vols[w].K*450),vols[w].K*300);
+    for(let g=0;g<30&&tot()>vols[w].K*1.1;g++){
+      const sb=days.filter(d=>d.kind==='sub'&&d.reps>(d.min>=8?2:4)).sort((a,b)=>b.reps*b.len-a.reps*a.len)[0];
+      if(sb){sb.reps--;sb.km-=sb.len/1000;sb.what=`${sb.reps} × ${sb.len<1000?sb.len+' m':kmt(sb.len)+' km'}${sb.repWhat?' '+sb.repWhat:''}`;continue}
+      const hs=days.find(d=>d.kind==='hillsprints'&&d.dist>3000);
+      if(hs){hs.dist-=1000;hs.km-=1;hs.what=hs.what.replace(/^\d+ km/,`${kmt(hs.dist)} km`);hs.main=[hs.main[0].replace(/^\d+ km/,`${kmt(hs.dist)} km`),...hs.main.slice(1)];continue}
+      const L=days.find(d=>d.kind==='long');
+      if(L&&L.dist-1000>=Lmin){L.dist-=1000;L.km-=1;L.what=`${kmt(L.dist)} km`;continue}
+      break;
+    }
+    // Strength and mobility: twice a week outside the taper, on easy or rest days
+    if(ph!=='taper'&&!last){
+      const sd=[0,4,2,6].filter(i=>!days[i].hard&&!days[i].pre&&!(ti!=null&&(i===ti||i===ti-1))).slice(0,2);
+      for(const i of sd)days[i].extras=[...days[i].extras,STRENGTH];
+    }
+    const focus=x.cut&&x.test?(w===0?'Test week: find your starting point on the course.':'Test week: lighter, so you arrive at the test fresh. The result resets your paces.')
+      :ph==='base'?'Base: build the aerobic engine. Long sub-threshold reps, hill sprints, easy miles.'
+      :ph==='build'?'Build: the heart of the plan. More sub-threshold, and the weekly hill reps.'
+      :ph==='peak'?`Peak: race-specific. ${course&&short?'Rehearsals on the course at race pace, ':''}threshold kept sharp, hill strength held.`
+      :last?'Race week: fresh legs, a touch of speed, then race.':'Taper: about 40 % less running, the same quality. Fatigue clears, fitness shows.';
+    return {...x,...vols[w],focus,days};
   });
-  // adapting to how you feel: pain rests the next two days; tiredness turns the next hard session easy
+  // Adapting to how you feel: pain rests the next two days; tiredness turns the next hard session easy
   if(st.now!=null){
-    const today=dayNum(st.now),all=out.flatMap(x=>x.days),fut=all.filter(d=>dayNum(d.date)>=today);
-    if(st.pain)for(const d of fut.filter(d=>dayNum(d.date)<=today+1&&d.kind!=='race'))Object.assign(d,sess('rest',pc,{why:'Rest: you noted pain. Give it two days; if it is still there when you run easy, stop and get it looked at before any hard running.',adapted:'pain'}));
+    const today=dayNum(st.now),fut=out.flatMap(x=>x.days).filter(d=>dayNum(d.date)>=today);
+    if(st.pain)for(const d of fut.filter(d=>dayNum(d.date)<=today+1&&d.kind!=='race'))Object.assign(d,sess('rest',{why:'Rest: you noted pain. Give it two days; if it is still there when you run easy, stop and get it looked at before any hard running.',adapted:'pain'}));
     else if(st.fatigue>=3){const h=fut.find(d=>d.hard&&d.kind!=='race'&&d.kind!=='test'&&dayNum(d.date)<=today+4);
-      if(h)Object.assign(h,sess('easy',pc,{dist:Math.round(h.km||6)*1000,pace:pc.easy,what:`${Math.round(h.km||6)} km easy`,swapped:h.title,adapted:'tired',
-        why:`Swapped from ${h.title.toLowerCase()}: your legs and energy say you're carrying fatigue. An easy day now pays off more than a hard one run tired.`}))}
+      if(h)Object.assign(h,sess('easy',{dist:Math.round(Math.max(4,(h.km||6)-2.5))*1000,pace:pc.easy,venue:{type:'any'},what:`${Math.round(Math.max(4,(h.km||6)-2.5))} km easy`,swapped:h.title,adapted:'tired',
+        why:`Swapped from ${h.title.toLowerCase()}: your legs and energy say you're carrying fatigue. An easy day now pays off more than a hard one run tired.`,now:'Adapting to how you feel.'}))}
   }
   return {weeks:out,paces:pc};
 }
@@ -221,9 +283,8 @@ export function programme(cfg,st){
 // ---------------------------------------------------------------------------------------------------
 // Adapting to how sessions felt
 // ---------------------------------------------------------------------------------------------------
-// fb: [{t (ms), kind, feel:{rpe 1–10, how:'plan'|'easy'|'hard'|'cut', legs:'fresh'|'ok'|'heavy'|'sore',
-// energy:'great'|'ok'|'low', pain:bool}}]. since: the last fitness test (only later feedback moves the
-// paces). Returns {dv (VDOT nudge, ±2 at most), easyAdj (×easy paces), fatigue (0+), pain, why:[...]}
+// fb: [{t, kind, feel:{rpe, how:'plan'|'easy'|'hard'|'cut', legs, energy, pain}}]; since: the last test.
+// Returns {dv (VDOT nudge, ±2 at most), easyAdj, fatigue, pain, why}
 export function adapt(fb,{since=0,now=Date.now()}={}){
   let dv=0;const why=[];
   for(const f of fb.filter(x=>x.t>=since&&x.feel?.rpe)){
@@ -234,7 +295,7 @@ export function adapt(fb,{since=0,now=Date.now()}={}){
     else if(r>=e[1]+2){dv-=0.3;why.push({t:f.t,kind:f.kind,up:false})}
   }
   dv=clip(dv,-2,2);
-  const easyHard=fb.filter(x=>now-x.t<21*DAY&&['easy','recovery','long','strides'].includes(x.kind)&&x.feel?.rpe>=6).length;
+  const easyHard=fb.filter(x=>now-x.t<21*DAY&&['easy','recovery','long','strides','hillsprints'].includes(x.kind)&&x.feel?.rpe>=6).length;
   let fatigue=0;
   for(const f of fb.filter(x=>now-x.t<7*DAY&&x.t<=now&&x.feel)){
     const w=now-f.t<3*DAY?1:0.6,F=f.feel,e=KINDS[f.kind]?.rpe;
@@ -244,8 +305,7 @@ export function adapt(fb,{since=0,now=Date.now()}={}){
   return {dv,easyAdj:easyHard>=2?1.03:1,fatigue,pain,why};
 }
 
-// Training load: session effort × minutes (sRPE), by week. runs: [{t, min, rpe}]. Returns the last n weeks'
-// totals (oldest first) and how this week compares with the four before it (1 = the same)
+// Training load: effort × minutes by week (oldest first) and this week against the four before it
 export function load(runs,now,n=8){
   const m=mondayOf(now),wk=Array.from({length:n},(_,k)=>({monday:addDays(m,-7*(n-1-k)),load:0,min:0}));
   for(const r of runs){const k=n-1-Math.round((dayNum(m)-dayNum(mondayOf(r.t)))/7);if(k<0||k>=n)continue;wk[k].load+=r.min*r.rpe;wk[k].min+=r.min}

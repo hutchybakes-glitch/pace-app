@@ -1,8 +1,10 @@
 // The Insights tab: draws what analysis.js learned. All charts are inline SVG.
-import {pctAt,effortOf,TYPICAL,RACES} from './analysis.js';
+import {pctAt,effortOf,TYPICAL,RACES,KINDS} from './analysis.js';
 
 const fmt=s=>{s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=String(s%60).padStart(2,'0');return h?`${h}:${String(m).padStart(2,'0')}:${x}`:`${m}:${x}`};
 const pct=x=>`${Math.abs(x).toFixed(0)} %`;
+// Run kinds: the same colours everywhere (Insights, Runs, results)
+export const KCOL={race:'#fb923c',tempo:'#facc15',easy:'#4ade80',long:'#2dd4bf',int:'#c084fc'};
 const C={you:'#c084fc',typ:'#64748b',grid:'rgba(148,163,184,.14)',txt:'#8796b0',up:'#f87171',down:'#4ade80',blue:'#60a5fa',pacer:'#fb923c'};
 
 // Six axes, 50 = a typical runner; missing scores drawn as a dashed "not known yet"
@@ -39,22 +41,26 @@ function hillChart(A){
   return `<svg class="ch" viewBox="0 0 ${W} ${H}" role="img" aria-label="How much slower or quicker you run by gradient">${s}</svg>`;
 }
 
-// Flat-equivalent pace of each run over time (quicker = higher), with the trend
+// Form over time: every run as a dot at its 10 km-equivalent pace (hills taken out), coloured by kind,
+// and your form (the strongest of the last six weeks) as the line. Quicker is higher.
 function fitnessChart(A){
-  const per=A.per.slice(-30),W=640,H=240,L=56,Rr=620,T=16,B=200;
+  const per=A.per.slice(-60),W=640,H=250,L=56,Rr=620,T=16,B=206;
   if(per.length<2)return '';
-  const t0=per[0].run.started,t1=Math.max(per.at(-1).run.started,t0+864e5),ps=per.map(x=>x.fp);
-  let lo=Math.min(...ps),hi=Math.max(...ps);const pad=Math.max(5,(hi-lo)*0.15);lo-=pad;hi+=pad;
-  const X=t=>L+(t-t0)/(t1-t0)*(Rr-L),Y=p=>T+(p-lo)/(hi-lo)*(B-T);
+  const t0=per[0].run.started,t1=Math.max(per.at(-1).run.started,t0+864e5),fs=per.map(x=>x.form);
+  let lo=Math.min(...fs),hi=Math.min(Math.max(...per.map(x=>x.eq)),lo*1.32);const pad=Math.max(4,(hi-lo)*0.08);lo-=pad;hi+=pad;
+  const X=t=>L+(t-t0)/(t1-t0)*(Rr-L),Y=p=>T+(Math.min(p,hi)-lo)/(hi-lo)*(B-T);
   let s='';
   for(const p of [lo+pad,(lo+hi)/2,hi-pad])s+=`<line x1="${L}" x2="${Rr}" y1="${Y(p)}" y2="${Y(p)}" stroke="${C.grid}"/><text x="${L-8}" y="${Y(p)+4}" fill="${C.txt}" font-size="12" text-anchor="end">${fmt(p)}</text>`;
-  const d=per.map((x,i)=>`${i?'L':'M'}${X(x.run.started).toFixed(1)} ${Y(x.fp).toFixed(1)}`).join('');
-  s+=`<path d="${d} L${X(per.at(-1).run.started)} ${B} L${X(t0)} ${B}Z" fill="url(#fg)"/><path d="${d}" fill="none" stroke="${C.blue}" stroke-width="3" stroke-linejoin="round"/>`;
-  for(const x of per)s+=`<circle cx="${X(x.run.started)}" cy="${Y(x.fp)}" r="5" fill="#0d1529" stroke="${C.blue}" stroke-width="3"/>`;
+  // form: a step line (it only moves when a run beats it, or the best drops out of the six weeks)
+  let d='';per.forEach((x,i)=>{const px=X(x.run.started).toFixed(1),py=Y(x.form).toFixed(1);d+=i?`H${px}V${py}`:`M${px} ${py}`});
+  s+=`<path d="${d}V${B}H${X(t0)}Z" fill="url(#fg)"/><path d="${d}" fill="none" stroke="${C.blue}" stroke-width="3" stroke-linejoin="round"/>`;
+  for(const x of per)s+=`<circle cx="${X(x.run.started).toFixed(1)}" cy="${Y(x.eq).toFixed(1)}" r="${x.kind==='race'?6:4.5}" fill="${KCOL[x.kind]||C.blue}" fill-opacity="${x.kind==='race'?1:.75}" stroke="#0d1529" stroke-width="2"/>`;
   const day=ms=>new Date(ms).toLocaleDateString(undefined,{day:'numeric',month:'short'});
   s+=`<text x="${L}" y="${B+24}" fill="${C.txt}" font-size="12">${day(t0)}</text><text x="${Rr}" y="${B+24}" fill="${C.txt}" font-size="12" text-anchor="end">${day(t1)}</text>`;
-  return `<svg class="ch" viewBox="0 0 ${W} ${H}" role="img" aria-label="Your flat-equivalent pace over time"><defs><linearGradient id="fg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${C.blue}" stop-opacity=".35"/><stop offset="1" stop-color="${C.blue}" stop-opacity="0"/></linearGradient></defs>${s}</svg>`;
+  return `<svg class="ch" viewBox="0 0 ${W} ${H}" role="img" aria-label="Your form over time, with every run by kind"><defs><linearGradient id="fg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${C.blue}" stop-opacity=".3"/><stop offset="1" stop-color="${C.blue}" stop-opacity="0"/></linearGradient></defs>${s}</svg>`;
 }
+const kindKey=A=>{const n={};for(const x of A.per)n[x.kind]=(n[x.kind]||0)+1;
+  return `<div class="lg">${Object.keys(KCOL).filter(k=>n[k]).map(k=>`<span><i class="kdot" style="background:${KCOL[k]}"></i>${KINDS[k].name} ${n[k]}</span>`).join('')}<span><i style="background:${C.blue}"></i>Form</span></div>`};
 
 // Cadence against pace, with your line
 function cadenceChart(c){
@@ -92,20 +98,24 @@ export function renderInsights(el,A,o={}){
     ${bar('Climbing',s.climb,'linear-gradient(90deg,#fca5a5,#ef4444)')}${bar('Descending',s.descent,'linear-gradient(90deg,#86efac,#16a34a)')}
     <div class="mepacer"><span><b>“Like you” pacer:</b> a pacer that takes the hills exactly as you do, so the gap shows only your fitness on the day, not your hill style.</span><button id="ins-me" class="switch ${o.meOn?'on':''}" role="switch" aria-checked="${!!o.meOn}"></button></div></div>`;
 
-  // fitness and predictions
-  const tr=A.trend;
-  h+=`<div class="card ins"><h3>📈 Fitness</h3>
-    <p class="lead">Your pace with the hills taken out ("flat-equivalent"). Best: <b>${fmt(A.bestFp)}/km</b>.${tr==null?'':Math.abs(tr)<1?' Holding steady.':tr<0?` Getting quicker: <b>${Math.abs(tr).toFixed(1)} s/km a month</b>.`:` ${tr.toFixed(1)} s/km a month slower lately.`}</p>
-    ${fitnessChart(A)}
-    ${A.predict.length?`<div class="preds">${A.predict.map(p=>`<div><span>${p.name}</span><b>${fmt(p.t)}</b><small>${fmt(p.t/(p.d/1000))}/km</small></div>`).join('')}</div>
-    <p class="note">Predicted race times on a flat course, from your strongest recent run (Riegel's formula). Hilly races take longer: race their course here and the pacer works it out.</p>`:''}
+  // form, bests and predictions
+  const tr=A.trend,first=A.per[0]?.form;
+  h+=`<div class="card ins"><h3>📈 Form</h3>
+    <p class="lead">${A.form?`Right now you're worth about <b>${fmt(A.form*10)}</b> for 10 km on the flat (<b>${fmt(A.form)}/km</b>)`:`No runs in the last six weeks: your form fades from view`}.${tr==null?'':Math.abs(tr)<1?' Holding steady.':tr<0?` Getting quicker: <b>${Math.abs(tr).toFixed(1)} s/km a month</b>.`:` ${tr.toFixed(1)} s/km a month slower lately.`}${A.form&&first&&first-A.form>=2?` That's <b>${fmt((first-A.form)*10)}</b> quicker over 10 km than when you started.`:''}</p>
+    ${fitnessChart(A)}${kindKey(A)}
+    <p class="note">Every run as the 10 km pace it was worth, hills taken out; the line is your strongest of the last six weeks. Easy runs sit well below it, as they should.</p>
+    ${A.predict.length?`<div class="h sp">Race predictions · flat course</div><div class="preds">${A.predict.map(p=>`<div><span>${p.name}</span><b>${fmt(p.t)}</b><small>${fmt(p.t/(p.d/1000))}/km</small></div>`).join('')}</div>
+    <p class="note">From your strongest recent run (Riegel's formula). Hilly races take longer: race their course here and the pacer works it out.</p>`:''}
     ${bar('Speed',s.speed,'linear-gradient(90deg,#93c5fd,#2563eb)')}</div>`;
+  if(o.bests?.length)h+=`<div class="card ins"><h3>🏅 Personal bests</h3><p class="lead">Your quickest time over each distance, anywhere inside a run. Tap one to see the run.</p><div class="pbs">${o.bests.map(b=>`<button data-run="${b.run.id}"><span>${b.name}</span><b>${fmt(b.t)}</b><small>${fmt(b.t/(b.d/1000))}/km · ${new Date(b.run.started).toLocaleDateString(undefined,{day:'numeric',month:'short'})}</small><small>${esc(b.run.route?.name||'')}</small></button>`).join('')}</div></div>`;
 
   // pacing
   if(A.cv!=null||A.fade!=null){
+    const rf=A.raceFade;
     h+=`<div class="card ins"><h3>⏱️ Pacing</h3><div class="facts">
-      ${A.cv!=null?`<div><i>〰️</i><span>Your km-by-km effort varies by <b>${A.cv.toFixed(1)} %</b> in a typical run, hills taken out. ${A.cv<2.5?'Remarkably even.':A.cv<4.5?'Fairly even.':'Quite up and down: the pacer can smooth that out.'}</span></div>`:''}
-      ${A.fade!=null?`<div><i>${A.fade>2?'📉':A.fade<-1?'🚀':'➡️'}</i><span>${A.fade>2?`You typically fade: the last third <b>${A.fade.toFixed(1)} % slower</b> than the first. Try the Negative splitter pacer.`:A.fade<-1?`You finish strong: the last third <b>${Math.abs(A.fade).toFixed(1)} % quicker</b> than the first.`:'You hold your effort to the end.'}</span></div>`:''}
+      ${rf!=null?`<div><i>🏁</i><span>${rf>1.5?`In your <b>${A.nRaces} races</b> the last third runs <b>${rf.toFixed(1)} % slower</b> than the first, hills taken out: you go out too hard. A pacer on even effort, or the Negative splitter, banks that time back.`:rf<-1?`In your <b>${A.nRaces} races</b> you finish <b>${Math.abs(rf).toFixed(1)} % quicker</b> than you start: patient, and strong late.`:`In your <b>${A.nRaces} races</b> you hold your effort evenly to the line. That's exactly how to race.`}</span></div>`:''}
+      ${A.cv!=null?`<div><i>〰️</i><span>Your km-by-km effort varies by <b>${A.cv.toFixed(1)} %</b> in a typical hard run, hills taken out. ${A.cv<2.5?'Remarkably even.':A.cv<4.5?'Fairly even.':'Quite up and down: the pacer can smooth that out.'}</span></div>`:''}
+      ${A.fade!=null&&rf==null?`<div><i>${A.fade>2?'📉':A.fade<-1?'🚀':'➡️'}</i><span>${A.fade>2?`You typically fade: the last third <b>${A.fade.toFixed(1)} % slower</b> than the first. Try the Negative splitter pacer.`:A.fade<-1?`You finish strong: the last third <b>${Math.abs(A.fade).toFixed(1)} % quicker</b> than the first.`:'You hold your effort to the end.'}</span></div>`:''}
     </div>${bar('Pacing',s.pacing,'linear-gradient(90deg,#fde68a,#f59e0b)')}${bar('Endurance',s.endurance,'linear-gradient(90deg,#fdba74,#ea580c)')}</div>`;
   }
 
@@ -125,17 +135,22 @@ export function renderInsights(el,A,o={}){
 
   el.innerHTML=h;
   el.querySelector('#ins-me')?.addEventListener('click',()=>o.onMe?.(!o.meOn));
+  el.querySelectorAll('.pbs button').forEach(b=>b.onclick=()=>o.onRun?.(+b.dataset.run));
 }
 
-// A few lines about one run, for its result page: how it compared with how you usually run
-export function runFacts(A,r,flat){
-  if(!A?.ready||!flat)return '';
-  const per=A.per.find(x=>x.run.id===r.id),out=[];
+// A few lines about one run, for its result page: what kind of run it was, how it compared with how you
+// usually run, and any best efforts set in it. pbs: [{name, d, t}] bests set in this run
+export function runFacts(A,r,flat,pbs=[]){
+  const out=[];
+  for(const b of pbs)out.push(`<div><i>🏅</i><span>New ${b.name} best: <b>${fmt(b.t)}</b> (${fmt(b.t/(b.d/1000))}/km).</span></div>`);
+  const per=A?.ready&&flat?A.per.find(x=>x.run.id===r.id):null;
   if(per){
-    const better=A.per.filter(x=>x.fp<per.fp).length;
-    out.push(`<div><i>⚡</i><span>Flat-equivalent pace <b>${fmt(per.fp)}/km</b>${better===0&&A.per.length>1?': <b>your best effort yet</b>':`: #${better+1} of your ${A.per.length} runs`}.</span></div>`);
+    const better=A.per.filter(x=>x.eq<per.eq).length,k=KINDS[per.kind];
+    out.push(`<div><i>${k.icon}</i><span>${per.kind==='race'||per.kind==='tempo'?`${k.name} effort: worth <b>${fmt(per.eq*10)}</b> for 10 km on the flat${better===0&&A.per.length>1?', <b>your strongest effort yet</b>':`, #${better+1} of your ${A.per.length} runs`}.`
+      :`${k.name} run: <b>${Math.round((per.ratio-1)*100)} %</b> off your best effort, hills taken out.${per.ratio<1.15?' A bit quick for an easy day.':' Nicely easy.'}`}</span></div>`);
     if(per.fade!=null)out.push(`<div><i>${per.fade>2?'📉':per.fade<-1?'🚀':'➡️'}</i><span>${per.fade>2?`Faded <b>${per.fade.toFixed(1)} %</b> over the last third.`:per.fade<-1?`Finished <b>${Math.abs(per.fade).toFixed(1)} %</b> quicker than you started.`:'Held your effort to the end.'}</span></div>`);
   }
   return out.length?`<div class="h">This run</div><div class="facts">${out.join('')}</div>`:'';
 }
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 export {RACES,effortOf};

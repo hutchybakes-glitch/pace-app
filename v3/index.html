@@ -50,11 +50,14 @@
       <div class="bt2"><button class="btn go" data-act="gpx">Load a GPX</button><button class="btn rec" data-act="rec">● Record a route</button></div>
     </div>
 
+    <div id="goalcard" class="card goal" hidden></div>
+
     <div id="hero" class="card hero" hidden>
       <div class="hero-top"><span class="eyebrow">Ready to race</span><button id="hchange" class="link">Change route</button></div>
       <h2 id="hname"></h2>
       <div id="hchips" class="chips"></div>
       <div class="hmapw"><svg id="hmap" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg><svg id="hele" viewBox="0 0 300 40" preserveAspectRatio="none" aria-hidden="true"></svg></div>
+      <div class="seg purpose" id="hpurpose"><button data-v="race">🏁 Race</button><button data-v="tempo">🔥 Tempo</button><button data-v="easy">🌿 Easy</button></div>
       <div id="hvs" class="vs"></div>
       <div id="hwx" class="hwx"></div>
       <button id="qgo" class="btn go big">Start</button>
@@ -99,7 +102,8 @@
   <!-- ---------- Runs ---------- -->
   <div class="pane" id="tab-runs" hidden>
     <header class="hdr"><div><small id="runtotals"></small><h1>Runs</h1></div></header>
-    <div class="seg filt" id="rfilter"><button data-v="all" class="on">All</button><button data-v="race">Races</button><button data-v="int">Intervals</button><button data-v="imp">Imported</button></div>
+    <div id="volcard" class="card vol" hidden></div>
+    <div class="seg filt" id="rfilter"><button data-v="all" class="on">All</button><button data-v="race">Races</button><button data-v="work">Workouts</button><button data-v="easy">Easy &amp; long</button></div>
     <div id="noruns" class="empty">No runs yet. Your races, recordings and imported runs land here.</div>
     <ul id="runs"></ul>
   </div>
@@ -129,10 +133,10 @@
       <div id="howpart" class="howbox" hidden>
         <div class="set"><span><b>Distance</b><small id="partnote">From the start</small></span><div class="mini-step" id="partlen"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
       </div>
-      <div id="howlaps" class="howbox" hidden>
+      <details id="howlaps" class="howbox lapsfold" hidden><summary>Run it as laps…</summary>
         <div class="set"><span><b>Run it as laps</b><small id="lapsnote">This route finishes where it starts, so it can be lapped</small></span><div class="mini-step" id="lapsn"><button data-d="-1" aria-label="Less">−</button><b></b><button data-d="1" aria-label="More">+</button></div></div>
         <button id="lapsave" class="btn ghost">Save as a new route</button>
-      </div>
+      </details>
     </div>
 
     <div class="card" id="intcard" hidden>
@@ -161,11 +165,19 @@
     </div>
 
     <div class="card" id="tgtcard">
-      <div class="step"><span>3</span>Target</div>
+      <div class="step"><span>3</span>Today's run</div>
+      <div class="seg purpose" id="purpose"><button data-v="race">🏁 Race</button><button data-v="tempo">🔥 Tempo</button><button data-v="easy">🌿 Easy</button></div>
+      <small id="purnote" class="note"></small>
       <div class="stepper" id="st-finish"><button data-d="-1" aria-label="Decrease">−</button><div><b id="v-finish">–</b><span>finish time</span></div><button data-d="1" aria-label="Increase">+</button></div>
       <div class="stepper" id="st-pace"><button data-d="-1" aria-label="Decrease">−</button><div><b id="v-pace">–</b><span>average pace /km</span></div><button data-d="1" aria-label="Increase">+</button></div>
       <div id="tgthint" class="hint"></div>
     </div>
+
+    <details class="card fold" id="dgoal">
+      <summary><span><b>🎯 Goal race</b><small id="sum-goal"></small></span><i class="chev"></i></summary>
+      <div class="set"><span><b>Race day</b><small id="goalnote">Train towards a race on this course: Today shows how close you are, week by week</small></span><input type="date" id="goaldate" class="txt"></div>
+      <div class="bt2"><button id="goalset" class="btn go">Set as my goal</button><button id="goaldel" class="btn ghost">Remove</button></div>
+    </details>
 
     <details class="card fold" id="dstyle">
       <summary><span><b>Pacer style</b><small id="sum-style"></small></span><i class="chev"></i></summary>

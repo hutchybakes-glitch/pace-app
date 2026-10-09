@@ -89,3 +89,22 @@ test('analysis: no usable runs → not ready; runner types',()=>{
   assert.equal(runnerType({climb:50,descent:50,pacing:50,endurance:30}).id,'front');
   assert.equal(runnerType({climb:50,descent:50,pacing:50,endurance:50}).id,'allround');
 });
+
+test('analysis: a friend\'s run is raced, never learned from; runs are classed by effort; best efforts',async()=>{
+  const {mine,bests,effortsOf,eq10}=await import('../../v3/js/analysis.js');
+  const pts=route(),fit={climb:0.033,gain:0.018,taper:-10},day=864e5,t0=Date.UTC(2026,5,1);
+  const race=runOf(pts,2700,fit,{started:t0}),easy=runOf(pts,3400,fit,{started:t0+2*day}),tempo=runOf(pts,2950,fit,{started:t0+4*day});
+  const friend={...runOf(pts,2500,fit,{started:t0+5*day}),imported:{name:'parkrun',who:'Jess',challenge:true}};
+  assert.ok(!mine(friend)&&mine(race));
+  const A=analyse([race,easy,tempo,friend],t0+10*day);
+  assert.equal(A.runs,3,'the friend\'s run is left out');
+  assert.equal(A.kindOf.get(race.id),'race');assert.equal(A.kindOf.get(tempo.id),'tempo');assert.equal(A.kindOf.get(easy.id),'easy');
+  close(A.form,A.per.find(x=>x.run===race).eq,0.01,'form is the best effort');
+  // a purpose set before the run wins
+  const B=analyse([race,{...tempo,purpose:'easy'}],t0+10*day);assert.equal(B.kindOf.get(tempo.id),'easy');
+  // 10 km-equivalent: a 5 km pace is worth a slower 10 km pace
+  assert.ok(eq10(240,5000)>240&&eq10(240,20000)<240);
+  // best efforts: quickest stretch anywhere in the run; friends' runs don't count
+  const e=effortsOf(race);close(e['10k'],2700,3);assert.ok(e['5k']<1360&&e['1k']<275);
+  const b=bests([race,easy,friend]);assert.equal(b.find(x=>x.id==='10k').run,race);assert.ok(!b.find(x=>x.id==='half'));
+});

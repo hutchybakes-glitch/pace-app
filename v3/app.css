@@ -151,7 +151,6 @@ a{color:var(--you)}
 .meta{display:block;color:var(--mut);font-size:13px;font-weight:400;margin-top:2px}
 .meta.win{color:var(--good)}.meta.lose{color:var(--pacer)}
 .del{background:none;border:0;color:var(--mut);font-size:16px;padding:12px}
-#runs.f-race li.run:not([data-k="race"]),#runs.f-int li.run:not([data-k="int"]),#runs.f-imp li.run:not([data-k="imp"]){display:none}
 
 /* ---------- Sheets: race setup, settings ---------- */
 .sheet{position:fixed;inset:0;z-index:30;overflow-y:auto;-webkit-overflow-scrolling:touch;background:var(--bg);animation:up .28s cubic-bezier(.2,.8,.2,1)}
@@ -173,7 +172,7 @@ a{color:var(--you)}
 .kpace{background:var(--pacer);height:3px!important}.krv{background:var(--rival);height:3px!important}
 .kshade{font-style:italic}
 .how{margin-top:0}.howbox{margin-top:6px}
-.big3 button{padding:12px 2px;font-size:14px}.big3 .dot{width:8px;height:8px;margin-right:6px;vertical-align:1px}.big3 .dot+.dot{margin-left:-4px}
+.big3 button{padding:12px 2px;font-size:14px}.big3 .dot{width:8px;height:8px;margin-right:6px;vertical-align:2px}.big3 .dot+.dot{margin-left:-4px}
 .board{display:flex;flex-direction:column;gap:8px;margin-top:12px}
 .board .stylec{display:flex;align-items:center;gap:12px;border-color:transparent}
 .board .stylec.on{border-color:var(--rival);background:#1f1430}
@@ -325,7 +324,7 @@ a{color:var(--you)}
 #mstrip{justify-content:space-around;padding-top:0}
 .how{margin-top:8px}
 .h2s{font-size:13px;color:var(--mut2);margin:2px 0 6px}
-.tile .rstate{color:#d8b4fe;font-weight:800;margin-top:1px}
+.tile .rstate{color:#d8b4fe;font-weight:800;margin-top:2px;font-size:14px}
 .rbig .rv b{color:#c084fc}.howbox{margin-top:6px}
 #plan.int-mode #tgtcard,#plan.int-mode #wxcard,#plan.int-mode #prun,#plan.int-mode .pcm,#plan.int-mode #pcnote,#plan.int-mode #ghosts,#plan.int-mode .trow.strat{display:none!important}
 #i-list{margin-top:10px}#i-list td small{color:var(--mut)}
@@ -388,7 +387,7 @@ a{color:var(--you)}
 #result{background:radial-gradient(circle at 50% 0%,#1e3a8a66,transparent 60%),var(--bg)}
 .rbig div{border-radius:20px}
 .rbig .rv b{color:var(--rival)}
-.tile .rstate{color:#d8b4fe;font-weight:800;margin-top:1px}
+.tile .rstate{color:#d8b4fe;font-weight:800;margin-top:2px;font-size:14px}
 .ctrl{display:flex;gap:8px;margin-top:12px}.ctrl .btn{flex:1;font-size:15px;padding:13px 6px}
 /* run screen: optional parts, compact splits, softer status colours */
 #run.nosplits #lside,#run.nocad #mstrip,#run.nostrip #course,#run.nowind #wxs{display:none!important}
@@ -404,3 +403,43 @@ a{color:var(--you)}
 .tiles{height:auto;grid-template-rows:auto 54px}
 .tile.you,.tile.pc{padding:10px 12px;min-height:118px}
 #pmap{height:180px}
+
+/* ---------- v3.1: purpose, goal race, kinds, volume, bests ---------- */
+.purpose{margin-top:12px}
+.purpose button{font-size:14px}
+.hero .purpose{margin-top:14px;background:rgba(4,8,20,.7)}
+#purnote{text-align:center}
+.lapsfold>summary{list-style:none;cursor:pointer;color:var(--you);font-weight:700;font-size:14px;padding:10px 0 2px}
+.lapsfold>summary::-webkit-details-marker{display:none}
+.rbig.three{gap:8px}.rbig.three div{padding:12px 6px;min-width:0}.rbig.three b{font-size:26px}
+.rbig.three span{font-size:11px;letter-spacing:.5px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ktag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--k);background:color-mix(in srgb,var(--k) 16%,transparent);border-radius:6px;padding:1px 6px;margin-right:6px;vertical-align:2px}
+#runs li.empty{list-style:none;padding:24px}
+.vol .wk-top{display:flex;justify-content:space-between}
+.vol .wk-num{display:flex;gap:18px;margin-top:8px}.vol .wk-num b{font-size:22px;display:block}.vol .wk-num span{font-size:12px;color:var(--mut)}
+.vbars{display:flex;gap:6px;align-items:flex-end;height:96px;margin-top:14px}
+.vbars>div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:4px;min-width:0}
+.vbars .stk{display:flex;flex-direction:column-reverse;width:100%;border-radius:6px;overflow:hidden;min-height:3px;background:var(--card3)}
+.vbars .stk i{display:block;min-height:2px}
+.vbars small{font-size:10px;color:var(--mut);height:12px;white-space:nowrap}.vbars .now small{color:#fff;font-weight:800}
+.vol .lg,.ins .lg{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--mut);margin-top:8px}
+.vol .lg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.ins .lg i.kdot{width:10px;height:10px;border-radius:50%;vertical-align:-1px}
+.h.sp{margin-top:16px}
+.pbs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.pbs button{text-align:left;border:0;border-radius:14px;padding:12px;color:#fff;background:linear-gradient(160deg,#2a2210,var(--card2));box-shadow:inset 0 0 0 1px rgba(250,204,21,.2)}
+.pbs span{display:block;font-size:12px;color:#fde68a;font-weight:800;text-transform:uppercase;letter-spacing:.8px}
+.pbs b{display:block;font-size:24px;font-weight:800;margin-top:2px}.pbs small{display:block;color:var(--mut2);font-size:12px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.goal{padding:0;overflow:hidden;background:radial-gradient(90% 80% at 0% 0%,rgba(74,222,128,.16),transparent 60%),linear-gradient(180deg,#0f1d2e,#0b1326);border-color:rgba(74,222,128,.28)}
+.goal>.eyebrow,.goal>h3,.goal>.gl-res,.goal>.sub,.goal>.bt2{margin-left:16px;margin-right:16px}.goal>.eyebrow{margin-top:16px}.goal>.bt2{margin-bottom:16px}
+.goal .eyebrow{color:var(--good)}
+.goalbtn{display:block;width:100%;text-align:left;border:0;background:none;color:inherit;font:inherit;padding:16px}
+.goal h3{margin:6px 0 0;font-size:22px;letter-spacing:-.3px}.gdate{color:var(--mut2);font-size:13px}
+.gnums{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.gnums div{background:rgba(255,255,255,.04);border-radius:14px;padding:10px 12px}
+.gnums span{display:block;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--mut)}
+.gnums b{display:block;font-size:24px;font-weight:800;margin-top:2px}
+.gnums div:first-child b{color:var(--good)}.gnums div:last-child b{color:var(--pacer)}
+.gspark{display:block;width:100%;height:56px;margin-top:10px}
+.gstat{margin-top:8px;font-size:14px;font-weight:700;color:var(--pacer)}.gstat.win{color:var(--good)}
+.gl-res{display:flex;align-items:baseline;gap:10px;margin-top:10px}.gl-res b{font-size:30px}.gl-res span{color:var(--pacer);font-weight:700}.gl-res.win span{color:var(--good)}

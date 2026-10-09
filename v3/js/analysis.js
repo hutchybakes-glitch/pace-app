@@ -17,8 +17,61 @@ const clip=(x,a,b)=>Math.max(a,Math.min(b,x));
 const median=a=>{if(!a.length)return null;const v=[...a].sort((x,y)=>x-y),m=v.length>>1;return v.length%2?v[m]:(v[m-1]+v[m])/2};
 const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
 
-// Runs that can be analysed: finished, on a route with points, with enough timed fixes
-export const usable=runs=>runs.filter(r=>r.status==='done'&&r.mode!=='intervals'&&r.route?.pts?.length>20&&(r.fixes?.length||0)>20);
+// Your own runs: a friend's run (a challenge, or an imported run with their name) can be raced, but it
+// isn't learned from and doesn't count towards your bests or totals
+export const mine=r=>!r.imported?.who;
+// Runs that can be analysed: yours, finished, on a route with points, with enough timed fixes
+export const usable=runs=>runs.filter(r=>mine(r)&&r.status==='done'&&r.mode!=='intervals'&&r.route?.pts?.length>20&&(r.fixes?.length||0)>20);
+
+// Efforts over different distances made comparable: a flat-equivalent pace over dist as the pace it's
+// worth over 10 km (Riegel: pace scales with distance^0.06)
+export const eq10=(fp,dist)=>fp*Math.pow(10000/dist,0.06);
+export const FORM_DAYS=42;
+// What kind of run, from how hard it was against your best around then (10 km-equivalent pace within six
+// weeks either side): race ≤ 3.5 % off it, tempo ≤ 12 %, else easy (long if 14 km or more). A purpose set
+// before the run (race, tempo, easy) wins.
+export const KINDS={race:{name:'Race',icon:'🏁'},tempo:{name:'Tempo',icon:'🔥'},easy:{name:'Easy',icon:'🌿'},long:{name:'Long',icon:'🛤️'},int:{name:'Intervals',icon:'⏱️'}};
+export function classify(per){
+  for(const x of per){
+    const t=x.run.started,ref=Math.min(...per.filter(y=>Math.abs(y.run.started-t)<=FORM_DAYS*864e5).map(y=>y.eq));
+    x.ratio=x.eq/ref;
+    const p=x.run.purpose,auto=x.ratio<=1.035?'race':x.ratio<=1.12?'tempo':'easy';
+    x.kind=p==='race'||p==='tempo'?p:p==='easy'||auto==='easy'?(x.dist>=14000?'long':'easy'):auto;
+  }
+  return per;
+}
+// Your form at time t: your strongest 10 km-equivalent pace in the six weeks up to then (null if none)
+export function formAt(per,t){
+  const v=per.filter(x=>x.run.started<=t&&t-x.run.started<FORM_DAYS*864e5).map(x=>x.eq);
+  return v.length?Math.min(...v):null;
+}
+
+// Best efforts: your quickest time over each distance anywhere inside a run (not intervals). A run a few
+// metres short of a distance (a 4.99 km parkrun) counts at its own pace. [{id, name, d, t, run}]
+export const BESTS=[{id:'1k',name:'1 km',d:1000},{id:'5k',name:'5K',d:5000},{id:'10k',name:'10K',d:10000},{id:'half',name:'Half',d:21097.5}];
+export function effortsOf(run){
+  const F=[];let far=-1;
+  for(const f of run.fixes||[]){const d=f[10]??f[6];if(d==null||!(d>far+0.5))continue;far=d;F.push([d,f[1]/1000])}
+  if(F.length<10)return {};
+  const at=x=>{let lo=0,hi=F.length-1;if(x<=F[0][0])return F[0][1];while(hi-lo>1){const m=(lo+hi)>>1;if(F[m][0]<=x)lo=m;else hi=m}
+    const a=F[lo],b=F[hi];return a[1]+(b[1]-a[1])*(x-a[0])/((b[0]-a[0])||1)};
+  const total=F.at(-1)[0]-F[0][0],out={};
+  for(const B of BESTS){
+    if(total<B.d-30)continue;
+    if(total<B.d){out[B.id]=(F.at(-1)[1]-F[0][1])*B.d/total;continue}
+    let best=Infinity;for(const [d,t] of F){if(d-B.d<F[0][0])continue;best=Math.min(best,t-at(d-B.d))}
+    if(best<Infinity&&best/(B.d/1000)>=120)out[B.id]=best;
+  }
+  return out;
+}
+export function bests(runs){
+  const out={};
+  for(const r of runs){
+    if(!mine(r)||r.status!=='done'||r.mode==='intervals'||r.mode==='free')continue;
+    const e=effortsOf(r);for(const [k,t] of Object.entries(e))if(!out[k]||t<out[k].t)out[k]={...BESTS.find(b=>b.id===k),t,run:r};
+  }
+  return BESTS.map(b=>out[b.id]).filter(Boolean);
+}
 
 // Effort multiplier at grade g for a model {climb, gain, taper}
 export const effortOf=(m,g)=>effort(g,m.climb,{gain:m.gain,taper:m.taper});
@@ -167,14 +220,19 @@ export function analyse(runs,now=Date.now()){
   R.forEach((x,i)=>{const fp=lines[i]?.A??flatPace(x.segs,m);if(!fp)return;for(const s of x.segs)if(s.d>=SKIP_START)pts.push({grade:s.grade,r:s.pace/fp})});
   const f=fitHills(pts);m={climb:m.climb,gain:f.gain,taper:f.taper,nUp,nDown:f.nDown};
   // per run: flat-equivalent pace, pacing
-  const per=R.map(x=>({run:x.run,dist:x.dist,time:x.time,fp:flatPace(x.segs,m),...(pacing(x.segs,m)||{})})).filter(x=>x.fp);
-  const cvs=per.map(x=>x.cv).filter(x=>x!=null),fades=per.map(x=>x.fade).filter(x=>x!=null);
+  const per=classify(R.map(x=>{const fp=flatPace(x.segs,m);return {run:x.run,dist:x.dist,time:x.time,fp,eq:fp&&eq10(fp,x.dist),...(pacing(x.segs,m)||{})}}).filter(x=>x.fp));
+  // pacing is about the runs you push: races and tempo runs (all runs until there are a couple of those)
+  const hard=per.filter(x=>x.kind==='race'||x.kind==='tempo'),pace=hard.filter(x=>x.cv!=null).length>=2?hard:per;
+  const cvs=pace.map(x=>x.cv).filter(x=>x!=null),fades=pace.map(x=>x.fade).filter(x=>x!=null);
+  const races=per.filter(x=>x.kind==='race'&&x.fade!=null);
   const cad=fitCadence(R);
-  // fitness: flat-equivalent pace over time; trend (s/km per 30 days) over the last 120 days
-  const recent=per.filter(x=>now-x.run.started<120*864e5);
+  // form: your strongest 10 km-equivalent effort over the last six weeks, at each run; trend (s/km per
+  // 30 days) of that over the last 120 days
+  for(const x of per)x.form=formAt(per,x.run.started);
+  const recent=per.filter(x=>now-x.run.started<120*864e5&&x.run.started<=now);
   let trend=null;
   if(recent.length>=3){
-    const X=recent.map(x=>(x.run.started-now)/864e5),Y=recent.map(x=>x.fp),mx=mean(X),my=mean(Y);
+    const X=recent.map(x=>(x.run.started-now)/864e5),Y=recent.map(x=>x.form),mx=mean(X),my=mean(Y);
     let sxy=0,sxx=0;X.forEach((x,i)=>{sxy+=(x-mx)*(Y[i]-my);sxx+=(x-mx)**2});
     if(sxx>1)trend=sxy/sxx*30;
   }
@@ -190,7 +248,9 @@ export function analyse(runs,now=Date.now()){
     pacing:cvs.length?score.pacing(median(cvs)):null,endurance:fades.length?score.endurance(median(fades)):null,
     cadence:cad?score.cadence(cad.base):null,speed:score.speed(bestFp)};
   return {ready:R.length>=1,runs:R.length,need:1,km,segs:pts.length,model:m,hills:binned(pts),per,trend,predict,cadence:cad,
-    cv:cvs.length?median(cvs):null,fade:fades.length?median(fades):null,scores:s,type:runnerType(s),bestFp};
+    cv:cvs.length?median(cvs):null,fade:fades.length?median(fades):null,scores:s,type:runnerType(s),bestFp,
+    form:formAt(per,now),raceFade:races.length>=2?median(races.map(x=>x.fade)):null,nRaces:per.filter(x=>x.kind==='race').length,
+    kindOf:new Map(per.map(x=>[x.run.id,x.kind]))};
 }
 
 // Percent slower (+) or quicker (−) than on the flat at grade g, for a model
@@ -209,7 +269,7 @@ export function learnedProfile(a){
 // the course's distance (Riegel), then slowed and quickened by your own hill model at every point
 export function courseTime(A,P,now=Date.now()){
   if(!A?.ready)return null;
-  const D=P.total,recent=A.per.filter(x=>now-x.run.started<120*864e5&&x.dist>=1500),pool=recent.length?recent:A.per.filter(x=>x.dist>=1500);
+  const D=P.total,past=A.per.filter(x=>x.run.started<=now&&x.dist>=1500),recent=past.filter(x=>now-x.run.started<120*864e5),pool=recent.length?recent:past;
   if(!pool.length)return null;
   let best=null;for(const x of pool){const fp=x.fp*Math.pow(D/x.dist,0.06);if(!best||fp<best.fp)best={fp,from:x.run}}
   let T=0;for(let i=1;i<P.d.length;i++)T+=best.fp*effortOf(A.model,(P.grade[i-1]+P.grade[i])/2)*(P.d[i]-P.d[i-1])/1000;

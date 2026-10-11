@@ -101,7 +101,7 @@ async function initHome(){
   routes=(await listRoutes()).sort((a,b)=>b.created-a.created);
   allRuns=await listRuns();
   selectRoute(routes.find(r=>r.id===opt.get('route',null))||routes[0]||null);
-  refreshHistory();storageStatus();fixRecordedElevation();tab(curTab);checkChallenge();
+  refreshHistory();storageStatus();fixRecordedElevation();tab(curTab);checkChallenge();renderDemo();
 }
 
 $('gpx').onchange=async e=>{
@@ -1643,6 +1643,8 @@ function progState(){
   const did={},keys=new Set(P.weeks.flatMap(w=>w.days.map(s=>s.key)));
   for(const r of own)if(r.prog?.key&&keys.has(r.prog.key))(did[r.prog.key]??=[]).push(r);
   for(const w of P.weeks)for(const s of w.days){const rs=own.filter(r=>!(r.prog?.key&&keys.has(r.prog.key))&&dayNum(r.started)===dayNum(s.date));if(rs.length)(did[s.key]??=[]).push(...rs)}
+  // the coach demo (sim only): every session before today counts as run, so you're part way through
+  if(SIM&&opt.get('demo:on',false))for(const s of P.weeks.flatMap(w=>w.days))if(s.kind!=='rest'&&!s.pre&&dayNum(s.date)<dayNum(now)&&!did[s.key])did[s.key]=[demoRun(s)];
   const today=dayNum(now);let wk=P.weeks.findIndex(w=>dayNum(w.monday)<=today&&today<dayNum(w.monday)+7);
   if(wk<0)wk=today<dayNum(P.weeks[0].monday)?0:P.weeks.length-1;
   const loadRuns=allRuns.filter(r=>mine(r)&&r.status==='done'&&now-r.started<60*864e5&&(SIM||!r.sim)).map(r=>({t:r.started,min:(r.elapsed||0)/60000,rpe:r.feel?.rpe??(TKINDS[kindOfRun(r)]?.rpe?.[1]||4)}));
@@ -1700,7 +1702,7 @@ function renderPlanView(){
     onRoute:(k,id)=>{opt.set('prog:route:'+k,id);progKey=null;renderPlanView();renderToday()},
     onWeek:i=>{pgWeek=pgWeek===i?null:i;pgOpen=null;renderPlanView()},
     onRun:s=>{tab('today');loadSession(progDay(s,st))},
-    onOpenRun:id=>{const r=allRuns.find(x=>x.id===id);if(r)showResult(r)},
+    onOpenRun:id=>{if(String(id).startsWith('demo-')){tab('today');$('democard').scrollIntoView({behavior:'smooth',block:'start'});return}const r=allRuns.find(x=>x.id===id);if(r)showResult(r)},
     onEdit:()=>openBuilder(true),
     onEnd:()=>{if(!confirm('End this training plan? Your runs stay; the plan goes.'))return;opt.set('program',null);opt.set('plan:changes',[]);opt.set('plan:proposal',null);renderPlanView();renderToday()}});
 }
@@ -1982,7 +1984,7 @@ function renderAIState(s=laptop.state){
     ok:`✓ Connected · ${s.loaded?'model loaded':'model loading'} · voice ${s.voice==='ready'?'ready':s.voice==='loading'?'loading':'off'}`,
     down:`Can't reach your laptop${s.error?` (${s.error})`:''}. The run-screen coach still works on the phone.`}[s.status];
   if($('ai-status')){$('ai-status').textContent=txt;$('ai-status').className='sub ai-'+s.status}
-  $('cdot').className='ai-'+s.status;
+  $('cdot').className='ai-'+s.status;if($('dmst'))$('dmst').innerHTML=demoWho(s);
   $('cstate').textContent=s.status==='ok'?'AI coach on your laptop · tap 🎙 and speak':s.status==='finding'?'Finding your laptop…':s.status==='off'?'Coach on the phone':'Coach on the phone (laptop away)';
 }
 function initAISettings(){
@@ -2200,6 +2202,45 @@ function openStarter(){
   Object.assign(pf,{dist:'10k',date:isoDay(addDays(mondayOf(Date.now()),7*10+6)),days:4,km:Math.max(pf.km,20),longKm:Math.max(pf.longKm,8),route:pf.route&&Math.abs((routes.find(r=>r.id===pf.route)?.pts.at(-1).d||0)-10000)<600?pf.route:null});
   drawBuilder();
 }
+// ---- The coach demo (sim only): a pretend 10K plan, four weeks in. Tell the coach how the latest run felt
+// and see it change the weeks ahead. It lives under the sim's own keys (store.js), apart from your real plan ----
+const demoRun=s=>({id:'demo-'+s.key,demo:true,sim:true,status:'done',mode:'record',started:s.date+8*3600e3,rd:Math.round((s.km||0)*1000),
+  elapsed:Math.round((s.km||0)*(s.pace||330)*1000),feel:opt.get('demo:feel',{})[s.key]||null});
+const demoWho=s=>s.status==='ok'?'🧠 The AI on your laptop will answer.':s.status==='finding'?'Looking for your laptop…'
+  :'⚠️ The laptop isn’t connected, so the phone’s rules will answer instead. Start <b>start.bat</b> and enter your code in ⚙︎ Settings to use the AI.';
+function loadDemo(){
+  const mon=mondayOf(Date.now()),start=addDays(mon,-28)+9*3600e3;
+  opt.set('program',{start,raceDate:addDays(mon,7*5+6)+9*3600e3,dist:'10k',style:'norwegian',days:4,km:25,longKm:10,firstTest:addDays(start,6)+9*3600e3,goalTime:null,route:null,base:{v:45,from:'estimate'}});
+  opt.set('plan:changes',[]);opt.set('plan:proposal',null);opt.set('demo:feel',{});opt.set('demo:on',true);progKey=null;renderDemo();renderToday();
+}
+function endDemo(){
+  if(!confirm('End the demo? The demo plan and its changes go (your real plan isn’t affected).'))return;
+  opt.set('program',null);opt.set('plan:changes',[]);opt.set('plan:proposal',null);opt.set('demo:feel',{});opt.set('demo:on',false);
+  opt.set('prog:pending',null);opt.set('hero:loaded',null);opt.set('plan:auto',null);progKey=null;renderDemo();renderToday();
+}
+function renderDemo(){
+  const el=$('democard');el.hidden=!SIM;if(!SIM)return;
+  const st=opt.get('demo:on',false)?progState():null;
+  if(!st){
+    el.innerHTML=`<div class="h">🧠 Coach demo</div><p class="sub">A pretend 10K plan, four weeks in. Tell the coach how your latest run felt, like “legs very tired”, and see it change the paces and distances ahead. It’s kept apart from your real plan.</p><button class="btn go" id="dmgo">Load the demo plan</button>`;
+    $('dmgo').onclick=loadDemo;return;
+  }
+  const last=st.P.weeks.flatMap(w=>w.days).filter(s=>s.kind!=='rest'&&!s.pre&&dayNum(s.date)<st.today).at(-1),rid='demo-'+last.key;
+  el.innerHTML=`<div class="h">🧠 Coach demo<small>week ${st.wk+1} of ${st.P.weeks.length} · plan revision ${st.changes.length+1}</small></div>
+    <p class="sub" id="dmst">${demoWho(laptop.state)}</p>
+    <p class="sub">Your latest run: <b>${new Date(last.date).toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short'})} · ${esc(last.title)}</b>${last.km?` · ${kmStr(last.km*1000)} km`:''}</p>
+    <div id="dmfeel"></div><div id="dmcoach" class="prop" hidden></div>
+    <div class="bt2"><button class="btn ghost" id="dmplan">See the plan</button><button class="btn ghost" id="dmend">End the demo</button></div>`;
+  const draw=()=>renderFeel($('dmfeel'),{kind:last.kind,title:last.title,feel:opt.get('demo:feel',{})[last.key]||null},f=>{
+    const all=opt.get('demo:feel',{});all[last.key]=f;opt.set('demo:feel',all);progKey=null;draw();
+    const fb={session:last.kind,rpe:f.rpe,how:f.how,legs:f.legs,energy:f.energy,pain:!!f.pain,where:f.where||'',note:f.note||''};
+    logEvent({type:'feedback',demo:true,run:null,...fb});reviewPlan(fb,$('dmcoach'),{runId:rid});
+  });
+  draw();
+  const prop=opt.get('plan:proposal',null);if(prop?.runId===rid){$('dmcoach').hidden=false;drawProposal($('dmcoach'),prop)}
+  $('dmplan').onclick=()=>tab('plan');$('dmend').onclick=endDemo;
+}
+
 initAISettings();
 if(laptop.state.code)laptop.check();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&laptop.state.code&&$('run').hidden)laptop.check()});

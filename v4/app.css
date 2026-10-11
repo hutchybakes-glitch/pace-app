@@ -619,3 +619,7 @@ details.adv{margin:8px 0}details.adv summary{color:var(--mut2);font-size:14px;cu
 .sesd .sec.zone p b{color:#fff}
 .ses .adp.chg{background:#60a5fa}
 #pgstarter{margin-top:10px}
+
+/* Coach demo (sim only) */
+.demo .prop{margin-top:10px;padding:10px;border-radius:12px;background:var(--card2)}
+.demo #dmfeel{margin-top:6px}

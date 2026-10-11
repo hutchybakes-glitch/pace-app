@@ -18,10 +18,13 @@ export const saveRun=r=>tx('runs','readwrite',s=>s.put(r));
 export const listRuns=()=>tx('runs','readonly',s=>s.getAll());
 export const deleteRun=id=>tx('runs','readwrite',s=>s.delete(id));
 
-// Options
+// Options. In the sim (?sim=1) the training plan, the goal and the coach's changes are kept under 'pacer:sim:'
+// keys, so trying the coach out never touches your real plan
+const SANDBOX=typeof location!=='undefined'&&new URLSearchParams(location.search).has('sim');
+const key=k=>'pacer:'+(SANDBOX&&/^(program$|goal$|hero:loaded$|plan:|prog:|demo:)/.test(k)?'sim:':'')+k;
 export const opt={
-  get(k,def){try{const v=localStorage.getItem('pacer:'+k);return v==null?def:JSON.parse(v)}catch(e){return def}},
-  set(k,v){try{localStorage.setItem('pacer:'+k,JSON.stringify(v))}catch(e){}},
+  get(k,def){try{const v=localStorage.getItem(key(k));return v==null?def:JSON.parse(v)}catch(e){return def}},
+  set(k,v){try{localStorage.setItem(key(k),JSON.stringify(v))}catch(e){}},
 };
 
 // Copy v1's saved routes the first time Pacer runs (v1's database is only read, never upgraded)

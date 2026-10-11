@@ -39,6 +39,16 @@ Pacer v4 (https://hutchybakes-glitch.github.io/pace-app/v4/) gets an AI coach th
    - **Accept** applies the changes as a new plan revision; **Keep my plan** leaves it as it is.
    - The Plan tab has **Ask the coach** for weekly check-ins, the revision history with **Undo**, and the plan as JSON.
 
+## Try the coach without running (sim mode)
+
+1. Start `start.bat` on the laptop.
+2. Open https://hutchybakes-glitch.github.io/pace-app/v4/?sim=1. Enter the pairing code in ⚙︎ Settings → Laptop coach (AI); sim mode keeps its own copy of it.
+3. On Today, tap **Load the demo plan** on the 🧠 Coach demo card. It sets up a pretend 10K plan that is four weeks in, with the sessions so far marked as run.
+4. Fill in how your latest run felt, for example 6/10, legs Heavy, energy Low, note "legs very tired", and tap Save. The AI answers in about 30–45 s with its suggested changes.
+5. Tap **Accept**, then **See the plan** to see the new revision. Undo is on the Plan tab.
+
+In sim mode the plan, goal and coach changes are kept under separate `pacer:sim:` keys, so your real plan is never touched. **End the demo** clears it.
+
 ## How the phone reaches the laptop (and why this way)
 
 Phone (mobile data) → `https://….trycloudflare.com` → **cloudflared** on the laptop → **proxy.py** (`127.0.0.1:8787`) → **Ollama** (`127.0.0.1:11434`, never exposed)

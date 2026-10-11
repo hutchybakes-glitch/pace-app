@@ -1159,6 +1159,7 @@ function showResult(r){
   const notes=[];
   if(c.C.skipped>30)notes.push(`${Math.round(c.C.skipped/10)*10} m of the course was cut off, and the ${r.ghost?'past run':'pacer'} skipped it too`);
   if(c.C.extra>30)notes.push(`${Math.round(c.C.extra/10)*10} m extra off the course`);
+  if(r.adjust?.length){const K=r.adjust.reduce((p,a)=>p*a.k,1);if(Math.abs(K-1)>0.005)notes.push(`${r.ghost?'ghost':'pacer'} ${K>1?'eased off':'sped up'} mid-run, as you asked`)}
   if(c.kind==='short')notes.push(`finish line at ${kmStr(c.C.ran(c.Pr.total))} km`);
   if(c.kind==='full')notes.push(`full ${kmStr(c.Pr.total)} km in ${fmt(c.you)}, ${kmStr(c.ran)} km in all`);
   if(notes.length)$('rsub').textContent=notes.join(' · ')+($('rsub').textContent?' · '+$('rsub').textContent:'');
@@ -2007,11 +2008,11 @@ function initAISettings(){
 let runAdj=null,lastAdj=null,talking=null,toastTimer=0,dictTimer=0;
 function setupAdj(){
   if(mode!=='race'||!runP){runAdj=null;return}
-  if(runGhost){runAdj={off:'ghost'};return}
   const pp=opt.get('prog:pending',null),fromPlan=!!(rec?.prog&&pp&&pp.key===rec.prog.key),kind=fromPlan?pp.kind:null,st=fromPlan?progState():null;
   const cur=sess?sess.reps[sess.i].pace:fromPlan&&pp.flat?pp.flat:runP.finish/(runP.total/1000);
   const easy=kind?EASYK.includes(kind):!sess&&purposeOf()==='easy',z=st&&pp.zone&&st.Z[pp.zone];
-  // a plan session keeps to its zone (from the pace calculator); any other run moves up to 3 steps either way
+  // a plan session keeps to its zone (from the pace calculator); any other run (a ghost too: the rest of your
+  // past run replays that much slower or quicker) moves up to 3 steps either way
   const zone=z?{fast:z.fast,slow:z.slow,name:z.name}:{fast:cur-3*STEP_S,slow:cur+(easy?5:3)*STEP_S,name:easy?'easy':'target'};
   runAdj={cur,zone,onlySlower:easy,kind,K:sess&&runAdj?.K?runAdj.K:1};
 }
@@ -2048,10 +2049,10 @@ function applyIntent(intent,m={}){
   else if(['slower','faster','pain'].includes(intent)){
     res=retarget(intent==='faster'?-1:1,intent==='pain'?2:1,intent==='pain');
     if(res.pace){
-      said=`${intent==='faster'?'Quicker':'Easier'} target: ${paceSay(res.pace)}.${res.limit?` That's the ${res.limit==='fast'?'quick':'easy'} end of your ${zn} zone.`:''}`;
+      said=`${intent==='faster'?'Quicker':'Easier'} target: ${paceSay(res.pace)}.${runGhost?` Your ghost ${intent==='faster'?'speeds up':'eases off'} to match.`:''}${res.limit?` That's the ${res.limit==='fast'?'quick':'easy'} end of your ${zn} zone.`:''}`;
       shown=`${intent==='faster'?'🐇 Quicker':'🐢 Easier'} · ${paceTxt(res.pace)}${res.limit?` · the ${res.limit==='fast'?'quickest':'easiest'} in your ${zn} zone`:''}`;
     }else{
-      said={ghost:'You\'re racing your past run: it can\'t change pace. Run your own race.',end:'Nearly there: hold on!',
+      said={end:'Nearly there: hold on!',
         easy:`It's an easy run, so it stays easy. Holding at ${paceSay(runAdj?.cur||0)}.`,fast:`That's already the quick end of your ${zn} zone. Holding here.`,
         slow:`That's already the easy end of your ${zn} zone. If you need more, walk for a minute: that's fine.`}[res.why]||'Holding.';
       shown=said;

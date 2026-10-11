@@ -1,0 +1,1535 @@
+{
+ "schema": "pacer.plan",
+ "version": 1,
+ "plan": {
+  "name": "10K starter plan",
+  "revision": 1,
+  "units": "km",
+  "race": {
+   "name": "10K",
+   "distance_m": 10000,
+   "date": null
+  },
+  "fitness": {
+   "vdot": 45,
+   "from": "template"
+  }
+ },
+ "weeks": [
+  {
+   "week": 1,
+   "start": null,
+   "phase": "base",
+   "test": true,
+   "focus": "Test week: find your starting point on the course.",
+   "target_km": 18.8,
+   "days": [
+    {
+     "date": null,
+     "day": "Mon",
+     "sessions": [
+      {
+       "id": "0-0",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Tue",
+     "sessions": [
+      {
+       "id": "0-1",
+       "type": "sub",
+       "title": "Sub-threshold",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 4,
+        "length_m": 1300,
+        "rest_s": 60
+       },
+       "zone": "subthreshold",
+       "pace_s_per_km": 284,
+       "km": 7.7,
+       "hard": true,
+       "notes": "4 × 1.3 km (about 6 min each)"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Wed",
+     "sessions": [
+      {
+       "id": "0-2",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Thu",
+     "sessions": [
+      {
+       "id": "0-3",
+       "type": "strides",
+       "title": "Easy + strides",
+       "distance_m": 3000,
+       "duration_s": null,
+       "reps": null,
+       "zone": "easy",
+       "pace_s_per_km": 346,
+       "km": 3,
+       "hard": false,
+       "notes": "3 km + 6 strides"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Fri",
+     "sessions": [
+      {
+       "id": "0-4",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sat",
+     "sessions": [
+      {
+       "id": "0-5",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest, or 15–20 minutes very easy with 4 strides: fresh legs for tomorrow's test."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sun",
+     "sessions": [
+      {
+       "id": "0-6",
+       "type": "test",
+       "title": "Course test",
+       "distance_m": 10000,
+       "duration_s": null,
+       "reps": null,
+       "zone": "race",
+       "pace_s_per_km": 271,
+       "km": 13,
+       "hard": true,
+       "notes": "10 km time trial"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "week": 2,
+   "start": null,
+   "phase": "base",
+   "test": false,
+   "focus": "Base: build the aerobic engine. Long sub-threshold reps, hill sprints, easy miles.",
+   "target_km": 27.5,
+   "days": [
+    {
+     "date": null,
+     "day": "Mon",
+     "sessions": [
+      {
+       "id": "1-0",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Tue",
+     "sessions": [
+      {
+       "id": "1-1",
+       "type": "sub",
+       "title": "Sub-threshold",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 5,
+        "length_m": 1300,
+        "rest_s": 60
+       },
+       "zone": "subthreshold",
+       "pace_s_per_km": 284,
+       "km": 9,
+       "hard": true,
+       "notes": "5 × 1.3 km (about 6 min each)"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Wed",
+     "sessions": [
+      {
+       "id": "1-2",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Thu",
+     "sessions": [
+      {
+       "id": "1-3",
+       "type": "sub",
+       "title": "Sub-threshold",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 2,
+        "length_m": 2100,
+        "rest_s": 90
+       },
+       "zone": "subthreshold",
+       "pace_s_per_km": 289,
+       "km": 6.7,
+       "hard": true,
+       "notes": "2 × 2.1 km (about 10 min each)"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Fri",
+     "sessions": [
+      {
+       "id": "1-4",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sat",
+     "sessions": [
+      {
+       "id": "1-5",
+       "type": "hillsprints",
+       "title": "Easy + hill sprints",
+       "distance_m": 4000,
+       "duration_s": null,
+       "reps": null,
+       "zone": "easy",
+       "pace_s_per_km": 346,
+       "km": 4,
+       "hard": false,
+       "notes": "4 km easy + 7 × 10 s hill sprints"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sun",
+     "sessions": [
+      {
+       "id": "1-6",
+       "type": "long",
+       "title": "Long run",
+       "distance_m": 10000,
+       "duration_s": null,
+       "reps": null,
+       "zone": "easy",
+       "pace_s_per_km": 350,
+       "km": 10,
+       "hard": false,
+       "notes": "10 km"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "week": 3,
+   "start": null,
+   "phase": "base",
+   "test": false,
+   "focus": "Base: build the aerobic engine. Long sub-threshold reps, hill sprints, easy miles.",
+   "target_km": 29.1,
+   "days": [
+    {
+     "date": null,
+     "day": "Mon",
+     "sessions": [
+      {
+       "id": "2-0",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Tue",
+     "sessions": [
+      {
+       "id": "2-1",
+       "type": "sub",
+       "title": "Sub-threshold",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 5,
+        "length_m": 1300,
+        "rest_s": 60
+       },
+       "zone": "subthreshold",
+       "pace_s_per_km": 284,
+       "km": 9,
+       "hard": true,
+       "notes": "5 × 1.3 km (about 6 min each)"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Wed",
+     "sessions": [
+      {
+       "id": "2-2",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Thu",
+     "sessions": [
+      {
+       "id": "2-3",
+       "type": "sub",
+       "title": "Sub-threshold",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 3,
+        "length_m": 2100,
+        "rest_s": 90
+       },
+       "zone": "subthreshold",
+       "pace_s_per_km": 289,
+       "km": 8.8,
+       "hard": true,
+       "notes": "3 × 2.1 km (about 10 min each)"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Fri",
+     "sessions": [
+      {
+       "id": "2-4",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sat",
+     "sessions": [
+      {
+       "id": "2-5",
+       "type": "hillsprints",
+       "title": "Easy + hill sprints",
+       "distance_m": 4000,
+       "duration_s": null,
+       "reps": null,
+       "zone": "easy",
+       "pace_s_per_km": 346,
+       "km": 4,
+       "hard": false,
+       "notes": "4 km easy + 9 × 10 s hill sprints"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sun",
+     "sessions": [
+      {
+       "id": "2-6",
+       "type": "long",
+       "title": "Long run",
+       "distance_m": 10000,
+       "duration_s": null,
+       "reps": null,
+       "zone": "easy",
+       "pace_s_per_km": 350,
+       "km": 10,
+       "hard": false,
+       "notes": "10 km"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "week": 4,
+   "start": null,
+   "phase": "base",
+   "test": false,
+   "focus": "Base: build the aerobic engine. Long sub-threshold reps, hill sprints, easy miles.",
+   "target_km": 30.5,
+   "days": [
+    {
+     "date": null,
+     "day": "Mon",
+     "sessions": [
+      {
+       "id": "3-0",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Tue",
+     "sessions": [
+      {
+       "id": "3-1",
+       "type": "sub",
+       "title": "Sub-threshold",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 5,
+        "length_m": 1300,
+        "rest_s": 60
+       },
+       "zone": "subthreshold",
+       "pace_s_per_km": 284,
+       "km": 9,
+       "hard": true,
+       "notes": "5 × 1.3 km (about 6 min each)"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Wed",
+     "sessions": [
+      {
+       "id": "3-2",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Thu",
+     "sessions": [
+      {
+       "id": "3-3",
+       "type": "sub",
+       "title": "Sub-threshold",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 3,
+        "length_m": 2100,
+        "rest_s": 90
+       },
+       "zone": "subthreshold",
+       "pace_s_per_km": 289,
+       "km": 8.8,
+       "hard": true,
+       "notes": "3 × 2.1 km (about 10 min each)"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Fri",
+     "sessions": [
+      {
+       "id": "3-4",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sat",
+     "sessions": [
+      {
+       "id": "3-5",
+       "type": "hillsprints",
+       "title": "Easy + hill sprints",
+       "distance_m": 5000,
+       "duration_s": null,
+       "reps": null,
+       "zone": "easy",
+       "pace_s_per_km": 346,
+       "km": 5,
+       "hard": false,
+       "notes": "5 km easy + 10 × 10 s hill sprints"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sun",
+     "sessions": [
+      {
+       "id": "3-6",
+       "type": "long",
+       "title": "Long run",
+       "distance_m": 10000,
+       "duration_s": null,
+       "reps": null,
+       "zone": "easy",
+       "pace_s_per_km": 350,
+       "km": 10,
+       "hard": false,
+       "notes": "10 km"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "week": 5,
+   "start": null,
+   "phase": "build",
+   "test": true,
+   "focus": "Test week: lighter, so you arrive at the test fresh. The result resets your paces.",
+   "target_km": 22.9,
+   "days": [
+    {
+     "date": null,
+     "day": "Mon",
+     "sessions": [
+      {
+       "id": "4-0",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Tue",
+     "sessions": [
+      {
+       "id": "4-1",
+       "type": "sub",
+       "title": "Sub-threshold",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 5,
+        "length_m": 1300,
+        "rest_s": 60
+       },
+       "zone": "subthreshold",
+       "pace_s_per_km": 284,
+       "km": 9,
+       "hard": true,
+       "notes": "5 × 1.3 km (about 6 min each)"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Wed",
+     "sessions": [
+      {
+       "id": "4-2",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Thu",
+     "sessions": [
+      {
+       "id": "4-3",
+       "type": "easy",
+       "title": "Easy",
+       "distance_m": 3000,
+       "duration_s": null,
+       "reps": null,
+       "zone": "easy",
+       "pace_s_per_km": 346,
+       "km": 3,
+       "hard": false,
+       "notes": "3 km"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Fri",
+     "sessions": [
+      {
+       "id": "4-4",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sat",
+     "sessions": [
+      {
+       "id": "4-5",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest, or 15–20 minutes very easy with 4 strides: fresh legs for tomorrow's test."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sun",
+     "sessions": [
+      {
+       "id": "4-6",
+       "type": "test",
+       "title": "Course test",
+       "distance_m": 10000,
+       "duration_s": null,
+       "reps": null,
+       "zone": "race",
+       "pace_s_per_km": 271,
+       "km": 13,
+       "hard": true,
+       "notes": "10 km time trial"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "week": 6,
+   "start": null,
+   "phase": "build",
+   "test": false,
+   "focus": "Build: the heart of the plan. More sub-threshold, and the weekly hill reps.",
+   "target_km": 33.3,
+   "days": [
+    {
+     "date": null,
+     "day": "Mon",
+     "sessions": [
+      {
+       "id": "5-0",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Tue",
+     "sessions": [
+      {
+       "id": "5-1",
+       "type": "sub",
+       "title": "Sub-threshold",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 9,
+        "length_m": 600,
+        "rest_s": 60
+       },
+       "zone": "subthreshold",
+       "pace_s_per_km": 280,
+       "km": 7.9,
+       "hard": true,
+       "notes": "9 × 600 m (about 3 min each)"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Wed",
+     "sessions": [
+      {
+       "id": "5-2",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Thu",
+     "sessions": [
+      {
+       "id": "5-3",
+       "type": "sub",
+       "title": "Sub-threshold",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 4,
+        "length_m": 1700,
+        "rest_s": 75
+       },
+       "zone": "subthreshold",
+       "pace_s_per_km": 289,
+       "km": 9.3,
+       "hard": true,
+       "notes": "4 × 1.7 km (about 8 min each)"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Fri",
+     "sessions": [
+      {
+       "id": "5-4",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sat",
+     "sessions": [
+      {
+       "id": "5-5",
+       "type": "hills",
+       "title": "Hill reps",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 13,
+        "length_m": 200,
+        "rest_s": 75
+       },
+       "zone": "interval",
+       "pace_s_per_km": 255,
+       "km": 5.1,
+       "hard": true,
+       "notes": "13 × 200 m uphill"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sun",
+     "sessions": [
+      {
+       "id": "5-6",
+       "type": "long",
+       "title": "Long run",
+       "distance_m": 10000,
+       "duration_s": null,
+       "reps": null,
+       "zone": "easy",
+       "pace_s_per_km": 350,
+       "km": 10,
+       "hard": false,
+       "notes": "10 km"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "week": 7,
+   "start": null,
+   "phase": "build",
+   "test": false,
+   "focus": "Build: the heart of the plan. More sub-threshold, and the weekly hill reps.",
+   "target_km": 34.6,
+   "days": [
+    {
+     "date": null,
+     "day": "Mon",
+     "sessions": [
+      {
+       "id": "6-0",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Tue",
+     "sessions": [
+      {
+       "id": "6-1",
+       "type": "sub",
+       "title": "Sub-threshold",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 6,
+        "length_m": 1300,
+        "rest_s": 60
+       },
+       "zone": "subthreshold",
+       "pace_s_per_km": 284,
+       "km": 10.3,
+       "hard": true,
+       "notes": "6 × 1.3 km (about 6 min each)"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Wed",
+     "sessions": [
+      {
+       "id": "6-2",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Thu",
+     "sessions": [
+      {
+       "id": "6-3",
+       "type": "sub",
+       "title": "Sub-threshold",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 4,
+        "length_m": 1700,
+        "rest_s": 75
+       },
+       "zone": "subthreshold",
+       "pace_s_per_km": 289,
+       "km": 9.3,
+       "hard": true,
+       "notes": "4 × 1.7 km (about 8 min each)"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Fri",
+     "sessions": [
+      {
+       "id": "6-4",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sat",
+     "sessions": [
+      {
+       "id": "6-5",
+       "type": "hills",
+       "title": "Hill reps",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 16,
+        "length_m": 200,
+        "rest_s": 75
+       },
+       "zone": "interval",
+       "pace_s_per_km": 255,
+       "km": 5.7,
+       "hard": true,
+       "notes": "16 × 200 m uphill"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sun",
+     "sessions": [
+      {
+       "id": "6-6",
+       "type": "long",
+       "title": "Long run",
+       "distance_m": 10000,
+       "duration_s": null,
+       "reps": null,
+       "zone": "easy",
+       "pace_s_per_km": 350,
+       "km": 10,
+       "hard": false,
+       "notes": "10 km"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "week": 8,
+   "start": null,
+   "phase": "peak",
+   "test": false,
+   "focus": "Peak: race-specific. threshold kept sharp, hill strength held.",
+   "target_km": 36,
+   "days": [
+    {
+     "date": null,
+     "day": "Mon",
+     "sessions": [
+      {
+       "id": "7-0",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Tue",
+     "sessions": [
+      {
+       "id": "7-1",
+       "type": "sub",
+       "title": "Sub-threshold",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 10,
+        "length_m": 600,
+        "rest_s": 60
+       },
+       "zone": "subthreshold",
+       "pace_s_per_km": 280,
+       "km": 8.5,
+       "hard": true,
+       "notes": "10 × 600 m (about 3 min each)"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Wed",
+     "sessions": [
+      {
+       "id": "7-2",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Thu",
+     "sessions": [
+      {
+       "id": "7-3",
+       "type": "sub",
+       "title": "Sub-threshold",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 3,
+        "length_m": 2100,
+        "rest_s": 75
+       },
+       "zone": "subthreshold",
+       "pace_s_per_km": 289,
+       "km": 8.8,
+       "hard": true,
+       "notes": "3 × 2.1 km (about 10 min each)"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Fri",
+     "sessions": [
+      {
+       "id": "7-4",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sat",
+     "sessions": [
+      {
+       "id": "7-5",
+       "type": "hills",
+       "title": "Hill reps",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 12,
+        "length_m": 200,
+        "rest_s": 75
+       },
+       "zone": "interval",
+       "pace_s_per_km": 255,
+       "km": 4.9,
+       "hard": true,
+       "notes": "12 × 200 m uphill"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sun",
+     "sessions": [
+      {
+       "id": "7-6",
+       "type": "long",
+       "title": "Long run",
+       "distance_m": 10000,
+       "duration_s": null,
+       "reps": null,
+       "zone": "easy",
+       "pace_s_per_km": 350,
+       "km": 10,
+       "hard": false,
+       "notes": "10 km"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "week": 9,
+   "start": null,
+   "phase": "peak",
+   "test": false,
+   "focus": "Peak: race-specific. threshold kept sharp, hill strength held.",
+   "target_km": 36,
+   "days": [
+    {
+     "date": null,
+     "day": "Mon",
+     "sessions": [
+      {
+       "id": "8-0",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Tue",
+     "sessions": [
+      {
+       "id": "8-1",
+       "type": "sub",
+       "title": "Sub-threshold",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 10,
+        "length_m": 600,
+        "rest_s": 60
+       },
+       "zone": "subthreshold",
+       "pace_s_per_km": 280,
+       "km": 8.5,
+       "hard": true,
+       "notes": "10 × 600 m (about 3 min each)"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Wed",
+     "sessions": [
+      {
+       "id": "8-2",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Thu",
+     "sessions": [
+      {
+       "id": "8-3",
+       "type": "sub",
+       "title": "Sub-threshold",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 4,
+        "length_m": 2100,
+        "rest_s": 75
+       },
+       "zone": "subthreshold",
+       "pace_s_per_km": 289,
+       "km": 10.9,
+       "hard": true,
+       "notes": "4 × 2.1 km (about 10 min each)"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Fri",
+     "sessions": [
+      {
+       "id": "8-4",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sat",
+     "sessions": [
+      {
+       "id": "8-5",
+       "type": "hills",
+       "title": "Hill reps",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 12,
+        "length_m": 200,
+        "rest_s": 75
+       },
+       "zone": "interval",
+       "pace_s_per_km": 255,
+       "km": 4.9,
+       "hard": true,
+       "notes": "12 × 200 m uphill"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sun",
+     "sessions": [
+      {
+       "id": "8-6",
+       "type": "long",
+       "title": "Long run",
+       "distance_m": 10000,
+       "duration_s": null,
+       "reps": null,
+       "zone": "easy",
+       "pace_s_per_km": 350,
+       "km": 10,
+       "hard": false,
+       "notes": "10 km"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "week": 10,
+   "start": null,
+   "phase": "taper",
+   "test": false,
+   "focus": "Race week: fresh legs, a touch of speed, then race.",
+   "target_km": 21.6,
+   "days": [
+    {
+     "date": null,
+     "day": "Mon",
+     "sessions": [
+      {
+       "id": "9-0",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Tue",
+     "sessions": [
+      {
+       "id": "9-1",
+       "type": "sharpener",
+       "title": "Sharpener",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": {
+        "count": 4,
+        "length_m": 400,
+        "rest_s": 90
+       },
+       "zone": "race",
+       "pace_s_per_km": 271,
+       "km": 4.1,
+       "hard": true,
+       "notes": "4 × 400 m"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Wed",
+     "sessions": [
+      {
+       "id": "9-2",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Thu",
+     "sessions": [
+      {
+       "id": "9-3",
+       "type": "strides",
+       "title": "Easy + strides",
+       "distance_m": 5000,
+       "duration_s": null,
+       "reps": null,
+       "zone": "easy",
+       "pace_s_per_km": 346,
+       "km": 5,
+       "hard": false,
+       "notes": "5 km + 6 strides"
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Fri",
+     "sessions": [
+      {
+       "id": "9-4",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest day. Recovery is when the training lands: the work you did adapts into fitness while you rest."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sat",
+     "sessions": [
+      {
+       "id": "9-5",
+       "type": "rest",
+       "title": "Rest",
+       "distance_m": null,
+       "duration_s": null,
+       "reps": null,
+       "zone": null,
+       "pace_s_per_km": null,
+       "km": 0,
+       "hard": false,
+       "notes": "Rest, or 15 minutes very easy with 4 strides. Lay out your kit, and eat a carbohydrate-rich dinner."
+      }
+     ]
+    },
+    {
+     "date": null,
+     "day": "Sun",
+     "sessions": [
+      {
+       "id": "9-6",
+       "type": "race",
+       "title": "Race day",
+       "distance_m": 10000,
+       "duration_s": null,
+       "reps": null,
+       "zone": "race",
+       "pace_s_per_km": 271,
+       "km": 10,
+       "hard": true,
+       "notes": "10K"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "changes": []
+}

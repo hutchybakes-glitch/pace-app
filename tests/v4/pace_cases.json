@@ -1,0 +1,943 @@
+{
+ "vdot": [
+  {
+   "d": 5000,
+   "s": 1200,
+   "vdot": 49.806233428066335
+  },
+  {
+   "d": 5000,
+   "s": 1500,
+   "vdot": 38.30936290766015
+  },
+  {
+   "d": 10000,
+   "s": 2490,
+   "vdot": 49.756073061334526
+  },
+  {
+   "d": 10000,
+   "s": 3000,
+   "vdot": 40.01205049340948
+  },
+  {
+   "d": 21097.5,
+   "s": 5400,
+   "vdot": 50.97690626805135
+  },
+  {
+   "d": 42195,
+   "s": 12600,
+   "vdot": 44.55353056213261
+  },
+  {
+   "d": 1609.344,
+   "s": 330,
+   "vdot": 53.372537823603984
+  },
+  {
+   "d": 3000,
+   "s": 660,
+   "vdot": 52.82784072181966
+  }
+ ],
+ "raceTime": [
+  {
+   "v": 30,
+   "d": 1500,
+   "s": 509.5467165443365
+  },
+  {
+   "v": 30,
+   "d": 5000,
+   "s": 1840.877537363339
+  },
+  {
+   "v": 30,
+   "d": 10000,
+   "s": 3828.853225878819
+  },
+  {
+   "v": 30,
+   "d": 21097.5,
+   "s": 8477.21807492977
+  },
+  {
+   "v": 30,
+   "d": 42195,
+   "s": 17388.8617629539
+  },
+  {
+   "v": 35,
+   "d": 1500,
+   "s": 444.8778363473882
+  },
+  {
+   "v": 35,
+   "d": 5000,
+   "s": 1618.570567547495
+  },
+  {
+   "v": 35,
+   "d": 10000,
+   "s": 3361.870365446778
+  },
+  {
+   "v": 35,
+   "d": 21097.5,
+   "s": 7452.9469872125865
+  },
+  {
+   "v": 35,
+   "d": 42195,
+   "s": 15366.258157387852
+  },
+  {
+   "v": 40,
+   "d": 1500,
+   "s": 395.0792730663495
+  },
+  {
+   "v": 40,
+   "d": 5000,
+   "s": 1446.2189413106234
+  },
+  {
+   "v": 40,
+   "d": 10000,
+   "s": 3000.7710868713775
+  },
+  {
+   "v": 40,
+   "d": 21097.5,
+   "s": 6653.909186661849
+  },
+  {
+   "v": 40,
+   "d": 42195,
+   "s": 13777.421299376485
+  },
+  {
+   "v": 45,
+   "d": 1500,
+   "s": 355.65090769215226
+  },
+  {
+   "v": 45,
+   "d": 5000,
+   "s": 1308.572888163767
+  },
+  {
+   "v": 45,
+   "d": 10000,
+   "s": 2713.490975614626
+  },
+  {
+   "v": 45,
+   "d": 21097.5,
+   "s": 6014.212947618264
+  },
+  {
+   "v": 45,
+   "d": 42195,
+   "s": 12495.704417681722
+  },
+  {
+   "v": 50,
+   "d": 1500,
+   "s": 323.7175543616594
+  },
+  {
+   "v": 50,
+   "d": 5000,
+   "s": 1196.0208243278526
+  },
+  {
+   "v": 50,
+   "d": 10000,
+   "s": 2479.6036493371785
+  },
+  {
+   "v": 50,
+   "d": 21097.5,
+   "s": 5491.197069311498
+  },
+  {
+   "v": 50,
+   "d": 42195,
+   "s": 11439.741755151474
+  },
+  {
+   "v": 55,
+   "d": 1500,
+   "s": 297.361571162937
+  },
+  {
+   "v": 55,
+   "d": 5000,
+   "s": 1102.212401746764
+  },
+  {
+   "v": 55,
+   "d": 10000,
+   "s": 2285.5168399936165
+  },
+  {
+   "v": 55,
+   "d": 21097.5,
+   "s": 5056.040816989038
+  },
+  {
+   "v": 55,
+   "d": 42195,
+   "s": 10554.763150215771
+  },
+  {
+   "v": 60,
+   "d": 1500,
+   "s": 275.25858421560486
+  },
+  {
+   "v": 60,
+   "d": 5000,
+   "s": 1022.7851224265264
+  },
+  {
+   "v": 60,
+   "d": 10000,
+   "s": 2121.854975856172
+  },
+  {
+   "v": 60,
+   "d": 21097.5,
+   "s": 4688.594740425826
+  },
+  {
+   "v": 60,
+   "d": 42195,
+   "s": 9802.480501888374
+  },
+  {
+   "v": 70,
+   "d": 1500,
+   "s": 240.30017776170922
+  },
+  {
+   "v": 70,
+   "d": 5000,
+   "s": 895.5236855676444
+  },
+  {
+   "v": 70,
+   "d": 10000,
+   "s": 1860.9502494800035
+  },
+  {
+   "v": 70,
+   "d": 21097.5,
+   "s": 4102.678137969124
+  },
+  {
+   "v": 70,
+   "d": 42195,
+   "s": 8592.72822465326
+  }
+ ],
+ "riegel": [
+  {
+   "d": 5000,
+   "s": 1200,
+   "to": 10000,
+   "t": 2501.9178260186914
+  },
+  {
+   "d": 5000,
+   "s": 1500,
+   "to": 10000,
+   "t": 3127.397282523364
+  },
+  {
+   "d": 10000,
+   "s": 2490,
+   "to": 10000,
+   "t": 2490
+  },
+  {
+   "d": 10000,
+   "s": 3000,
+   "to": 10000,
+   "t": 3000
+  },
+  {
+   "d": 21097.5,
+   "s": 5400,
+   "to": 10000,
+   "t": 2447.422253138294
+  },
+  {
+   "d": 42195,
+   "s": 12600,
+   "to": 10000,
+   "t": 2739.0117443193867
+  },
+  {
+   "d": 1609.344,
+   "s": 330,
+   "to": 10000,
+   "t": 2288.0532182018205
+  },
+  {
+   "d": 3000,
+   "s": 660,
+   "to": 10000,
+   "t": 2364.8053843059306
+  }
+ ],
+ "zones": [
+  {
+   "v": 35,
+   "raceDist": 10000,
+   "zones": {
+    "recovery": {
+     "id": "recovery",
+     "name": "Recovery",
+     "target": 459.0279897323995,
+     "fast": 447.6021699927474,
+     "slow": 483.8540129513819,
+     "feel": "very easy, barely running"
+    },
+    "easy": {
+     "id": "easy",
+     "name": "Easy",
+     "target": 421.5219259893453,
+     "fast": 398.49077085986886,
+     "slow": 447.6021699927474,
+     "feel": "conversational"
+    },
+    "steady": {
+     "id": "steady",
+     "name": "Steady",
+     "target": 374.1720736223843,
+     "fast": 359.6540640198636,
+     "slow": 390.01456246767714,
+     "feel": "marathon effort, relaxed but working"
+    },
+    "subthreshold": {
+     "id": "subthreshold",
+     "name": "Sub-threshold",
+     "target": 347.9107345159831,
+     "fast": 343.1275187279283,
+     "slow": 356.2121552276119,
+     "feel": "comfortably hard, never straining"
+    },
+    "threshold": {
+     "id": "threshold",
+     "name": "Threshold",
+     "target": 340.01699002333976,
+     "fast": 333.97562078651316,
+     "slow": 343.1275187279283,
+     "feel": "the pace you could hold for about an hour"
+    },
+    "interval": {
+     "id": "interval",
+     "name": "Interval",
+     "target": 311.9691203038125,
+     "fast": 306.9500603366183,
+     "slow": 319.8429220190303,
+     "feel": "hard, about 3K–5K effort"
+    },
+    "repetition": {
+     "id": "repetition",
+     "name": "Repetition",
+     "target": 290.68861238071474,
+     "fast": 284.2804901706926,
+     "slow": 297.4218991398269,
+     "feel": "fast and relaxed, about mile effort"
+    },
+    "race": {
+     "id": "race",
+     "name": "Race pace",
+     "target": 336.1870365446778,
+     "fast": 331.14423099650764,
+     "slow": 341.22984209284795,
+     "feel": "goal race effort"
+    }
+   }
+  },
+  {
+   "v": 45.6,
+   "raceDist": 10000,
+   "zones": {
+    "recovery": {
+     "id": "recovery",
+     "name": "Recovery",
+     "target": 373.5239477774378,
+     "fast": 363.9619987147404,
+     "slow": 394.3733172454155,
+     "feel": "very easy, barely running"
+    },
+    "easy": {
+     "id": "easy",
+     "name": "Easy",
+     "target": 342.21467098784626,
+     "fast": 323.09939474185,
+     "slow": 363.9619987147404,
+     "feel": "conversational"
+    },
+    "steady": {
+     "id": "steady",
+     "name": "Steady",
+     "target": 303.0049623588848,
+     "fast": 291.05183813754434,
+     "slow": 316.08519655707744,
+     "feel": "marathon effort, relaxed but working"
+    },
+    "subthreshold": {
+     "id": "subthreshold",
+     "name": "Sub-threshold",
+     "target": 281.40635824760824,
+     "fast": 277.4834980465737,
+     "slow": 288.2226651593885,
+     "feel": "comfortably hard, never straining"
+    },
+    "threshold": {
+     "id": "threshold",
+     "name": "Threshold",
+     "target": 274.93427014256326,
+     "fast": 269.98713304069577,
+     "slow": 277.4834980465737,
+     "feel": "the pace you could hold for about an hour"
+    },
+    "interval": {
+     "id": "interval",
+     "name": "Interval",
+     "target": 252.0112041915474,
+     "fast": 247.92107599581482,
+     "slow": 258.4349062337203,
+     "feel": "hard, about 3K–5K effort"
+    },
+    "repetition": {
+     "id": "repetition",
+     "name": "Repetition",
+     "target": 234.69344649418645,
+     "fast": 229.4908281354525,
+     "slow": 240.16609846690622,
+     "feel": "fast and relaxed, about mile effort"
+    },
+    "race": {
+     "id": "race",
+     "name": "Race pace",
+     "target": 268.2923439395648,
+     "fast": 264.2679587804713,
+     "slow": 272.31672909865824,
+     "feel": "goal race effort"
+    }
+   }
+  },
+  {
+   "v": 50,
+   "raceDist": 10000,
+   "zones": {
+    "recovery": {
+     "id": "recovery",
+     "name": "Recovery",
+     "target": 347.2185917426039,
+     "fast": 338.2668144417501,
+     "slow": 366.7581647090538,
+     "feel": "very easy, barely running"
+    },
+    "easy": {
+     "id": "easy",
+     "name": "Easy",
+     "target": 317.9291559327535,
+     "fast": 300.07774986154703,
+     "slow": 338.2668144417501,
+     "feel": "conversational"
+    },
+    "steady": {
+     "id": "steady",
+     "name": "Steady",
+     "target": 281.33648568028167,
+     "fast": 270.2000052528825,
+     "slow": 293.53305723793676,
+     "feel": "marathon effort, relaxed but working"
+    },
+    "subthreshold": {
+     "id": "subthreshold",
+     "name": "Sub-threshold",
+     "target": 261.2197659665298,
+     "fast": 257.5690404991462,
+     "slow": 267.5653829121714,
+     "feel": "comfortably hard, never straining"
+    },
+    "threshold": {
+     "id": "threshold",
+     "name": "Threshold",
+     "target": 255.19714141950425,
+     "fast": 250.59521912220183,
+     "slow": 257.5690404991462,
+     "feel": "the pace you could hold for about an hour"
+    },
+    "interval": {
+     "id": "interval",
+     "name": "Interval",
+     "target": 233.88550809437837,
+     "fast": 230.08603322489705,
+     "slow": 239.85461728300243,
+     "feel": "hard, about 3K–5K effort"
+    },
+    "repetition": {
+     "id": "repetition",
+     "name": "Repetition",
+     "target": 217.80467120940594,
+     "fast": 212.9768099302033,
+     "slow": 222.88467298302226,
+     "feel": "fast and relaxed, about mile effort"
+    },
+    "race": {
+     "id": "race",
+     "name": "Race pace",
+     "target": 247.96036493371784,
+     "fast": 244.24095945971206,
+     "slow": 251.6797704077236,
+     "feel": "goal race effort"
+    }
+   }
+  },
+  {
+   "v": 60,
+   "raceDist": 10000,
+   "zones": {
+    "recovery": {
+     "id": "recovery",
+     "name": "Recovery",
+     "target": 300.07774986154703,
+     "fast": 292.26136670509777,
+     "slow": 317.17060856035016,
+     "feel": "very easy, barely running"
+    },
+    "easy": {
+     "id": "easy",
+     "name": "Easy",
+     "target": 274.53645758872227,
+     "fast": 259.0157330507604,
+     "slow": 292.26136670509777,
+     "feel": "conversational"
+    },
+    "steady": {
+     "id": "steady",
+     "name": "Steady",
+     "target": 242.75792157299628,
+     "fast": 233.11446045478064,
+     "slow": 253.33408840640266,
+     "feel": "marathon effort, relaxed but working"
+    },
+    "subthreshold": {
+     "id": "subthreshold",
+     "name": "Sub-threshold",
+     "target": 225.3473223165725,
+     "fast": 222.19205535513606,
+     "slow": 230.83489821545194,
+     "feel": "comfortably hard, never straining"
+    },
+    "threshold": {
+     "id": "threshold",
+     "name": "Threshold",
+     "target": 220.1427622828372,
+     "fast": 216.1683217567707,
+     "slow": 222.19205535513606,
+     "feel": "the pace you could hold for about an hour"
+    },
+    "interval": {
+     "id": "interval",
+     "name": "Interval",
+     "target": 201.75402326805894,
+     "fast": 198.4801100451626,
+     "slow": 206.90013988696322,
+     "feel": "hard, about 3K–5K effort"
+    },
+    "repetition": {
+     "id": "repetition",
+     "name": "Repetition",
+     "target": 187.90641313620327,
+     "fast": 183.75344014628084,
+     "slow": 192.27844919088983,
+     "feel": "fast and relaxed, about mile effort"
+    },
+    "race": {
+     "id": "race",
+     "name": "Race pace",
+     "target": 212.1854975856172,
+     "fast": 209.00271512183295,
+     "slow": 215.36828004940145,
+     "feel": "goal race effort"
+    }
+   }
+  }
+ ],
+ "zonesGoal": [
+  {
+   "v": 46,
+   "raceDist": 10000,
+   "raceTarget": 2700,
+   "zones": {
+    "recovery": {
+     "id": "recovery",
+     "name": "Recovery",
+     "target": 370.95545361883546,
+     "fast": 361.4523319054757,
+     "slow": 391.6787059011203,
+     "feel": "very easy, barely running"
+    },
+    "easy": {
+     "id": "easy",
+     "name": "Easy",
+     "target": 339.841089324874,
+     "fast": 320.84802743455054,
+     "slow": 361.4523319054757,
+     "feel": "conversational"
+    },
+    "steady": {
+     "id": "steady",
+     "name": "Steady",
+     "target": 300.88465099122925,
+     "fast": 289.0107201471978,
+     "slow": 313.8792775680541,
+     "feel": "marathon effort, relaxed but working"
+    },
+    "subthreshold": {
+     "id": "subthreshold",
+     "name": "Sub-threshold",
+     "target": 279.42980606594585,
+     "fast": 275.5333722076489,
+     "slow": 286.20042450417554,
+     "feel": "comfortably hard, never straining"
+    },
+    "threshold": {
+     "id": "threshold",
+     "name": "Threshold",
+     "target": 273.00136859495865,
+     "fast": 268.0877725927815,
+     "slow": 275.5333722076489,
+     "feel": "the pace you could hold for about an hour"
+    },
+    "interval": {
+     "id": "interval",
+     "name": "Interval",
+     "target": 250.23497804559972,
+     "fast": 246.1731383701895,
+     "slow": 256.61445341855284,
+     "feel": "hard, about 3K–5K effort"
+    },
+    "repetition": {
+     "id": "repetition",
+     "name": "Repetition",
+     "target": 233.03766682225552,
+     "fast": 227.87157161980878,
+     "slow": 238.47206707323087,
+     "feel": "fast and relaxed, about mile effort"
+    },
+    "race": {
+     "id": "race",
+     "name": "Race pace",
+     "target": 270,
+     "fast": 265.95,
+     "slow": 274.04999999999995,
+     "feel": "goal race effort"
+    }
+   }
+  }
+ ],
+ "units": {
+  "perKmToPerMile": [
+   [
+    300,
+    482.8032
+   ]
+  ],
+  "perMileToPerKm": [
+   [
+    480,
+    298.2581722739203
+   ]
+  ],
+  "kmToMiles": [
+   [
+    10,
+    6.2137119223733395
+   ]
+  ],
+  "milesToKm": [
+   [
+    26.2,
+    42.1648128
+   ]
+  ],
+  "paceToKmh": [
+   [
+    300,
+    12
+   ]
+  ],
+  "kmhToPace": [
+   [
+    12,
+    300
+   ]
+  ],
+  "paceToMph": [
+   [
+    300,
+    7.456454306848007
+   ]
+  ],
+  "mphToPace": [
+   [
+    7.5,
+    298.2581722739203
+   ]
+  ]
+ },
+ "parseDuration": [
+  [
+   "41:30",
+   2490
+  ],
+  [
+   "1:31:35",
+   5495
+  ],
+  [
+   "5:03.5",
+   303.5
+  ],
+  [
+   "0:59",
+   59
+  ],
+  [
+   "61:00",
+   3660
+  ],
+  [
+   "1:60:00",
+   null
+  ],
+  [
+   "abc",
+   null
+  ],
+  [
+   "",
+   null
+  ],
+  [
+   ":30",
+   null
+  ],
+  [
+   "12",
+   null
+  ]
+ ],
+ "formatDuration": [
+  [
+   59.6,
+   "1:00"
+  ],
+  [
+   61,
+   "1:01"
+  ],
+  [
+   2490,
+   "41:30"
+  ],
+  [
+   5495,
+   "1:31:35"
+  ],
+  [
+   36000,
+   "10:00:00"
+  ]
+ ],
+ "parsePace": [
+  [
+   "4:40/km",
+   "km",
+   280
+  ],
+  [
+   "7:30/mi",
+   "km",
+   279.6170365068003
+  ],
+  [
+   "7:30 per mile",
+   "km",
+   279.6170365068003
+  ],
+  [
+   "5:00",
+   "mi",
+   186.4113576712002
+  ],
+  [
+   "5:00",
+   "km",
+   300
+  ],
+  [
+   "4:75",
+   "km",
+   null
+  ],
+  [
+   "fast",
+   "km",
+   null
+  ]
+ ],
+ "formatPace": [
+  [
+   280,
+   "km",
+   "4:40/km"
+  ],
+  [
+   280,
+   "mi",
+   "7:31/mi"
+  ],
+  [
+   299.6,
+   "km",
+   "5:00/km"
+  ]
+ ],
+ "parseDistance": [
+  [
+   "10k",
+   10000
+  ],
+  [
+   "5 km",
+   5000
+  ],
+  [
+   "6.2 mi",
+   9977.9328
+  ],
+  [
+   "400m",
+   400
+  ],
+  [
+   "half",
+   21097.5
+  ],
+  [
+   "marathon",
+   42195
+  ],
+  [
+   "mile",
+   1609.344
+  ],
+  [
+   "3 miles",
+   4828.032
+  ],
+  [
+   "ten",
+   null
+  ]
+ ],
+ "stepPace": [
+  {
+   "pace": 320,
+   "dir": 1,
+   "zone": "easy",
+   "onlySlower": false,
+   "zoneFast": 300.07774986154703,
+   "zoneSlow": 338.2668144417501,
+   "out": {
+    "pace": 327.456454306848,
+    "changed": true,
+    "limit": null,
+    "by": 7.456454306848002
+   }
+  },
+  {
+   "pace": 320,
+   "dir": -1,
+   "zone": "easy",
+   "onlySlower": true,
+   "zoneFast": 300.07774986154703,
+   "zoneSlow": 338.2668144417501,
+   "out": {
+    "pace": 320,
+    "changed": false,
+    "limit": "easy",
+    "by": 0
+   }
+  },
+  {
+   "pace": 300,
+   "dir": -1,
+   "zone": "easy",
+   "onlySlower": false,
+   "zoneFast": 300.07774986154703,
+   "zoneSlow": 338.2668144417501,
+   "out": {
+    "pace": 300,
+    "changed": false,
+    "limit": "fast",
+    "by": 0
+   }
+  },
+  {
+   "pace": 262,
+   "dir": -1,
+   "zone": "subthreshold",
+   "onlySlower": false,
+   "zoneFast": 257.5690404991462,
+   "zoneSlow": 267.5653829121714,
+   "out": {
+    "pace": 257.5690404991462,
+    "changed": true,
+    "limit": "fast",
+    "by": -4.430959500853817
+   }
+  },
+  {
+   "pace": 262,
+   "dir": 1,
+   "zone": "subthreshold",
+   "onlySlower": false,
+   "zoneFast": 257.5690404991462,
+   "zoneSlow": 267.5653829121714,
+   "out": {
+    "pace": 267.5653829121714,
+    "changed": true,
+    "limit": "slow",
+    "by": 5.565382912171401
+   }
+  },
+  {
+   "pace": 268,
+   "dir": 1,
+   "zone": "subthreshold",
+   "onlySlower": false,
+   "zoneFast": 257.5690404991462,
+   "zoneSlow": 267.5653829121714,
+   "out": {
+    "pace": 268,
+    "changed": false,
+    "limit": "slow",
+    "by": 0
+   }
+  }
+ ]
+}

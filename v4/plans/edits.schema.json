@@ -1,0 +1,62 @@
+{
+ "type": "object",
+ "required": [
+  "edits",
+  "say"
+ ],
+ "additionalProperties": false,
+ "properties": {
+  "edits": {
+   "type": "array",
+   "maxItems": 4,
+   "items": {
+    "type": "object",
+    "required": [
+     "op"
+    ],
+    "properties": {
+     "op": {
+      "enum": [
+       "swap_session",
+       "move_session",
+       "reduce_volume_pct",
+       "shift_pace_zone"
+      ]
+     },
+     "session_id": {
+      "type": "string"
+     },
+     "new_type": {
+      "enum": [
+       "rest",
+       "recovery",
+       "easy",
+       "strides",
+       "long",
+       "sub",
+       "hills"
+      ]
+     },
+     "to_date": {
+      "type": "string"
+     },
+     "week": {
+      "type": "integer"
+     },
+     "pct": {
+      "type": "number"
+     },
+     "direction": {
+      "enum": [
+       "easier",
+       "harder"
+      ]
+     }
+    }
+   }
+  },
+  "say": {
+   "type": "string"
+  }
+ }
+}

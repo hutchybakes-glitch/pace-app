@@ -1,0 +1,49 @@
+{
+ "about": "30 feedback scenarios with expected outcomes. 'intent' cases: what the runner says mid-run and the intent the coach should pick. 'plan' cases: post-run feedback and what the plan edits should do, checked against the plan window below (ids are week-day; HARD marks hard days). Used by coach/eval.py (the model) and tests/v4/intents.test.js (the phone's keyword fallback).",
+ "window": [
+  {"id": "2-6", "date": "2026-10-25", "day": "Sun", "week": 3, "type": "long", "km": 12, "zone": "easy", "hard": false},
+  {"id": "3-0", "date": "2026-10-26", "day": "Mon", "week": 4, "type": "rest", "km": 0, "zone": null, "hard": false},
+  {"id": "3-1", "date": "2026-10-27", "day": "Tue", "week": 4, "type": "sub", "km": 9, "zone": "subthreshold", "hard": true},
+  {"id": "3-2", "date": "2026-10-28", "day": "Wed", "week": 4, "type": "rest", "km": 0, "zone": null, "hard": false},
+  {"id": "3-3", "date": "2026-10-29", "day": "Thu", "week": 4, "type": "sub", "km": 9.5, "zone": "subthreshold", "hard": true},
+  {"id": "3-4", "date": "2026-10-30", "day": "Fri", "week": 4, "type": "rest", "km": 0, "zone": null, "hard": false},
+  {"id": "3-5", "date": "2026-10-31", "day": "Sat", "week": 4, "type": "hills", "km": 5, "zone": "interval", "hard": true},
+  {"id": "3-6", "date": "2026-11-01", "day": "Sun", "week": 4, "type": "long", "km": 13, "zone": "easy", "hard": false},
+  {"id": "4-0", "date": "2026-11-02", "day": "Mon", "week": 5, "type": "rest", "km": 0, "zone": null, "hard": false},
+  {"id": "4-1", "date": "2026-11-03", "day": "Tue", "week": 5, "type": "sub", "km": 9, "zone": "subthreshold", "hard": true}
+ ],
+ "intent": [
+  {"text": "I'm really struggling", "expect": "slower"},
+  {"text": "this feels too easy, give me a faster target", "expect": "faster"},
+  {"text": "how am I doing?", "expect": "status"},
+  {"text": "can you slow it down a bit", "expect": "slower"},
+  {"text": "I feel great, push me", "expect": "faster"},
+  {"text": "my left calf is killing me", "expect": "pain"},
+  {"text": "keep this pace, it's perfect", "expect": "hold"},
+  {"text": "what's my pace", "expect": "status"},
+  {"text": "I'm blowing up here", "expect": "slower"},
+  {"text": "got a stitch", "expect": "pain"},
+  {"text": "let's pick it up", "expect": "faster"},
+  {"text": "how far is left", "expect": "status"},
+  {"text": "I'm absolutely knackered", "expect": "slower"},
+  {"text": "this is fine, stay like this", "expect": "hold"},
+  {"text": "is that a dog over there", "expect": "none"},
+  {"text": "it's not easy at all, I'm hanging on", "expect": "slower"}
+ ],
+ "plan": [
+  {"name": "normal sub-threshold session", "feedback": {"session": "sub", "rpe": 6, "how": "plan", "legs": "ok", "energy": "ok", "pain": false}, "expect": "none"},
+  {"name": "too hard, heavy legs, poor sleep", "feedback": {"session": "sub", "rpe": 9, "how": "hard", "legs": "heavy", "energy": "low", "pain": false, "note": "legs felt dead, slept badly all week"}, "expect": "ease_next_hard"},
+  {"name": "knee pain", "feedback": {"session": "easy", "rpe": 5, "how": "plan", "legs": "sore", "energy": "ok", "pain": true, "where": "left knee", "note": "sharp pain on the downhills"}, "expect": "rest_soon"},
+  {"name": "sub-threshold too easy again", "feedback": {"session": "sub", "rpe": 4, "how": "easy", "legs": "fresh", "energy": "great", "pain": false, "note": "felt easy again, second time this week"}, "expect": "harder"},
+  {"name": "lovely long run", "feedback": {"session": "long", "rpe": 4, "how": "plan", "legs": "ok", "energy": "great", "pain": false, "note": "lovely run"}, "expect": "none"},
+  {"name": "a cold", "feedback": {"session": "easy", "rpe": 6, "how": "plan", "legs": "ok", "energy": "low", "pain": false, "note": "I've got a cold, sore throat and a blocked nose"}, "expect": "rest_soon"},
+  {"name": "busy week", "feedback": {"session": "long", "rpe": 5, "how": "plan", "legs": "ok", "energy": "ok", "pain": false, "note": "work is mad this week, I can only manage shorter runs"}, "expect": "cut_week"},
+  {"name": "can't run Tuesday", "feedback": {"session": "long", "rpe": 4, "how": "plan", "legs": "ok", "energy": "ok", "pain": false, "note": "I can't run on Tuesday, I'm travelling for work"}, "expect": "touch_3_1"},
+  {"name": "cut short, legs gone", "feedback": {"session": "sub", "rpe": 10, "how": "cut", "legs": "heavy", "energy": "low", "pain": false, "note": "had to stop after three reps, legs gone"}, "expect": "ease_next_hard"},
+  {"name": "fresh easy run", "feedback": {"session": "easy", "rpe": 3, "how": "plan", "legs": "fresh", "energy": "great", "pain": false}, "expect": "none"},
+  {"name": "tough but done", "feedback": {"session": "sub", "rpe": 7, "how": "plan", "legs": "ok", "energy": "ok", "pain": false, "note": "tough but I did it"}, "expect": "none"},
+  {"name": "hills felt easy", "feedback": {"session": "hills", "rpe": 5, "how": "easy", "legs": "fresh", "energy": "great", "pain": false, "note": "hills felt easy today"}, "expect": "not_easier"},
+  {"name": "bonked on the long run", "feedback": {"session": "long", "rpe": 8, "how": "hard", "legs": "heavy", "energy": "low", "pain": false, "note": "bonked at the end, really drained"}, "expect": "ease_next_hard"},
+  {"name": "tired and stale", "feedback": {"session": "sub", "rpe": 8, "how": "plan", "legs": "heavy", "energy": "low", "pain": false, "note": "feeling tired and stale lately, motivation is low"}, "expect": "ease"}
+ ]
+}

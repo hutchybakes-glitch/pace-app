@@ -1,0 +1,6 @@
+# Laptop coach: private settings (the pairing code), logs, downloads and Python's own folders
+coach/config.json
+coach/data/
+coach/bin/
+coach/.venv/
+__pycache__/
